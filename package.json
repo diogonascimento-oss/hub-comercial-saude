@@ -1,0 +1,16 @@
+{
+  "name": "hub-comercial-saude",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hub Comercial do Núcleo de Saúde: interface e Worker de repasse (Cloudflare) e API (pasta server, Render).",
+  "type": "module",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i estilos/entrada.css -o client/estilos.css --minify",
+    "deploy": "npm run build:css && wrangler deploy",
+    "test": "node --test worker/index.test.js && npm --prefix server test"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.19",
+    "wrangler": "^4"
+  }
+}

@@ -1,0 +1,24 @@
+# Definição do serviço da API no Render (plano gratuito).
+# Os valores marcados com "sync: false" são preenchidos no painel do Render e
+# não ficam no repositório.
+services:
+  - type: web
+    name: hub-comercial-saude-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: KOMMO_SUBDOMAIN
+        sync: false
+      - key: KOMMO_TOKEN
+        sync: false
+      - key: API_TOKEN
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Metodologia de cálculo — Hub Comercial, Núcleo de Saúde</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body class="bg-bg text-ink font-sans antialiased">
+<main class="max-w-3xl mx-auto px-5 md:px-8 py-10 text-sm leading-relaxed">
+
+  <p class="rotulo">Robson Menezes Advogados · Núcleo de Saúde</p>
+  <h1 class="font-serif text-2xl font-semibold mt-2">Metodologia de cálculo dos indicadores</h1>
+  <p class="text-inkdim mt-2">Hub Comercial. Este documento descreve a origem dos dados, as regras de contagem e as limitações de cada indicador exibido no painel.</p>
+  <p class="mt-3"><a href="/" class="underline decoration-dotted text-goldbright">Voltar ao painel</a></p>
+
+  <h2 class="titulo-secao mt-10 mb-3">1. Origem dos dados</h2>
+  <p>O painel consulta a API do Kommo a cada atualização e utiliza três fontes:</p>
+  <ul class="list-disc pl-5 mt-2 space-y-1 text-inkdim">
+    <li><span class="text-ink">Leads</span> dos três funis das campanhas (IR-Q, IR-W e REA-Q), com etapa atual, etiquetas, datas de criação e de última atualização e motivo de perda.</li>
+    <li><span class="text-ink">Contatos</span> vinculados aos leads, de onde vêm nome e telefone.</li>
+    <li><span class="text-ink">Eventos de mudança de etapa</span> ocorridos dentro do período selecionado.</li>
+  </ul>
+  <p class="mt-3">Nenhum dado é gravado pelo painel no Kommo. A consulta é somente de leitura.</p>
+
+  <h2 class="titulo-secao mt-10 mb-3">2. Regras gerais</h2>
+  <ul class="list-disc pl-5 space-y-2 text-inkdim">
+    <li><span class="text-ink">Período.</span> Do primeiro instante da data inicial ao último da data final, no fuso de Recife (UTC−3).</li>
+    <li><span class="text-ink">Campanha.</span> Cada lead pertence à campanha do funil em que se encontra no momento da consulta.</li>
+    <li><span class="text-ink">Duplicidade.</span> Dois leads com o mesmo telefone na mesma campanha são tratados como a mesma pessoa; permanece o de criação mais recente. A mesma pessoa pode constar em campanhas diferentes.</li>
+    <li><span class="text-ink">Leads fora da base.</span> Eventos de leads excluídos, mesclados ou descartados por duplicidade não entram nos indicadores. O painel informa a quantidade.</li>
+    <li><span class="text-ink">Taxa sem base de cálculo.</span> Quando o denominador é zero, a taxa é exibida como traço, e não como 0%.</li>
+    <li><span class="text-ink">Criação do lead.</span> O Kommo não gera evento de mudança de etapa quando o lead é criado. A etapa em que o lead nasceu é deduzida da origem do seu primeiro evento; sem eventos, é a etapa atual.</li>
+  </ul>
+
+  <h2 class="titulo-secao mt-10 mb-3">3. Indicadores de volume</h2>
+  <div class="border border-line overflow-x-auto">
+    <table class="w-full text-xs">
+      <thead class="bg-surface text-left"><tr class="rotulo"><th class="px-3 py-2 font-semibold">Indicador</th><th class="px-3 py-2 font-semibold">Regra</th></tr></thead>
+      <tbody class="divide-y divide-line text-inkdim">
+        <tr><td class="px-3 py-2 text-ink">Leads recebidos</td><td class="px-3 py-2">Leads criados dentro do período.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Leads contatados</td><td class="px-3 py-2">Leads que entraram em Contato Iniciado no período.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Com primeira resposta</td><td class="px-3 py-2">Leads que entraram em Em Qualificação no período.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Qualificados</td><td class="px-3 py-2">Leads que entraram em Lead Qualificado no período. Como a coluna é de passagem, também conta quem foi movido diretamente de uma etapa anterior à qualificação para Em Agendamento ou Agendado.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Qualificados sem agendamento</td><td class="px-3 py-2">Qualificados no período que não entraram em Agendado depois da qualificação, dentro do período.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Reuniões marcadas</td><td class="px-3 py-2">Entradas em Agendado no período. É uma contagem de agendamentos: o mesmo lead conta mais de uma vez se foi reagendado. São remarcações as entradas vindas de Remarcação e a segunda entrada em diante do mesmo lead.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Reuniões realizadas</td><td class="px-3 py-2">Saídas de Agendado para Protocolo Farmer, Reaquecimento ou Fechado, ocorridas no período. A saída para Desqualificado conta como realizada somente se o lead tiver a etiqueta REUNIAO_REALIZADA.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Não realizadas</td><td class="px-3 py-2">Saídas de Agendado para Remarcação, quando o agendamento também ocorreu no período. Reúne ausências e pedidos de remarcação; a separação depende da etiqueta NO_SHOW (seção 6).</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Reuniões em aberto</td><td class="px-3 py-2">Leads agendados no período que continuam na coluna Agendado no momento da consulta.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Remarcações recuperadas</td><td class="px-3 py-2">Movimentações de Remarcação para Agendado no período. "Recuperadas e realizadas" são as que, em seguida, tiveram a reunião realizada.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Contratos fechados</td><td class="px-3 py-2">Leads que entraram em Fechado no período.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Desqualificados</td><td class="px-3 py-2">Leads que entraram em Desqualificado / Não Fechado no período. O motivo vem do campo de motivo configurado ou, na falta dele, do motivo de perda nativo do Kommo.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="titulo-secao mt-10 mb-3">4. Taxas</h2>
+  <div class="border border-line overflow-x-auto">
+    <table class="w-full text-xs">
+      <thead class="bg-surface text-left"><tr class="rotulo"><th class="px-3 py-2 font-semibold">Taxa</th><th class="px-3 py-2 font-semibold">Cálculo</th></tr></thead>
+      <tbody class="divide-y divide-line text-inkdim">
+        <tr><td class="px-3 py-2 text-ink">Qualificação</td><td class="px-3 py-2">Qualificados ÷ Leads recebidos</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Qualificado para agendado</td><td class="px-3 py-2">Qualificados no período que agendaram ÷ Qualificados no período</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Comparecimento</td><td class="px-3 py-2">Reuniões realizadas cujo agendamento ocorreu no período ÷ Reuniões marcadas</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Remarcação recuperada</td><td class="px-3 py-2">Remarcações recuperadas ÷ Entradas em Remarcação</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Reunião para fechamento</td><td class="px-3 py-2">Contratos fechados ÷ Reuniões realizadas</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Conversão final</td><td class="px-3 py-2">Contratos fechados ÷ Leads recebidos</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-3 text-inkdim">As taxas de qualificação, de reunião para fechamento e de conversão final relacionam fatos ocorridos no mesmo período, e não o mesmo grupo de leads. Um contrato fechado neste mês pode vir de um lead recebido no mês anterior. Em períodos curtos essas taxas oscilam mais e podem superar 100%. Para avaliar uma campanha, recomenda-se um período de pelo menos um mês.</p>
+  <p class="mt-2 text-inkdim">As taxas de comparecimento e de não realização consideram apenas desfechos de reuniões marcadas dentro do período. Sem essa regra, a ausência de um lead agendado no mês anterior entraria na taxa deste mês sem ter entrado na base. Enquanto houver reuniões em aberto, essas duas taxas ainda podem mudar.</p>
+
+  <h2 class="titulo-secao mt-10 mb-3">5. Tempos de atendimento</h2>
+  <ul class="list-disc pl-5 space-y-1 text-inkdim">
+    <li><span class="text-ink">Da entrada à primeira mensagem:</span> da criação do lead até a mudança para Contato Iniciado, para leads criados no período.</li>
+    <li><span class="text-ink">Até a primeira resposta:</span> da entrada em Contato Iniciado até a entrada em Em Qualificação.</li>
+    <li><span class="text-ink">Da qualificação ao agendamento:</span> da qualificação até a primeira entrada em Agendado.</li>
+  </ul>
+  <p class="mt-3 text-inkdim">O painel exibe a mediana, menos sensível a casos extremos, e a média. A contagem é de tempo corrido, incluindo noites, fins de semana e feriados. Ela não equivale à medição dos SLAs do protocolo, que consideram apenas o expediente de segunda a sexta, das 8h30 às 18h.</p>
+
+  <h2 class="titulo-secao mt-10 mb-3">6. Indicadores baseados em etiquetas</h2>
+  <p>Parte das informações do protocolo não está na coluna em que o lead se encontra, e sim em etiquetas aplicadas pela automação:</p>
+  <ul class="list-disc pl-5 mt-2 space-y-1 text-inkdim">
+    <li><span class="text-ink font-mono text-xs">CONFIRMOU_REUNIAO</span>: reuniões confirmadas, entre os leads com reunião marcada no período.</li>
+    <li><span class="text-ink font-mono text-xs">NO_SHOW</span>: ausências, entre as reuniões não realizadas.</li>
+    <li><span class="text-ink font-mono text-xs">PROPOSTA_ENVIADA</span>: propostas enviadas, entre os leads que entraram no Protocolo Farmer no período.</li>
+    <li><span class="text-ink font-mono text-xs">TINTIN_QUALIFICADO_ENVIADO</span> e <span class="text-ink font-mono text-xs">TINTIN_FECHADO_ENVIADO</span>: eventos enviados ao TinTin/Meta.</li>
+  </ul>
+  <p class="mt-3 text-inkdim">Limitação: a etiqueta reflete a situação atual do lead, sem data. Um lead que faltou a uma reunião e compareceu à seguinte mantém a etiqueta NO_SHOW. Quando nenhum lead da base possui a etiqueta, o painel informa "etiqueta ainda não utilizada" em vez de exibir zero.</p>
+
+  <h2 class="titulo-secao mt-10 mb-3">7. Funil, conversão entre etapas e pendências</h2>
+  <ul class="list-disc pl-5 space-y-2 text-inkdim">
+    <li><span class="text-ink">Passagem por etapa no período.</span> Leads únicos que entraram em cada etapa. O mesmo lead conta em todas as etapas por que passou.</li>
+    <li><span class="text-ink">Volume atual por etapa.</span> Situação da base no momento da consulta; não depende do período. O número de dias é a média desde a última atualização do lead no Kommo, que inclui qualquer alteração no registro, e não apenas mudanças de etapa.</li>
+    <li><span class="text-ink">Etapas-chave.</span> Dos leads que entraram na etapa de origem no período, quantos entraram na de destino depois, mesmo passando por etapas intermediárias.</li>
+    <li><span class="text-ink">Transições e destinos.</span> Leads únicos que fizeram cada movimentação direta, em percentual sobre os leads que saíram da etapa de origem. Um lead que saiu da mesma etapa para dois destinos conta nos dois; por isso a soma pode superar 100%.</li>
+    <li><span class="text-ink">Leads ativos sem movimentação.</span> Leads sem atualização há mais de 7 dias, exceto os que estão em Fechado, Desqualificado ou Reaquecimento.</li>
+  </ul>
+
+  <h2 class="titulo-secao mt-10 mb-3">8. Correção de movimentações indevidas</h2>
+  <p class="text-inkdim">O Kommo não permite excluir nem editar eventos do histórico. Quando um lead é movido por engano, o painel permite excluir o evento do cálculo ou ajustar a etapa e o horário considerados. As marcações ficam armazenadas fora do Kommo, registram o usuário e a data, podem ser revertidas e são aplicadas antes de cada cálculo. A exportação do histórico completo mantém os eventos excluídos, sinalizados, para auditoria.</p>
+
+  <h2 class="titulo-secao mt-10 mb-3">9. Itens do protocolo ainda não contemplados</h2>
+  <ul class="list-disc pl-5 space-y-1 text-inkdim">
+    <li>Contratos assinados como indicador distinto de Fechado: depende de definição sobre qual registro do Kommo marca a assinatura.</li>
+    <li>Substatus do Protocolo Farmer: depende do campo utilizado para registrá-los.</li>
+    <li>Distinção entre ausência do cliente, cancelamento prévio e falha interna: depende de registro específico, além da etiqueta NO_SHOW.</li>
+    <li>Conversão por anúncio e criativo e custo por campanha.</li>
+    <li>Medição dos SLAs em horas úteis.</li>
+  </ul>
+
+</main>
+</body>
+</html>

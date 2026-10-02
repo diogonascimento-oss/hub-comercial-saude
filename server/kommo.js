@@ -1,0 +1,124 @@
+// Cliente da API v4 do Kommo. Somente leitura.
+
+import axios from "axios";
+
+const LIMITE_POR_PAGINA = 250;
+const MAXIMO_DE_PAGINAS = 2000;
+
+let cliente = null;
+
+function obterCliente() {
+  if (cliente) return cliente;
+  const baseURL =
+    process.env.KOMMO_BASE_URL ||
+    `https://${process.env.KOMMO_SUBDOMAIN}.kommo.com/api/v4`;
+  cliente = axios.create({
+    baseURL,
+    headers: { Authorization: `Bearer ${process.env.KOMMO_TOKEN}` },
+    timeout: 30000,
+  });
+  return cliente;
+}
+
+export function kommoConfigurado() {
+  return Boolean(process.env.KOMMO_TOKEN && (process.env.KOMMO_SUBDOMAIN || process.env.KOMMO_BASE_URL));
+}
+
+const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Uma requisição GET, com nova tentativa quando o Kommo sinaliza excesso de
+// chamadas (429) ou falha temporária (5xx).
+async function requisitar(caminho, params) {
+  const tentativas = 4;
+  for (let i = 1; ; i++) {
+    try {
+      return await obterCliente().get(caminho, { params });
+    } catch (erro) {
+      const status = erro.response?.status;
+      const temporario = status === 429 || (status >= 500 && status < 600) || !erro.response;
+      if (!temporario || i >= tentativas) throw erro;
+      await esperar(500 * 2 ** (i - 1));
+    }
+  }
+}
+
+// Percorre todas as páginas de uma listagem. O Kommo responde 204 (sem corpo)
+// quando não há registros e informa "_links.next" enquanto houver mais páginas.
+//
+// Uma falha no meio da paginação interrompe a consulta com erro. Devolver uma
+// lista parcial produziria indicadores errados sem nenhum aviso.
+async function listarTudo(caminho, chaveEmbutida, params = {}) {
+  const itens = [];
+  for (let pagina = 1; pagina <= MAXIMO_DE_PAGINAS; pagina++) {
+    const r = await requisitar(caminho, { ...params, limit: LIMITE_POR_PAGINA, page: pagina });
+    if (r.status === 204 || !r.data) break;
+    const lote = r.data?._embedded?.[chaveEmbutida] || [];
+    itens.push(...lote);
+    const haProxima = Boolean(r.data?._links?.next?.href);
+    if (!lote.length || !haProxima) break;
+  }
+  return itens;
+}
+
+export function listarFunis() {
+  return listarTudo("/leads/pipelines", "pipelines");
+}
+
+export function listarCamposDeLead() {
+  return listarTudo("/leads/custom_fields", "custom_fields");
+}
+
+// Leads dos funis informados, com o contato vinculado e o motivo de perda.
+export function listarLeadsDosFunis(idsDosFunis) {
+  const params = { with: "contacts,loss_reason" };
+  idsDosFunis.forEach((id, i) => {
+    params[`filter[pipeline_id][${i}]`] = id;
+  });
+  return listarTudo("/leads", "leads", params);
+}
+
+// Contatos por ID, em blocos, para não exceder o tamanho da URL.
+export async function listarContatosPorIds(ids) {
+  const contatosPorId = new Map();
+  const unicos = [...new Set(ids)].filter(Boolean);
+  const tamanhoDoBloco = 100;
+  for (let i = 0; i < unicos.length; i += tamanhoDoBloco) {
+    const bloco = unicos.slice(i, i + tamanhoDoBloco);
+    const params = {};
+    bloco.forEach((id, j) => {
+      params[`filter[id][${j}]`] = id;
+    });
+    const contatos = await listarTudo("/contacts", "contacts", params);
+    contatos.forEach((c) => contatosPorId.set(c.id, c));
+  }
+  return contatosPorId;
+}
+
+// Eventos de mudança de etapa em um intervalo (timestamps em segundos).
+export function listarMudancasDeEtapa(deTs, ateTs) {
+  return listarTudo("/events", "events", {
+    "filter[entity]": "leads",
+    "filter[type]": "lead_status_changed",
+    "filter[created_at][from]": deTs,
+    "filter[created_at][to]": ateTs,
+  });
+}
+
+// Todas as mudanças de etapa de um lead, sem limite de data.
+export function listarMudancasDeEtapaDoLead(leadId) {
+  return listarTudo("/events", "events", {
+    "filter[entity]": "leads",
+    "filter[type]": "lead_status_changed",
+    "filter[entity_id]": leadId,
+  });
+}
+
+export async function buscarLead(leadId) {
+  const r = await requisitar(`/leads/${leadId}`, { with: "contacts,loss_reason" });
+  return r.data;
+}
+
+export async function buscarContato(contatoId) {
+  const r = await requisitar(`/contacts/${contatoId}`);
+  return r.data;
+}

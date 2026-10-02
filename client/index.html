@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Hub Comercial — Núcleo de Saúde | Robson Menezes Advogados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body class="bg-bg text-ink font-sans antialiased min-h-screen">
+
+  <header class="border-b border-line bg-surface">
+    <div class="max-w-[1400px] mx-auto px-5 md:px-10 py-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div class="flex items-center gap-4">
+        <div class="w-11 h-11 border border-gold/60 text-goldbright flex items-center justify-center font-serif font-semibold text-lg">RM</div>
+        <div>
+          <h1 class="font-serif text-lg font-semibold text-ink leading-tight">Robson Menezes Advogados</h1>
+          <p class="rotulo mt-1">Núcleo de Saúde · Hub Comercial</p>
+        </div>
+      </div>
+      <p class="text-xs text-inkdim">
+        Última atualização: <span id="ultimaAtualizacao" class="text-ink tabular">—</span>
+        <span class="text-inkfaint mx-1.5">|</span> atualização automática a cada 5 minutos
+      </p>
+    </div>
+  </header>
+
+  <!-- Avisos -->
+  <div class="max-w-[1400px] mx-auto px-5 md:px-10 pt-5 space-y-2">
+    <p id="avisoServidor" class="hidden border border-gold/30 bg-gold/5 text-goldbright text-xs px-4 py-2.5" role="status">
+      O servidor está sendo iniciado. A primeira consulta após um período sem uso pode levar cerca de um minuto.
+    </p>
+    <p id="avisoErro" class="hidden border border-negativo/40 bg-negativo/10 text-ink text-xs px-4 py-2.5" role="alert"></p>
+    <div id="avisoMapeamento" class="hidden border border-gold/30 bg-gold/5 text-xs px-4 py-3">
+      <p class="text-goldbright font-semibold">Configuração do Kommo incompleta. Os indicadores abaixo podem estar parciais.</p>
+      <ul id="listaPendencias" class="mt-1.5 text-inkdim list-disc pl-5 space-y-0.5"></ul>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="max-w-[1400px] mx-auto px-5 md:px-10 pt-6 flex flex-col lg:flex-row justify-between lg:items-end gap-4">
+    <div>
+      <h2 class="font-serif text-xl font-semibold text-ink">Desempenho comercial por campanha</h2>
+      <p class="text-[13px] text-inkdim mt-1">Indicadores calculados a partir do histórico de movimentações dos leads no Kommo.</p>
+      <p class="text-xs text-inkdim mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        <a href="/documentacao" target="_blank" rel="noopener" class="underline decoration-dotted hover:text-goldbright">Metodologia de cálculo</a>
+        <button id="btnAbrirCorrecao" class="underline decoration-dotted hover:text-goldbright">Corrigir movimentação indevida</button>
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 bg-surface p-1.5 border border-line text-sm">
+      <label class="sr-only" for="dataInicio">Data inicial</label>
+      <input type="date" id="dataInicio" class="bg-surface2 border border-line px-3 py-1.5 text-ink text-xs">
+      <span class="rotulo">a</span>
+      <label class="sr-only" for="dataFim">Data final</label>
+      <input type="date" id="dataFim" class="bg-surface2 border border-line px-3 py-1.5 text-ink text-xs">
+      <button id="btnFiltrar" class="bg-gold hover:bg-goldbright text-bg font-bold px-5 py-1.5 text-xs uppercase tracking-wide">Aplicar</button>
+    </div>
+  </div>
+
+  <main class="max-w-[1400px] mx-auto px-5 md:px-10 mt-8 space-y-10 pb-16">
+
+    <!-- 1. Comparativo -->
+    <section aria-labelledby="tComparativo">
+      <div class="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
+        <h3 id="tComparativo" class="titulo-secao">1. Comparativo por campanha</h3>
+        <button id="btnExportarComparativo" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Exportar CSV</button>
+      </div>
+      <div class="border border-line overflow-x-auto">
+        <table class="comparativo w-full text-sm">
+          <thead id="cabecalhoComparativo" class="bg-surface"></thead>
+          <tbody id="corpoComparativo">
+            <tr><td class="text-inkdim text-xs">Carregando.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Seletor de campanha -->
+    <div>
+      <p class="rotulo mb-2">As seções seguintes mostram</p>
+      <div id="seletorCampanha" class="flex flex-wrap gap-1 border-b border-line" role="tablist"></div>
+    </div>
+
+    <!-- 2. Indicadores -->
+    <section aria-labelledby="tIndicadores">
+      <h3 id="tIndicadores" class="titulo-secao mb-3">2. Indicadores do período</h3>
+      <div id="cartoes" class="grade grid-cols-2 lg:grid-cols-4"></div>
+      <p id="avisoEmAberto" class="hidden mt-3 border border-gold/25 bg-gold/5 text-goldbright text-xs px-4 py-2.5"></p>
+      <p id="avisoForaDaBase" class="hidden mt-2 text-[11px] text-inkdim"></p>
+    </section>
+
+    <!-- 3. Funil -->
+    <section aria-labelledby="tFunil">
+      <h3 id="tFunil" class="titulo-secao mb-3">3. Funil</h3>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-px bg-line border border-line">
+        <div class="bg-bg p-5">
+          <p class="rotulo">Passagem por etapa no período</p>
+          <p class="text-[11px] text-inkfaint mt-1 mb-4">Leads que entraram em cada etapa no intervalo selecionado. Um lead conta em todas as etapas por que passou.</p>
+          <div id="graficoEntradas" class="space-y-2.5"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <p class="rotulo">Volume atual por etapa</p>
+          <p class="text-[11px] text-inkfaint mt-1 mb-4">Situação da base neste momento, independente do período. À direita, média de dias desde a última atualização.</p>
+          <div id="graficoVolume" class="space-y-2.5"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Tempos -->
+    <section aria-labelledby="tTempos">
+      <h3 id="tTempos" class="titulo-secao mb-3">4. Tempos de atendimento</h3>
+      <div id="cartoesTempos" class="grade grid-cols-1 md:grid-cols-3"></div>
+      <p class="text-[11px] text-inkfaint mt-2">Tempo corrido, incluindo noites e fins de semana. Não equivale à medição dos SLAs do protocolo, que contam apenas o expediente.</p>
+    </section>
+
+    <!-- 5. Conversão -->
+    <section aria-labelledby="tConversao">
+      <h3 id="tConversao" class="titulo-secao mb-3">5. Conversão entre etapas</h3>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-px bg-line border border-line">
+        <div class="bg-bg p-5">
+          <p class="rotulo">Etapas-chave</p>
+          <p class="text-[11px] text-inkfaint mt-1 mb-3">Do total que passou pela origem, quantos chegaram ao destino, mesmo com etapas intermediárias.</p>
+          <div id="conversaoAmpla" class="text-xs"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <p class="rotulo">Transições mais frequentes</p>
+          <p class="text-[11px] text-inkfaint mt-1 mb-3">Movimentações diretas de uma coluna para outra.</p>
+          <div id="conversaoEntreEtapas" class="text-xs"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <p class="rotulo">Destino dos leads a partir de</p>
+            <label class="sr-only" for="seletorOrigem">Etapa de origem</label>
+            <select id="seletorOrigem" class="bg-surface2 border border-line text-[11px] text-ink px-2 py-1"></select>
+          </div>
+          <div id="destinos" class="text-xs mt-3"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Perdas e etiquetas -->
+    <section aria-labelledby="tPerdas">
+      <h3 id="tPerdas" class="titulo-secao mb-3">6. Perdas e registros do protocolo</h3>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-px bg-line border border-line">
+        <div class="bg-bg p-5">
+          <p class="rotulo mb-3">Desqualificados no período, por motivo</p>
+          <div id="motivos" class="space-y-2.5 text-xs"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <p class="rotulo">Indicadores baseados em etiquetas</p>
+          <p class="text-[11px] text-inkfaint mt-1 mb-3">Dependem de a automação aplicar as etiquetas previstas no protocolo.</p>
+          <div id="porEtiqueta" class="text-xs"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <p class="rotulo mb-3">Etiquetas mais frequentes na base</p>
+          <div id="etiquetasFrequentes" class="space-y-2.5 text-xs"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Pendências -->
+    <section aria-labelledby="tPendencias">
+      <h3 id="tPendencias" class="titulo-secao mb-3">7. Pendências operacionais</h3>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-px bg-line border border-line">
+        <div class="bg-bg p-5">
+          <div class="flex items-center justify-between mb-1">
+            <p class="rotulo">Leads ativos sem movimentação há mais de 7 dias <span id="totalParados" class="text-goldbright ml-1">0</span></p>
+            <button id="btnExportarParados" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">CSV</button>
+          </div>
+          <p class="text-[11px] text-inkfaint mb-3">Não inclui Fechado, Desqualificado e Reaquecimento.</p>
+          <div id="listaParados" class="rolagem max-h-72 pr-1 text-xs"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <div class="flex items-center justify-between mb-1">
+            <p class="rotulo">Reuniões em aberto <span id="totalEmAberto" class="text-goldbright ml-1">0</span></p>
+            <button id="btnExportarEmAberto" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">CSV</button>
+          </div>
+          <p class="text-[11px] text-inkfaint mb-3">Agendadas no período e ainda na coluna Agendado, sem desfecho registrado.</p>
+          <div id="listaEmAberto" class="rolagem max-h-72 pr-1 text-xs"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. Registro -->
+    <section aria-labelledby="tRegistro">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+        <h3 id="tRegistro" class="titulo-secao">8. Leads movimentados no período <span id="totalLeads" class="text-inkdim ml-1">0</span></h3>
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="sr-only" for="buscaLeads">Buscar</label>
+          <input id="buscaLeads" type="search" placeholder="Buscar por nome, telefone ou etapa" class="bg-surface2 border border-line px-3 py-1.5 text-xs text-ink w-64 placeholder:text-inkfaint">
+          <button id="btnExportarLeads" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1.5">CSV</button>
+          <button id="btnExportarHistorico" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1.5" title="Todas as mudanças de etapa do período, incluindo as excluídas do cálculo, sinalizadas">Histórico completo (CSV)</button>
+        </div>
+      </div>
+      <div class="border border-line rolagem max-h-[420px]">
+        <table class="w-full text-sm text-left">
+          <thead class="sticky top-0 bg-surface">
+            <tr class="rotulo border-b border-line">
+              <th class="px-4 py-3 font-semibold">Nome</th>
+              <th class="px-4 py-3 font-semibold">Telefone</th>
+              <th class="px-4 py-3 font-semibold">Campanha</th>
+              <th class="px-4 py-3 font-semibold">Etapa no período</th>
+              <th class="px-4 py-3 font-semibold">Etiquetas</th>
+              <th class="px-4 py-3 font-semibold text-right">Atualização</th>
+            </tr>
+          </thead>
+          <tbody id="corpoLeads" class="divide-y divide-line"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Correção de movimentação indevida -->
+  <div id="modalCorrecao" class="hidden fixed inset-0 z-50 bg-black/70 items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="tituloCorrecao">
+    <div class="bg-surface border border-line w-full max-w-xl max-h-[85vh] flex flex-col">
+      <div class="p-5 border-b border-line flex items-start justify-between gap-3">
+        <div>
+          <h3 id="tituloCorrecao" class="font-serif text-base font-semibold text-ink">Corrigir movimentação indevida</h3>
+          <p class="text-[11px] text-inkdim mt-1.5 leading-relaxed">
+            Destina-se exclusivamente a leads movidos por engano no Kommo. É possível excluir o evento do cálculo ou
+            ajustar a etapa e o horário registrados. O histórico do Kommo não é alterado e a marcação pode ser revertida.
+            Não deve ser usado para omitir desfechos reais.
+          </p>
+        </div>
+        <button id="btnFecharCorrecao" class="text-inkdim hover:text-ink text-sm border border-line px-2 py-0.5" aria-label="Fechar">Fechar</button>
+      </div>
+      <div class="p-5 space-y-3 rolagem">
+        <div class="flex gap-2">
+          <label class="sr-only" for="leadIdCorrecao">ID do lead no Kommo</label>
+          <input id="leadIdCorrecao" type="text" inputmode="numeric" placeholder="ID do lead no Kommo" class="flex-1 bg-surface2 border border-line px-3 py-2 text-sm text-ink placeholder:text-inkfaint">
+          <button id="btnBuscarEventos" class="bg-gold hover:bg-goldbright text-bg font-bold px-4 py-2 text-sm">Buscar</button>
+        </div>
+        <div id="eventosCorrecao" class="space-y-2 text-xs"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

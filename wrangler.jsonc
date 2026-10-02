@@ -1,0 +1,16 @@
+{
+  // Configuração do Cloudflare Workers: entrega a interface (pasta client/) e
+  // executa worker/index.js para as chamadas /api/*.
+  "name": "hub-comercial-saude",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./client"
+  },
+  // Endereços de pré-visualização ficam fora da política do Cloudflare Access;
+  // por isso permanecem desativados.
+  "preview_urls": false,
+  "observability": {
+    "enabled": true
+  }
+}
