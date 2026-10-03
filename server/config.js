@@ -107,13 +107,14 @@ export const CAMPANHAS = [
 // Campos personalizados de lead (IDs em Configurações > Campos Personalizados).
 // A rota GET /api/diagnostico/campos lista todos os campos da conta com os IDs.
 export const CAMPOS = {
-  // Motivo de desqualificação. Se ficar null, o painel usa o motivo de perda
-  // nativo do Kommo (quando preenchido).
+  // Motivo de desqualificação. A conta não tem campo próprio para isso: com
+  // null, o painel usa o motivo de perda nativo do Kommo, pedido ao mover o
+  // lead para "Venda perdida".
   motivoDesqualificacao: null,
   // Origem de marketing, usados na exportação do histórico.
-  campanhaMeta: null,
-  conjunto: null,
-  anuncio: null,
+  campanhaMeta: 1127409,
+  conjunto: 1127411,
+  anuncio: 1127413,
 };
 
 // Etiquetas definidas no protocolo de automações. Alguns indicadores dependem

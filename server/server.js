@@ -463,7 +463,14 @@ app.get("/api/diagnostico/funis", async (req, res) => {
 app.get("/api/diagnostico/campos", async (req, res) => {
   try {
     const campos = await kommo.listarCamposDeLead();
-    res.json({ total: campos.length, campos: campos.map((c) => ({ id: c.id, nome: c.name, codigo: c.code, tipo: c.type })) });
+    res.json({ total: campos.length, campos: campos.map((c) => ({
+        id: c.id,
+        nome: c.name,
+        codigo: c.code,
+        tipo: c.type,
+        // Opções dos campos de seleção, necessárias para ligar um indicador a um valor específico.
+        opcoes: c.enums ? c.enums.map((o) => ({ id: o.id, valor: o.value })) : undefined,
+      })) });
   } catch (erro) {
     responderErro(res, erro, "Falha ao consultar os campos");
   }
