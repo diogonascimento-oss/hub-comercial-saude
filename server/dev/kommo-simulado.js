@@ -10,6 +10,7 @@
 // Nenhum dado aqui é real.
 
 import express from "express";
+import { CAMPANHAS, ETAPAS } from "../config.js";
 
 const PORTA = process.env.PORTA_SIMULADO || 4010;
 const DIA = 86400;
@@ -26,43 +27,35 @@ const chance = (p) => sortear() < p;
 const entre = (min, max) => min + sortear() * (max - min);
 const escolher = (lista) => lista[Math.floor(sortear() * lista.length)];
 
-const NOMES_DAS_COLUNAS = [
-  "Leads de entrada",
-  "CONTATO INICIAL",
-  "CONTATO INICIADO",
-  "EM QUALIFICAÇÃO",
-  "LEAD QUALIFICADO",
-  "EM AGENDAMENTO",
-  "AGENDADO",
-  "REMARCAÇÃO",
-  "PROTOCOLO FARMER",
-  "REAQUECIMENTO",
-  "FECHADO",
-  "DESQUALIFICADO/NÃO FECHADO",
-];
+// Os funis simulados usam os mesmos IDs de server/config.js, para que o
+// mapeamento por ID funcione também no ambiente de desenvolvimento.
+const NOMES_DAS_COLUNAS = ["Etapa de leads de entrada", ...ETAPAS.map((e) => e.nome.toUpperCase())];
+NOMES_DAS_COLUNAS[10] = "Venda ganha";
+NOMES_DAS_COLUNAS[11] = "Venda perdida";
+
+function montarFunil(id, name, idsDasEtapas) {
+  const ids = [id * 10, ...ETAPAS.map((e, i) => idsDasEtapas?.[e.chave] || id * 10 + i + 1)];
+  return { id, name, ids, _embedded: { statuses: NOMES_DAS_COLUNAS.map((nome, i) => ({ id: ids[i], name: nome, pipeline_id: id })) } };
+}
 
 const funis = [
-  { id: 9001, name: "IR-Q | Tema 324 - Questionário" },
-  { id: 9002, name: "IR-W | Tema 324 - WhatsApp" },
-  { id: 9003, name: "REA-Q | Reajuste - Questionário" },
-  { id: 9099, name: "Núcleo de Autismo" },
-].map((f) => ({
-  ...f,
-  _embedded: { statuses: NOMES_DAS_COLUNAS.map((name, i) => ({ id: f.id * 100 + i, name, pipeline_id: f.id })) },
-}));
+  ...CAMPANHAS.map((c, i) => montarFunil(c.pipelineId || 9001 + i, `[${c.codigo}]`, c.etapas)),
+  // Funil de outro núcleo, que o painel deve ignorar.
+  montarFunil(9099, "Núcleo de Autismo"),
+];
 
 const PRIMEIROS = ["Ana", "Bruno", "Carla", "Daniel", "Elisa", "Fábio", "Gisele", "Heitor", "Ingrid", "Jonas", "Karen", "Lucas", "Marta", "Nelson", "Olívia", "Paulo"];
 const SOBRENOMES = ["Almeida", "Barros", "Campos", "Dantas", "Esteves", "Farias", "Gouveia", "Holanda", "Lins", "Moura", "Nóbrega", "Pessoa"];
 const DDDS = ["81", "81", "81", "83", "84", "85", "11", "21", "71", "87"];
 const MOTIVOS = ["Sem interesse", "Sem resposta após cadência", "Considerou os honorários elevados", "Fechou com concorrente", "Sem aderência jurídica preliminar"];
-const VOLUME = { 9001: 120, 9002: 70, 9003: 160, 9099: 40 };
+const VOLUMES = [120, 70, 160, 40];
 // Chance de avançar em cada passo, por funil.
-const PERFIL = {
-  9001: { responde: 0.75, qualifica: 0.8, agenda: 0.4, comparece: 0.55, fecha: 0.2 },
-  9002: { responde: 0.85, qualifica: 0.7, agenda: 0.45, comparece: 0.5, fecha: 0.15 },
-  9003: { responde: 0.7, qualifica: 0.65, agenda: 0.3, comparece: 0.4, fecha: 0.4 },
-  9099: { responde: 0.8, qualifica: 0.7, agenda: 0.5, comparece: 0.6, fecha: 0.3 },
-};
+const PERFIS = [
+  { responde: 0.75, qualifica: 0.8, agenda: 0.4, comparece: 0.55, fecha: 0.2 },
+  { responde: 0.85, qualifica: 0.7, agenda: 0.45, comparece: 0.5, fecha: 0.15 },
+  { responde: 0.7, qualifica: 0.65, agenda: 0.3, comparece: 0.4, fecha: 0.4 },
+  { responde: 0.8, qualifica: 0.7, agenda: 0.5, comparece: 0.6, fecha: 0.3 },
+];
 
 const leads = [];
 const contatos = [];
@@ -70,11 +63,11 @@ const eventos = [];
 let proximoLead = 500000;
 let proximoEvento = 9000000;
 
-for (const funil of funis) {
-  const coluna = (i) => funil.id * 100 + i;
-  const perfil = PERFIL[funil.id];
+for (const [indice, funil] of funis.entries()) {
+  const coluna = (i) => funil.ids[i];
+  const perfil = PERFIS[indice];
 
-  for (let n = 0; n < VOLUME[funil.id]; n++) {
+  for (let n = 0; n < VOLUMES[indice]; n++) {
     const id = ++proximoLead;
     const criadoEm = Math.floor(AGORA - entre(0.5, 75) * DIA);
     const tags = [];
@@ -199,7 +192,9 @@ function paginar(req, res, chave, itens) {
   res.json(corpo);
 }
 
-app.get("/api/v4/leads/pipelines", (req, res) => res.json({ _embedded: { pipelines: funis } }));
+app.get("/api/v4/leads/pipelines", (req, res) =>
+  res.json({ _embedded: { pipelines: funis.map(({ ids, ...funil }) => funil) } }),
+);
 
 app.get("/api/v4/leads/custom_fields", (req, res) =>
   res.json({ _embedded: { custom_fields: [{ id: 7001, name: "Motivo de desqualificação", code: null, type: "select" }] } }),
