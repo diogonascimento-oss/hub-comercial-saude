@@ -112,6 +112,8 @@ No painel do Worker, em "Settings", "Variables and Secrets", adicionar quatro it
 | `ACCESS_TEAM_DOMAIN` | Domínio da equipe, por exemplo `nome-da-equipe.cloudflareaccess.com` |
 | `ACCESS_AUD` | "Application Audience (AUD) Tag" copiada no item 7 |
 
+O tipo deve ser "Secret", e não "Text". Os valores não devem ser copiados para o arquivo `wrangler.jsonc`, mesmo que o painel do Cloudflare sugira: o token da API ficaria exposto no repositório.
+
 O Worker valida, a cada chamada, a assinatura do token emitido pelo Access. Sem os quatro segredos ele recusa as chamadas e informa quais faltam.
 
 ---

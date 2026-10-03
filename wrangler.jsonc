@@ -7,6 +7,11 @@
   "assets": {
     "directory": "./client"
   },
+  // Preserva as variáveis cadastradas no painel do Cloudflare a cada deploy.
+  // Os valores do Worker (API_ORIGEM, API_TOKEN, ACCESS_TEAM_DOMAIN e
+  // ACCESS_AUD) não ficam neste arquivo: devem ser cadastrados no painel,
+  // como "Secret".
+  "keep_vars": true,
   // Endereços de pré-visualização ficam fora da política do Cloudflare Access;
   // por isso permanecem desativados.
   "preview_urls": false,
