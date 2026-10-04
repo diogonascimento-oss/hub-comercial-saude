@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Hub Comercial — Núcleo de Saúde | Modo TV</title>
+<link rel="icon" href="icones/favicon-48.png" sizes="48x48" type="image/png">
+<link rel="icon" href="icones/icone.svg" sizes="any" type="image/svg+xml">
+<meta name="theme-color" content="#0b0c11">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Tela única, sem rolagem, dimensionada pela altura da televisão. Só números
+     agregados: nenhum nome ou telefone de lead aparece neste modo. */
+  :root { --bg:#0b0c11; --sup:#12131b; --sup2:#181a24; --linha:rgba(255,255,255,.09); --tinta:#e9e7de; --fraca:#9a9ca8; --apagada:#6b6d7a; --ouro:#b6923f; --ouroclaro:#d8b565; --bom:#4fb38a; --ruim:#d0685a; }
+  * { box-sizing:border-box; margin:0; }
+  html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tinta); font-family:Inter, system-ui, sans-serif; }
+  body { display:grid; grid-template-rows:9vh 24vh 20vh minmax(0,1fr) 2.5vh; gap:1.6vh; padding:2.2vh 2.4vw 1.2vh; }
+  .serifa { font-family:Fraunces, Georgia, serif; }
+  .rotulo { font-family:"IBM Plex Mono", monospace; text-transform:uppercase; letter-spacing:.14em; color:var(--fraca); font-size:1.45vh; }
+  .num { font-variant-numeric:tabular-nums; }
+
+  header { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--linha); padding-bottom:1.4vh; }
+  header .marca { display:flex; align-items:center; gap:1.4vw; }
+  header svg { height:6vh; width:auto; }
+  header h1 { font-size:2.5vh; font-weight:400; letter-spacing:.22em; text-transform:uppercase; }
+  header .sub { margin-top:.6vh; }
+  #mes { font-size:3vh; font-weight:600; text-align:center; }
+  #relogio { font-size:5vh; font-weight:600; line-height:1; text-align:right; }
+  #atualizado { text-align:right; margin-top:.6vh; }
+
+  .grade { display:grid; gap:1.2vw; }
+  #metas { grid-template-columns:repeat(3, 1fr); }
+  .cartao { background:var(--sup); border:1px solid var(--linha); padding:2vh 1.6vw; display:flex; flex-direction:column; justify-content:space-between; min-width:0; }
+  .meta .valor { font-size:9.5vh; font-weight:600; line-height:1; }
+  .meta .valor small { font-size:4vh; color:var(--fraca); font-weight:400; }
+  .meta .trilho { height:1.6vh; background:var(--sup2); position:relative; margin-top:1.4vh; }
+  .meta .barra { height:100%; transition:width .8s ease; }
+  .meta .ritmo { position:absolute; top:-.7vh; bottom:-.7vh; width:2px; background:var(--tinta); opacity:.7; }
+  .meta .rodape { display:flex; justify-content:space-between; margin-top:1.1vh; font-size:1.8vh; color:var(--fraca); }
+
+  #indicadores { grid-template-columns:repeat(5, 1fr); }
+  .ind .valor { font-size:8vh; font-weight:600; line-height:1; }
+  .ind .detalhe { font-size:1.8vh; color:var(--fraca); margin-top:.8vh; }
+  .ind .detalhe strong { color:var(--tinta); font-weight:600; }
+
+  #base { grid-template-columns:1.15fr 1fr; min-height:0; }
+  #base .cartao { justify-content:flex-start; overflow:hidden; padding-bottom:1.4vh; }
+  #porEtapa { flex:1; display:flex; flex-direction:column; justify-content:space-between; margin-top:1.2vh; min-height:0; }
+  table { width:100%; border-collapse:collapse; margin-top:1.2vh; }
+  th { font-family:"IBM Plex Mono", monospace; font-size:1.35vh; letter-spacing:.1em; text-transform:uppercase; color:var(--apagada); font-weight:500; text-align:right; padding:.6vh .6vw; }
+  th:first-child, td:first-child { text-align:left; }
+  td { font-size:3.1vh; text-align:right; padding:.75vh .6vw; border-top:1px solid var(--linha); }
+  td:first-child { font-size:2.3vh; }
+  td small { display:block; font-size:1.4vh; color:var(--apagada); }
+  tr.total td { color:var(--ouroclaro); font-weight:600; }
+  .etapa { display:grid; grid-template-columns:15vw 1fr 4vw; align-items:center; gap:.8vw; font-size:1.8vh; line-height:1.15; }
+  .etapa .nome { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--fraca); }
+  .etapa .trilho { height:1.2vh; background:var(--sup2); }
+  .etapa .barra { height:100%; transition:width .8s ease; }
+  .etapa .qtd { text-align:right; font-size:2.1vh; font-weight:600; }
+
+  footer { display:flex; justify-content:space-between; align-items:center; font-size:1.3vh; color:var(--apagada); }
+  #aviso { color:var(--ouroclaro); }
+  a { color:inherit; }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="marca">
+      <svg viewBox="60 50 1392 670" role="img" aria-label="Robson Menezes Advogados">
+        <defs><linearGradient id="ouro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6c983"/><stop offset=".55" stop-color="#d8b565"/><stop offset="1" stop-color="#a8853a"/></linearGradient></defs>
+        <g fill="url(#ouro)"><path d="M72 60H465A215 215 0 0 1 526 482L660 708H535L350 385H465A110 110 0 0 0 465 165H72Z"/><path d="M792 65L1128 392L1440 88V240L1128 548L905 330V708H792Z"/></g>
+        <g fill="#8f7233"><path d="M122 388H240L432 708H305Z"/><path d="M1440 420V572L1297 708H1135Z"/></g>
+      </svg>
+      <div>
+        <h1 class="serifa">Robson Menezes</h1>
+        <p class="rotulo sub">Núcleo de Saúde · Hub Comercial</p>
+      </div>
+    </div>
+    <p id="mes" class="serifa"></p>
+    <div>
+      <p id="relogio" class="serifa num">--:--</p>
+      <p id="atualizado" class="rotulo">Carregando</p>
+    </div>
+  </header>
+
+  <section id="metas" class="grade" aria-label="Metas do mês"></section>
+  <section id="indicadores" class="grade" aria-label="Indicadores do mês"></section>
+
+  <section id="base" class="grade">
+    <div class="cartao">
+      <p class="rotulo">Mês por campanha</p>
+      <table>
+        <thead><tr><th>Campanha</th><th>Leads</th><th>Qualificados</th><th>Marcadas</th><th>Realizadas</th><th>Contratos</th></tr></thead>
+        <tbody id="porCampanha"></tbody>
+      </table>
+    </div>
+    <div class="cartao">
+      <p class="rotulo">Leads em cada etapa agora</p>
+      <div id="porEtapa"></div>
+    </div>
+  </section>
+
+  <footer>
+    <span id="aviso" role="status"></span>
+    <span>Clique na tela ou pressione F para tela cheia · <a href="/">voltar ao painel</a> · Desenvolvido por diogocoding</span>
+  </footer>
+
+  <script src="tv.js"></script>
+</body>
+</html>

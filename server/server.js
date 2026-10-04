@@ -305,7 +305,9 @@ app.get("/api/metrics", async (req, res) => {
     const base = { eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, agora };
 
     const escopos = {};
-    const todas = calcularEscopo({ ...base, leads, incluirListas: true });
+    // resumo=1 (modo TV): só os totais, sem as listas de leads e sem o período de comparação.
+    const resumo = req.query.resumo === "1";
+    const todas = calcularEscopo({ ...base, leads, incluirListas: !resumo });
     const { listas, ...indicadoresGerais } = todas;
     escopos.TODAS = { ...indicadoresGerais, porPessoa: indicadoresPorPessoa(leads, base) };
     for (const campanha of CAMPANHAS) {
@@ -314,7 +316,7 @@ app.get("/api/metrics", async (req, res) => {
     }
 
     const anterior = periodoAnteriorA(periodo);
-    const escoposAnteriores = await resumoDoPeriodo(anterior, agora);
+    const escoposAnteriores = resumo ? null : await resumoDoPeriodo(anterior, agora);
 
     // Metas: sempre sobre o mês corrente, independentemente do filtro.
     const hoje = dataLocal(agora);
@@ -333,7 +335,7 @@ app.get("/api/metrics", async (req, res) => {
       metas: { mes: hoje.slice(0, 7), itens: METAS_MENSAIS.map((m) => ({ ...m, atual: doMes[m.chave] })) },
       escopos,
       escoposAnteriores,
-      listas,
+      listas: resumo ? undefined : listas,
     });
   } catch (erro) {
     responderErro(res, erro, "Falha ao calcular os indicadores");
