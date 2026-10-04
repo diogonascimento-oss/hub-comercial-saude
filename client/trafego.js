@@ -33,8 +33,11 @@ function fecharModaisDeTrafego() {
 
 // --- Detalhamento: leads de um grupo -------------------------------------------
 
-function abrirLeadsDoGrupo(titulo, leads) {
+// regra: texto opcional, exibido acima da lista, explicando como os leads foram contados.
+function abrirLeadsDoGrupo(titulo, leads, regra = "") {
   $("tituloLeads").textContent = `${titulo} (${numero(leads.length)})`;
+  $("regraDosLeads").textContent = regra;
+  $("regraDosLeads").classList.toggle("hidden", !regra);
   $("corpoLeadsDoGrupo").innerHTML = leads.length
     ? leads
         .map(

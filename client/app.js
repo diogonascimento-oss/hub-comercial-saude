@@ -299,10 +299,37 @@ function comparacaoComAnterior(chave, menorEhMelhor = false) {
   return `<span class="text-inkfaint">Período anterior: ${numero(anterior)}</span> <span class="${cor} font-semibold tabular">${pct > 0 ? "+" : ""}${pct.toLocaleString("pt-BR")}%</span>`;
 }
 
-function cartao(valor, rotulo, detalhe, corDoValor = "text-ink", comparacao = "") {
+// Regra de contagem de cada indicador, exibida junto com a lista de leads.
+const REGRAS_DOS_INDICADORES = {
+  leadsRecebidos: ["Leads recebidos", "Leads criados no Kommo dentro do período selecionado, nos funis das três campanhas."],
+  contatados: ["Leads contatados", "Leads que entraram na coluna Contato Iniciado dentro do período. Inclui leads criados antes do período que só foram movidos agora."],
+  comPrimeiraResposta: ["Com primeira resposta", "Leads que entraram na coluna Em Qualificação dentro do período. Inclui leads contatados antes do período que responderam agora, por isso não é necessariamente uma parte dos contatados."],
+  qualificados: ["Qualificados", "Leads que entraram na coluna Lead Qualificado dentro do período. Também conta quem foi movido direto de uma etapa anterior à qualificação para Em Agendamento ou Agendado."],
+  qualificadosSemAgendamento: ["Qualificados sem agendamento", "Leads qualificados no período que não entraram em Agendado depois da qualificação, dentro do período."],
+  reunioesMarcadas: ["Leads com reunião marcada", "Leads que entraram na coluna Agendado dentro do período. O número do cartão conta agendamentos: um lead reagendado conta mais de uma vez no cartão e uma vez nesta lista."],
+  reunioesRealizadas: ["Leads com reunião realizada", "Leads que saíram de Agendado para Protocolo Farmer, Reaquecimento ou Fechado dentro do período. A saída para Desqualificado conta somente se o lead tiver a etiqueta REUNIAO_REALIZADA."],
+  naoRealizadas: ["Leads com reunião não realizada", "Leads que saíram de Agendado para Remarcação, quando o agendamento também ocorreu dentro do período."],
+  remarcacoesRecuperadas: ["Remarcações recuperadas", "Leads movidos de Remarcação para Agendado dentro do período."],
+  fechados: ["Contratos fechados", "Leads que entraram na coluna final de venda ganha dentro do período."],
+  desqualificados: ["Desqualificados", "Leads que entraram na coluna final de venda perdida dentro do período."],
+};
+
+// Abre a relação dos leads contados em um indicador, na campanha selecionada.
+function abrirLeadsDoIndicador(indicador) {
+  const [titulo, regra] = REGRAS_DOS_INDICADORES[indicador];
+  const leads = daCampanha(dados.listas.leadsPorIndicador)
+    .filter((l) => l.indicadores.includes(indicador))
+    .map((l) => ({ nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
+  abrirLeadsDoGrupo(titulo, leads, regra);
+}
+
+// Trecho clicável dentro do texto de um cartão.
+const linkDoIndicador = (indicador, texto) => `<button data-indicador="${indicador}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">${texto}</button>`;
+
+function cartao(valor, rotulo, detalhe, corDoValor = "text-ink", comparacao = "", indicador = "") {
   return `
     <div class="p-5">
-      <p class="font-serif text-3xl font-semibold tabular ${corDoValor}">${valor}</p>
+      <p class="font-serif text-3xl font-semibold tabular ${corDoValor}">${indicador ? `<button data-indicador="${indicador}" class="hover:underline decoration-1 underline-offset-4" title="Ver os leads e a regra de cálculo">${valor}</button>` : valor}</p>
       <p class="rotulo mt-2">${esc(rotulo)}</p>
       ${comparacao ? `<p class="text-[11px] mt-2">${comparacao}</p>` : ""}
       ${detalhe ? `<p class="text-[11px] text-inkdim mt-2 leading-relaxed">${detalhe}</p>` : ""}
@@ -317,19 +344,19 @@ function renderizarCartoes() {
   const c = comparacaoComAnterior;
 
   $("cartoes").innerHTML = [
-    cartao(numero(v.leadsRecebidos), "Leads recebidos", `${numero(v.contatados)} contatados · ${numero(v.comPrimeiraResposta)} com primeira resposta`, "text-ink", c("leadsRecebidos")),
-    cartao(numero(v.qualificados), "Qualificados", `Taxa de qualificação: <span class="${classeDaTaxa(t.qualificacao)}">${percentual(t.qualificacao)}</span><br>${numero(v.qualificadosSemAgendamento)} sem agendamento`, "text-ink", c("qualificados")),
-    cartao(numero(v.reunioesMarcadas), "Reuniões marcadas", `${numero(v.reunioesMarcadasNovas)} novas · ${numero(v.remarcacoes)} remarcações<br>Qualificado para agendado: <span class="${classeDaTaxa(t.qualificadoParaAgendado)}">${percentual(t.qualificadoParaAgendado)}</span>`, "text-goldbright", c("reunioesMarcadas")),
-    cartao(numero(v.reunioesRealizadas), "Reuniões realizadas", `Comparecimento: <span class="${classeDaTaxa(t.comparecimento)}">${percentual(t.comparecimento)}</span>`, "text-positivo", c("reunioesRealizadas")),
-    cartao(numero(v.naoRealizadas), "Não realizadas", `${percentual(t.naoRealizacao)} das marcadas<br>${esc(noShow)}`, "text-negativo", c("naoRealizadas", true)),
-    cartao(numero(v.remarcacoesRecuperadas), "Remarcações recuperadas", `De ${numero(v.entradasEmRemarcacao)} entradas em Remarcação: ${percentual(t.remarcacaoRecuperada)}<br>${numero(v.remarcacoesRecuperadasERealizadas)} recuperadas e realizadas`, "text-ink", c("remarcacoesRecuperadas")),
-    cartao(numero(v.fechados), "Contratos fechados", `Reunião para fechamento: <span class="${classeDaTaxa(t.reuniaoParaFechamento)}">${percentual(t.reuniaoParaFechamento)}</span><br>Conversão final: ${percentual(t.conversaoFinal)}`, "text-positivo", c("fechados")),
-    cartao(numero(v.desqualificados), "Desqualificados", `${numero(v.perdidasAntesDaReuniao)} perdidos entre o agendamento e a reunião`, "text-ink", c("desqualificados", true)),
+    cartao(numero(v.leadsRecebidos), "Leads recebidos", `${linkDoIndicador("contatados", `${numero(v.contatados)} contatados`)} · ${linkDoIndicador("comPrimeiraResposta", `${numero(v.comPrimeiraResposta)} com primeira resposta`)}`, "text-ink", c("leadsRecebidos"), "leadsRecebidos"),
+    cartao(numero(v.qualificados), "Qualificados", `Taxa de qualificação: <span class="${classeDaTaxa(t.qualificacao)}">${percentual(t.qualificacao)}</span><br>${linkDoIndicador("qualificadosSemAgendamento", `${numero(v.qualificadosSemAgendamento)} sem agendamento`)}`, "text-ink", c("qualificados"), "qualificados"),
+    cartao(numero(v.reunioesMarcadas), "Reuniões marcadas", `${numero(v.reunioesMarcadasNovas)} novas · ${numero(v.remarcacoes)} remarcações<br>Qualificado para agendado: <span class="${classeDaTaxa(t.qualificadoParaAgendado)}">${percentual(t.qualificadoParaAgendado)}</span>`, "text-goldbright", c("reunioesMarcadas"), "reunioesMarcadas"),
+    cartao(numero(v.reunioesRealizadas), "Reuniões realizadas", `Comparecimento: <span class="${classeDaTaxa(t.comparecimento)}">${percentual(t.comparecimento)}</span>`, "text-positivo", c("reunioesRealizadas"), "reunioesRealizadas"),
+    cartao(numero(v.naoRealizadas), "Não realizadas", `${percentual(t.naoRealizacao)} das marcadas<br>${esc(noShow)}`, "text-negativo", c("naoRealizadas", true), "naoRealizadas"),
+    cartao(numero(v.remarcacoesRecuperadas), "Remarcações recuperadas", `De ${numero(v.entradasEmRemarcacao)} entradas em Remarcação: ${percentual(t.remarcacaoRecuperada)}<br>${numero(v.remarcacoesRecuperadasERealizadas)} recuperadas e realizadas`, "text-ink", c("remarcacoesRecuperadas"), "remarcacoesRecuperadas"),
+    cartao(numero(v.fechados), "Contratos fechados", `Reunião para fechamento: <span class="${classeDaTaxa(t.reuniaoParaFechamento)}">${percentual(t.reuniaoParaFechamento)}</span><br>Conversão final: ${percentual(t.conversaoFinal)}`, "text-positivo", c("fechados"), "fechados"),
+    cartao(numero(v.desqualificados), "Desqualificados", `${numero(v.perdidasAntesDaReuniao)} perdidos entre o agendamento e a reunião`, "text-ink", c("desqualificados", true), "desqualificados"),
   ].join("");
 
   const dataBr = (iso) => iso.split("-").reverse().join("/");
   $("periodoAnterior").textContent = dados.periodoAnterior
-    ? `Comparação com o período anterior de mesma duração: ${dataBr(dados.periodoAnterior.inicio)} a ${dataBr(dados.periodoAnterior.fim)}.`
+    ? `"Período anterior", nos cartões acima, é ${dataBr(dados.periodoAnterior.inicio)} a ${dataBr(dados.periodoAnterior.fim)}.`
     : "";
 
   const emAberto = $("avisoEmAberto");
@@ -1014,6 +1041,10 @@ async function executarAcaoDeCorrecao(acao, eventId) {
 // --- Eventos da página ---------------------------------------------------------
 
 $("btnFiltrar").addEventListener("click", atualizar);
+$("cartoes").addEventListener("click", (e) => {
+  const botao = e.target.closest("button[data-indicador]");
+  if (botao && dados) abrirLeadsDoIndicador(botao.dataset.indicador);
+});
 $("modoComparativo").addEventListener("change", () => dados && renderizarComparativo());
 $("modoEvolucao").addEventListener("change", () => dados && renderizarEvolucao());
 $("etapasEvolucao").addEventListener("change", () => dados && renderizarEvolucao());

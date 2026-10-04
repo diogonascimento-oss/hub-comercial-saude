@@ -67,6 +67,11 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
   const leadsDesqualificados = new Set();
   const leadsQualificados = new Set();
   const qualificadosQueAgendaram = new Set();
+  // Conjuntos usados só para o detalhamento "quem são esses leads".
+  const leadsRecebidosNoPeriodo = new Set();
+  const leadsComReuniaoRealizada = new Set();
+  const leadsComReuniaoNaoRealizada = new Set();
+  const leadsComRemarcacaoRecuperada = new Set();
 
   const temposAtePrimeiraMensagem = [];
   const temposAtePrimeiraResposta = [];
@@ -84,6 +89,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
 
     if (criadoNoPeriodo) {
       leadsRecebidos++;
+      leadsRecebidosNoPeriodo.add(lead.id);
       // A criação do lead não gera evento de mudança de etapa. A etapa em que
       // ele nasceu é a de origem do primeiro evento; sem eventos, é a atual.
       const etapaDeNascimento = eventos[0]?.de || lead.etapa;
@@ -131,7 +137,10 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
 
         const veioDeRemarcacao = ev.de === "REMARCACAO";
         if (vezesAgendado > 1 || veioDeRemarcacao) remarcacoes++;
-        if (veioDeRemarcacao) remarcacoesRecuperadas++;
+        if (veioDeRemarcacao) {
+          remarcacoesRecuperadas++;
+          leadsComRemarcacaoRecuperada.add(lead.id);
+        }
         ultimoAgendamentoVeioDeRemarcacao = veioDeRemarcacao;
 
         if (instanteDaQualificacao !== null) {
@@ -147,7 +156,10 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
         const realizada =
           ETAPAS_REUNIAO_REALIZADA.includes(ev.para) ||
           (ev.para === "DESQUALIFICADO" && tem(ETIQUETAS.reuniaoRealizada));
-        if (realizada) reunioesRealizadas++;
+        if (realizada) {
+          reunioesRealizadas++;
+          leadsComReuniaoRealizada.add(lead.id);
+        }
 
         // Os desfechos abaixo só contam quando o agendamento correspondente
         // também ocorreu no período. Sem isso, a falta de um lead agendado no
@@ -159,6 +171,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
             if (ultimoAgendamentoVeioDeRemarcacao) remarcacoesRecuperadasERealizadas++;
           } else if (ev.para === "REMARCACAO") {
             naoRealizadas++;
+            leadsComReuniaoNaoRealizada.add(lead.id);
             if (tem(ETIQUETAS.noShow)) naoRealizadasComEtiquetaNoShow++;
           } else if (ev.para === "DESQUALIFICADO") {
             perdidasAntesDaReuniao++;
@@ -369,7 +382,32 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
         etapasPorLead.get(leadId).push(chave);
       }
     }
+    // Indicadores em que cada lead foi contado, para o detalhamento dos cartões.
+    const conjuntos = {
+      leadsRecebidos: leadsRecebidosNoPeriodo,
+      contatados: new Set(entradas.get("CONTATO_INICIADO")?.keys() || []),
+      comPrimeiraResposta: new Set(entradas.get("EM_QUALIFICACAO")?.keys() || []),
+      qualificados: leadsQualificados,
+      qualificadosSemAgendamento: new Set([...leadsQualificados].filter((id) => !qualificadosQueAgendaram.has(id))),
+      reunioesMarcadas: leadsComReuniaoMarcada,
+      reunioesRealizadas: leadsComReuniaoRealizada,
+      naoRealizadas: leadsComReuniaoNaoRealizada,
+      remarcacoesRecuperadas: leadsComRemarcacaoRecuperada,
+      fechados: leadsFechados,
+      desqualificados: leadsDesqualificados,
+    };
+    const indicadoresPorLead = new Map();
+    for (const [indicador, ids] of Object.entries(conjuntos)) {
+      for (const id of ids) {
+        if (!indicadoresPorLead.has(id)) indicadoresPorLead.set(id, []);
+        indicadoresPorLead.get(id).push(indicador);
+      }
+    }
     resultado.listas = {
+      leadsPorIndicador: [...indicadoresPorLead].map(([leadId, indicadores]) => {
+        const l = porId.get(leadId);
+        return { id: l.id, nome: l.nome, telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, indicadores };
+      }),
       leadsPorEtapa: [...etapasPorLead].map(([leadId, etapas]) => {
         const l = porId.get(leadId);
         return { id: l.id, nome: l.nome, telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, etapas };

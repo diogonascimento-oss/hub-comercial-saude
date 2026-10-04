@@ -263,6 +263,29 @@ async function resumoDoPeriodo(periodo, agora) {
   return resumo;
 }
 
+// Período de comparação.
+//
+// Quando o filtro começa no dia 1, compara com os mesmos dias do mês anterior
+// (ou com o mês anterior inteiro, se o filtro cobre o mês inteiro): 1 a 3 de
+// outubro é comparado com 1 a 3 de setembro. Nos demais casos, usa o intervalo
+// de mesma quantidade de dias imediatamente antes do filtro.
+function periodoAnteriorA(periodo) {
+  const [ano, mes, dia] = periodo.inicio.split("-").map(Number);
+  const [anoFim, mesFim, diaFim] = periodo.fim.split("-").map(Number);
+  const dois = (n) => String(n).padStart(2, "0");
+  const ultimoDia = (a, m) => new Date(Date.UTC(a, m, 0)).getUTCDate();
+
+  if (dia === 1 && ano === anoFim && mes === mesFim) {
+    const anoAnterior = mes === 1 ? ano - 1 : ano;
+    const mesAnterior = mes === 1 ? 12 : mes - 1;
+    const cobreOMesInteiro = diaFim === ultimoDia(ano, mes);
+    const fim = cobreOMesInteiro ? ultimoDia(anoAnterior, mesAnterior) : Math.min(diaFim, ultimoDia(anoAnterior, mesAnterior));
+    return periodoDe(`${anoAnterior}-${dois(mesAnterior)}-01`, `${anoAnterior}-${dois(mesAnterior)}-${dois(fim)}`);
+  }
+  const duracao = periodo.ateTs - periodo.deTs + 1;
+  return periodoDe(dataLocal(periodo.deTs - duracao), dataLocal(periodo.deTs - 1));
+}
+
 app.get("/api/metrics", async (req, res) => {
   const periodo = lerPeriodo(req);
   if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
@@ -282,9 +305,7 @@ app.get("/api/metrics", async (req, res) => {
       escopos[campanha.codigo] = { ...calcularEscopo({ ...base, leads: doEscopo }), porPessoa: indicadoresPorPessoa(doEscopo, base) };
     }
 
-    // Período imediatamente anterior, de mesma duração, para comparação.
-    const duracao = periodo.ateTs - periodo.deTs + 1;
-    const anterior = periodoDe(dataLocal(periodo.deTs - duracao), dataLocal(periodo.deTs - 1));
+    const anterior = periodoAnteriorA(periodo);
     const escoposAnteriores = await resumoDoPeriodo(anterior, agora);
 
     // Metas: sempre sobre o mês corrente, independentemente do filtro.
