@@ -108,33 +108,50 @@ async function chamarApi(caminho, opcoes) {
 const escopo = () => dados.escopos[campanhaSelecionada];
 const daCampanha = (lista) => (campanhaSelecionada === "TODAS" ? lista : lista.filter((l) => l.campanha === campanhaSelecionada));
 
+// [rótulo, valor numérico do indicador, é taxa?]
 const LINHAS_DO_COMPARATIVO = [
-  ["Leads recebidos", (e) => numero(e.volume.leadsRecebidos)],
-  ["Leads contatados", (e) => numero(e.volume.contatados)],
-  ["Com primeira resposta", (e) => numero(e.volume.comPrimeiraResposta)],
-  ["Qualificados", (e) => numero(e.volume.qualificados)],
-  ["Taxa de qualificação", (e) => percentual(e.taxas.qualificacao), true],
-  ["Qualificados sem agendamento", (e) => numero(e.volume.qualificadosSemAgendamento)],
-  ["Qualificado para agendado", (e) => percentual(e.taxas.qualificadoParaAgendado), true],
-  ["Reuniões marcadas", (e) => numero(e.volume.reunioesMarcadas)],
-  ["Reuniões realizadas", (e) => numero(e.volume.reunioesRealizadas)],
-  ["Não realizadas (foram para Remarcação)", (e) => numero(e.volume.naoRealizadas)],
-  ["Taxa de comparecimento", (e) => percentual(e.taxas.comparecimento), true],
-  ["Remarcações recuperadas", (e) => numero(e.volume.remarcacoesRecuperadas)],
-  ["Taxa de remarcação recuperada", (e) => percentual(e.taxas.remarcacaoRecuperada), true],
-  ["Entradas no Protocolo Farmer", (e) => numero(e.volume.entradasEmFarmer)],
-  ["Em reaquecimento (situação atual)", (e) => numero(e.volume.emReaquecimentoAgora)],
-  ["Contratos fechados", (e) => numero(e.volume.fechados)],
-  ["Reunião para fechamento", (e) => percentual(e.taxas.reuniaoParaFechamento), true],
-  ["Conversão final", (e) => percentual(e.taxas.conversaoFinal), true],
-  ["Desqualificados", (e) => numero(e.volume.desqualificados)],
+  ["Leads recebidos", (e) => e.volume.leadsRecebidos],
+  ["Leads contatados", (e) => e.volume.contatados],
+  ["Com primeira resposta", (e) => e.volume.comPrimeiraResposta],
+  ["Qualificados", (e) => e.volume.qualificados],
+  ["Taxa de qualificação", (e) => e.taxas.qualificacao, true],
+  ["Qualificados sem agendamento", (e) => e.volume.qualificadosSemAgendamento],
+  ["Qualificado para agendado", (e) => e.taxas.qualificadoParaAgendado, true],
+  ["Reuniões marcadas", (e) => e.volume.reunioesMarcadas],
+  ["Reuniões realizadas", (e) => e.volume.reunioesRealizadas],
+  ["Não realizadas (foram para Remarcação)", (e) => e.volume.naoRealizadas],
+  ["Taxa de comparecimento", (e) => e.taxas.comparecimento, true],
+  ["Remarcações recuperadas", (e) => e.volume.remarcacoesRecuperadas],
+  ["Taxa de remarcação recuperada", (e) => e.taxas.remarcacaoRecuperada, true],
+  ["Entradas no Protocolo Farmer", (e) => e.volume.entradasEmFarmer],
+  ["Em reaquecimento (situação atual)", (e) => e.volume.emReaquecimentoAgora],
+  ["Contratos fechados", (e) => e.volume.fechados],
+  ["Reunião para fechamento", (e) => e.taxas.reuniaoParaFechamento, true],
+  ["Conversão final", (e) => e.taxas.conversaoFinal, true],
+  ["Desqualificados", (e) => e.volume.desqualificados],
 ];
+
+const formatarIndicador = ([, valor, ehTaxa], e) => (ehTaxa ? percentual(valor(e)) : numero(valor(e)));
+
+// Cor e traço de cada campanha nos gráficos. O traço diferencia as séries
+// também para quem não distingue as cores.
+const ESTILO_DE_CAMPANHA = [
+  { cor: "#b6923f", traco: "" },
+  { cor: "#6ea8d8", traco: "7,3" },
+  { cor: "#4fb38a", traco: "2,3" },
+];
+const estiloDaCampanha = (codigo) => ESTILO_DE_CAMPANHA[Math.max(dados.campanhas.findIndex((c) => c.codigo === codigo), 0) % ESTILO_DE_CAMPANHA.length];
 
 function colunasDoComparativo() {
   return [...dados.campanhas.map((c) => ({ codigo: c.codigo, titulo: c.codigo, descricao: c.nome })), { codigo: "TODAS", titulo: "Total", descricao: "Três campanhas" }];
 }
 
 function renderizarComparativo() {
+  const emGrafico = $("modoComparativo").value === "grafico";
+  $("tabelaComparativo").classList.toggle("hidden", emGrafico);
+  $("graficoComparativo").classList.toggle("hidden", !emGrafico);
+  if (emGrafico) return renderizarComparativoEmGrafico();
+
   const colunas = colunasDoComparativo();
   $("cabecalhoComparativo").innerHTML = `
     <tr class="rotulo text-left">
@@ -142,14 +159,59 @@ function renderizarComparativo() {
       ${colunas.map((c) => `<th class="font-semibold text-right" title="${esc(c.descricao)}">${esc(c.titulo)}</th>`).join("")}
     </tr>`;
   $("corpoComparativo").innerHTML = LINHAS_DO_COMPARATIVO.map(
-    ([rotulo, valor, ehTaxa]) => `
-    <tr class="${ehTaxa ? "destaque" : ""}">
-      <td class="${ehTaxa ? "text-inkdim pl-8 text-xs" : "text-ink"}">${esc(rotulo)}</td>
+    (linha) => `
+    <tr class="${linha[2] ? "destaque" : ""}">
+      <td class="${linha[2] ? "text-inkdim pl-8 text-xs" : "text-ink"}">${esc(linha[0])}</td>
       ${colunas
-        .map((c) => `<td class="text-right tabular ${c.codigo === "TODAS" ? "font-semibold text-ink" : "text-ink/90"} ${ehTaxa ? "text-xs" : ""}">${valor(dados.escopos[c.codigo])}</td>`)
+        .map((c) => `<td class="text-right tabular ${c.codigo === "TODAS" ? "font-semibold text-ink" : "text-ink/90"} ${linha[2] ? "text-xs" : ""}">${formatarIndicador(linha, dados.escopos[c.codigo])}</td>`)
         .join("")}
     </tr>`,
   ).join("");
+}
+
+// Comparativo em gráfico: para cada indicador, uma barra por campanha. Nos
+// volumes, a escala é a do próprio indicador; nas taxas, vai de 0 a 100%.
+function renderizarComparativoEmGrafico() {
+  const bloco = (linha) => {
+    const [rotulo, valor, ehTaxa] = linha;
+    const valores = dados.campanhas.map((c) => valor(dados.escopos[c.codigo]));
+    const maximo = ehTaxa ? 100 : Math.max(...valores, 1);
+    return `
+      <div>
+        <div class="flex items-baseline justify-between gap-2 mb-1">
+          <p class="text-[11px] text-ink">${esc(rotulo)}</p>
+          <p class="text-[10px] text-inkfaint tabular">Total: ${formatarIndicador(linha, dados.escopos.TODAS)}</p>
+        </div>
+        ${dados.campanhas
+          .map((c, i) => {
+            const v = valores[i];
+            const largura = v === null || v === undefined ? 0 : Math.min((v / maximo) * 100, 100);
+            return `<div class="flex items-center gap-2 mb-0.5">
+              <span class="w-12 shrink-0 text-[10px] font-mono text-inkdim">${esc(c.codigo)}</span>
+              <span class="flex-1 h-2.5 bg-surface2 block"><span class="barra h-full block" style="width:${largura}%;background:${estiloDaCampanha(c.codigo).cor}"></span></span>
+              <span class="w-14 shrink-0 text-[11px] tabular text-ink text-right">${formatarIndicador(linha, dados.escopos[c.codigo])}</span>
+            </div>`;
+          })
+          .join("")}
+      </div>`;
+  };
+  const volumes = LINHAS_DO_COMPARATIVO.filter((l) => !l[2]);
+  const taxas = LINHAS_DO_COMPARATIVO.filter((l) => l[2]);
+  $("graficoComparativo").innerHTML = `
+    <div class="flex flex-wrap gap-x-5 gap-y-1 mb-4 text-[11px] text-inkdim">
+      ${dados.campanhas.map((c) => `<span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5" style="background:${estiloDaCampanha(c.codigo).cor}"></span>${esc(c.codigo)} · ${esc(c.nome)}</span>`).join("")}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-5">
+      <div class="lg:col-span-2">
+        <p class="rotulo mb-3">Volumes</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">${volumes.map(bloco).join("")}</div>
+      </div>
+      <div>
+        <p class="rotulo mb-3">Taxas</p>
+        <div class="space-y-4">${taxas.map(bloco).join("")}</div>
+      </div>
+    </div>
+    <p class="text-[10px] text-inkfaint mt-4">Nos volumes, o comprimento da barra é relativo ao maior valor do próprio indicador. Nas taxas, a escala vai de 0 a 100%; um traço indica que não há base de cálculo.</p>`;
 }
 
 function renderizarSeletorDeCampanha() {
@@ -238,8 +300,62 @@ function renderizarBarras(idDoContainer, contagem, detalhe) {
     : '<p class="text-xs text-inkdim">Sem dados no período.</p>';
 }
 
+// Evolução dos leads ao longo das etapas: quantos entraram em cada etapa no
+// período, na ordem do funil. Uma linha por campanha ou uma linha unificada,
+// que segue a campanha selecionada.
+function renderizarEvolucao() {
+  const container = $("graficoEvolucao");
+  const etapas = dados.etapas.filter((e) => e.categoria !== "outra");
+  const unificado = $("modoEvolucao").value === "unificado";
+  const series = unificado
+    ? [{ nome: campanhaSelecionada === "TODAS" ? "Todas as campanhas" : campanhaSelecionada, cor: "#d8b565", traco: "", escopo: escopo() }]
+    : dados.campanhas.map((c) => ({ nome: c.codigo, ...estiloDaCampanha(c.codigo), escopo: dados.escopos[c.codigo] }));
+  for (const s of series) s.valores = etapas.map((e) => s.escopo.entradasPorEtapa[e.chave] || 0);
+
+  const maximo = Math.max(...series.flatMap((s) => s.valores), 1);
+  if (!series.some((s) => s.valores.some((v) => v > 0))) {
+    container.innerHTML = '<p class="text-xs text-inkdim">Nenhum lead movimentado no período.</p>';
+    return;
+  }
+
+  const W = 940, H = 330, ML = 84, MR = 24, MT = 24, MB = 104;
+  const areaW = W - ML - MR, areaH = H - MT - MB, base = MT + areaH;
+  const passo = areaW / (etapas.length - 1);
+  const x = (i) => ML + i * passo;
+  const y = (v) => base - (v / maximo) * areaH;
+
+  const marcas = [0, 0.25, 0.5, 0.75, 1]
+    .map((f) => `<line x1="${ML}" y1="${y(maximo * f)}" x2="${W - MR}" y2="${y(maximo * f)}" stroke="#1f2130"/><text x="${ML - 6}" y="${y(maximo * f) + 3}" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="9" fill="#6b6d7a">${Math.round(maximo * f)}</text>`)
+    .join("");
+  const linhas = series
+    .map((s, si) => {
+      // Com várias linhas, o rótulo alterna acima e abaixo do ponto para reduzir a sobreposição.
+      const deslocamento = unificado || si !== 1 ? -9 : 15;
+      return `<path d="${s.valores.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/>
+      ${s.valores
+        .map(
+          (v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="#0b0c11" stroke="${s.cor}" stroke-width="2"><title>${esc(s.nome)}, ${esc(etapas[i].nome)}: ${v}</title></circle>
+          <text x="${x(i).toFixed(1)}" y="${(y(v) + deslocamento).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" font-weight="600" fill="${s.cor}">${v}</text>`,
+        )
+        .join("")}`;
+    })
+    .join("");
+  const rotulos = etapas
+    .map((e, i) => `<g transform="translate(${x(i).toFixed(1)},${base + 14}) rotate(-28)"><text text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="${corEtapa(e.chave)}">${esc(e.nome)}</text></g>`)
+    .join("");
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução dos leads ao longo das etapas" style="display:block;width:100%;height:auto">
+      ${marcas}<line x1="${ML}" y1="${base}" x2="${W - MR}" y2="${base}" stroke="#33364a"/>${linhas}${rotulos}
+    </svg>
+    <div class="flex flex-wrap gap-x-5 gap-y-1 mt-1 text-[11px] text-inkdim">
+      ${series.map((s) => `<span class="flex items-center gap-1.5"><svg width="20" height="8" aria-hidden="true"><line x1="0" y1="4" x2="20" y2="4" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/></svg>${esc(s.nome)}</span>`).join("")}
+    </div>`;
+}
+
 function renderizarFunil() {
   const e = escopo();
+  renderizarEvolucao();
   renderizarBarras("graficoEntradas", e.entradasPorEtapa);
   renderizarBarras("graficoVolume", e.volumeAtual, (chave) => (e.tempoMedioPorEtapa[chave] !== undefined ? `${e.tempoMedioPorEtapa[chave]} d` : ""));
 }
@@ -475,7 +591,7 @@ function exportarComparativo() {
   baixarCSV(
     `comparativo_${sufixoDoPeriodo()}.csv`,
     ["Indicador", ...colunas.map((c) => c.titulo)],
-    LINHAS_DO_COMPARATIVO.map(([rotulo, valor]) => [rotulo, ...colunas.map((c) => valor(dados.escopos[c.codigo]))]),
+    LINHAS_DO_COMPARATIVO.map((linha) => [linha[0], ...colunas.map((c) => formatarIndicador(linha, dados.escopos[c.codigo]))]),
   );
 }
 
@@ -749,6 +865,8 @@ async function executarAcaoDeCorrecao(acao, eventId) {
 // --- Eventos da página ---------------------------------------------------------
 
 $("btnFiltrar").addEventListener("click", atualizar);
+$("modoComparativo").addEventListener("change", () => dados && renderizarComparativo());
+$("modoEvolucao").addEventListener("change", () => dados && renderizarEvolucao());
 $("seletorOrigem").addEventListener("change", renderizarDestinos);
 $("buscaLeads").addEventListener("input", () => dados && renderizarLeads());
 $("btnExportarComparativo").addEventListener("click", exportarComparativo);

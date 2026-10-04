@@ -66,8 +66,13 @@ function renderizarMapaDoBrasil(container, lista, aoClicar) {
     .join("");
 
   const semEstado = porSigla.get("(não informado)")?.totalLeads || 0;
+  const contagens = lista
+    .filter((g) => MAPA_ESTADOS_BRASIL[g.grupo])
+    .map((g) => `<span class="tabular"><strong class="text-ink">${g.grupo}</strong> ${g.totalLeads}</span>`)
+    .join("");
   container.innerHTML = `
     <svg viewBox="0 0 450 460" role="img" aria-label="Mapa do Brasil com a quantidade de leads por estado" style="display:block;width:100%;max-width:420px;height:auto;margin:0 auto">${estados}</svg>
+    <p class="flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-inkdim mt-3">${contagens}</p>
     <p class="text-[10px] text-inkfaint text-center mt-2">Tom mais claro indica mais leads. Cinza indica nenhum lead no período.${semEstado ? ` ${semEstado} lead(s) sem estado identificado.` : ""}</p>`;
 
   container.querySelectorAll("g[data-sigla]").forEach((g) => {

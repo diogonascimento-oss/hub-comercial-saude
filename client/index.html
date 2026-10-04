@@ -71,9 +71,13 @@
     <section aria-labelledby="tComparativo">
       <div class="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
         <h3 id="tComparativo" class="titulo-secao">1. Comparativo por campanha</h3>
-        <button id="btnExportarComparativo" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Exportar CSV</button>
+        <div class="flex items-center gap-2">
+          <select id="modoComparativo" class="bg-surface2 border border-line text-[11px] text-ink px-2 py-1" aria-label="Modo de exibição do comparativo"><option value="tabela">Tabela</option><option value="grafico">Gráfico</option></select>
+          <button id="btnExportarComparativo" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Exportar CSV</button>
+        </div>
       </div>
-      <div class="border border-line overflow-x-auto">
+      <div id="graficoComparativo" class="hidden border border-line p-5"></div>
+      <div id="tabelaComparativo" class="border border-line overflow-x-auto">
         <table class="comparativo w-full text-sm">
           <thead id="cabecalhoComparativo" class="bg-surface"></thead>
           <tbody id="corpoComparativo">
@@ -100,6 +104,14 @@
     <!-- 3. Funil -->
     <section aria-labelledby="tFunil">
       <h3 id="tFunil" class="titulo-secao mb-3">3. Funil</h3>
+      <div class="border border-line p-5 mb-px">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <p class="rotulo">Evolução dos leads ao longo das etapas</p>
+          <select id="modoEvolucao" class="bg-surface2 border border-line text-[11px] text-ink px-2 py-1" aria-label="Linhas do gráfico"><option value="separado">Uma linha por campanha</option><option value="unificado">Linha unificada</option></select>
+        </div>
+        <p class="text-[11px] text-inkfaint mt-1 mb-3">Leads que entraram em cada etapa no período, na ordem do funil. A linha unificada segue a campanha selecionada acima.</p>
+        <div id="graficoEvolucao"></div>
+      </div>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-px bg-line border border-line">
         <div class="bg-bg p-5">
           <p class="rotulo">Passagem por etapa no período</p>
@@ -289,7 +301,7 @@
             <p class="rotulo">Engajamento por etapa: conjunto de anúncios</p>
             <label class="text-[10px] text-inkdim flex items-center gap-1">Exibir
               <input type="number" id="qtdEngajamentoConjunto" value="5" min="1" max="12" class="w-12 bg-surface2 border border-line px-1 py-0.5 text-ink">
-              <select id="modoEngajamentoConjunto" class="bg-surface2 border border-line text-ink px-1 py-0.5" aria-label="Unidade"><option value="percentual">%</option><option value="quantidade">Qtd.</option></select>
+              <select id="modoEngajamentoConjunto" class="bg-surface2 border border-line text-ink px-1 py-0.5" aria-label="Unidade"><option value="quantidade">Qtd.</option><option value="percentual">%</option></select>
             </label>
           </div>
           <div id="graficoEngajamentoConjunto"></div>
@@ -299,7 +311,7 @@
             <p class="rotulo">Engajamento por etapa: estados</p>
             <label class="text-[10px] text-inkdim flex items-center gap-1">Exibir
               <input type="number" id="qtdEngajamentoEstado" value="5" min="1" max="12" class="w-12 bg-surface2 border border-line px-1 py-0.5 text-ink">
-              <select id="modoEngajamentoEstado" class="bg-surface2 border border-line text-ink px-1 py-0.5" aria-label="Unidade"><option value="percentual">%</option><option value="quantidade">Qtd.</option></select>
+              <select id="modoEngajamentoEstado" class="bg-surface2 border border-line text-ink px-1 py-0.5" aria-label="Unidade"><option value="quantidade">Qtd.</option><option value="percentual">%</option></select>
             </label>
           </div>
           <div id="graficoEngajamentoEstado"></div>
