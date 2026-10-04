@@ -430,6 +430,8 @@ async function renderizarComparacao() {
 function renderizarFormularioDeCusto() {
   const custo = semanaAberta.custo || {};
   const salvo = new Map((custo.porAnuncio || []).map((c) => [c.grupo, c.orcamentoDiario]));
+  const investido = new Map((custo.porAnuncio || []).filter((c) => c.gastoReal !== null && c.gastoReal !== undefined).map((c) => [c.grupo, c.gastoReal]));
+  const meta = custo.meta;
   const grupos = (semanaAberta.analise?.porAnuncioEConjunto || []).map((g) => g.grupo);
   const campo = "w-full bg-surface2 border border-line px-2 py-1.5 text-xs text-ink";
   $("formularioCusto").innerHTML = `
@@ -445,6 +447,7 @@ function renderizarFormularioDeCusto() {
             .map(
               (nome) => `<label class="flex items-center gap-2 mb-1.5">
         <span class="text-[11px] text-ink flex-1 truncate" title="${esc(nome)}">${esc(nome)}</span>
+        ${investido.has(nome) ? `<span class="text-[10px] text-inkdim tabular whitespace-nowrap" title="Valor investido na semana, importado do Meta">${reais(investido.get(nome))} investidos</span>` : ""}
         <input type="number" min="0" step="0.01" data-grupo="${esc(nome)}" value="${salvo.get(nome) ?? ""}" class="campo-custo w-28 bg-surface2 border border-line px-2 py-1 text-xs text-ink">
       </label>`,
             )
@@ -452,8 +455,42 @@ function renderizarFormularioDeCusto() {
         : '<p class="text-inkdim">Nenhum anúncio identificado nos leads desta semana.</p>'
     }
     <button id="btnSalvarCusto" class="mt-3 bg-gold hover:bg-goldbright text-bg font-bold px-4 py-1.5 text-xs uppercase tracking-wide">Salvar orçamento</button>
-    <span id="avisoCusto" class="ml-3 text-positivo" role="status"></span>`;
+    <button id="btnImportarMeta" class="mt-3 ml-2 border border-line hover:border-gold text-ink px-4 py-1.5 text-xs uppercase tracking-wide">Importar valor investido do Meta</button>
+    <span id="avisoCusto" class="ml-3 text-positivo" role="status"></span>
+    <p class="text-[10px] text-inkfaint mt-2">Com o valor importado do Meta, o custo usa o que foi efetivamente investido na semana; sem ele, usa o orçamento diário informado vezes os dias.</p>
+    ${
+      meta
+        ? `<div class="mt-2 text-[10px] text-inkdim">
+        <p>Importado do Meta em ${new Date(meta.importadoEm).toLocaleString("pt-BR")}: ${reais(meta.gastoTotal)} investidos na conta, ${reais(meta.gastoAssociado)} associados a anúncios com leads na semana.</p>
+        ${
+          meta.semLeads?.length
+            ? `<details class="mt-1"><summary class="cursor-pointer">${numero(meta.semLeads.length)} anúncio(s) com investimento e sem lead associado</summary>
+          <ul class="mt-1 space-y-0.5">${meta.semLeads.map((a) => `<li>${esc(a.anuncio)} — ${esc(a.conjunto)}: ${reais(a.gasto)}</li>`).join("")}</ul>
+          <p class="mt-1 text-inkfaint">A associação é pelo nome. Confira se o anúncio e o conjunto gravados no lead, no Kommo, têm o mesmo nome usado no Meta.</p></details>`
+            : ""
+        }
+      </div>`
+        : ""
+    }`;
   $("btnSalvarCusto").addEventListener("click", salvarCusto);
+  $("btnImportarMeta").addEventListener("click", importarGastoDoMeta);
+}
+
+async function importarGastoDoMeta() {
+  const botao = $("btnImportarMeta");
+  botao.disabled = true;
+  botao.textContent = "Importando.";
+  try {
+    semanaAberta = await chamarApi("/trafego/importar-gasto-meta", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ inicio: semanaAberta.inicio, fim: semanaAberta.fim }) });
+    renderizarFormularioDeCusto();
+    $("avisoCusto").textContent = "Valor investido importado.";
+    renderizarComparacao();
+    atualizarGraficoDeCusto();
+  } catch (erro) {
+    alert(`Não foi possível importar do Meta. ${erro.message}`);
+    botao.disabled = false;
+    botao.textContent = "Importar valor investido do Meta";
+  }
 }
 
 async function salvarCusto() {

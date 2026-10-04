@@ -185,23 +185,56 @@ function comCusto(grupo, custoTotal, orcamentoDiario) {
   };
 }
 
-// Cruza o orçamento diário informado para a semana com os grupos calculados.
-// O custo por lead, por qualificado e por contrato é sempre calculado, nunca
-// digitado.
+// Custo de um item do orçamento no período: o valor investido importado do
+// Meta, quando houver; senão, o orçamento diário informado vezes os dias.
+function custoDoItem(item, dias) {
+  if (item.gastoReal !== null && item.gastoReal !== undefined) return item.gastoReal;
+  if (item.orcamentoDiario !== null && item.orcamentoDiario !== undefined) return item.orcamentoDiario * dias;
+  return null;
+}
+
+// Cruza o custo registrado para a semana com os grupos calculados. O custo por
+// lead, por qualificado e por contrato é sempre calculado, nunca digitado.
 export function mesclarCusto(grupos, listaDeCusto, inicio, fim) {
   const dias = diasDoPeriodo(inicio, fim);
   const custoPorGrupo = new Map((listaDeCusto || []).map((c) => [c.grupo, c]));
   return grupos.map((g) => {
     const custo = custoPorGrupo.get(g.grupo);
-    return custo ? comCusto(g, custo.orcamentoDiario * dias, custo.orcamentoDiario) : comCusto(g, null);
+    return custo ? comCusto(g, custoDoItem(custo, dias), custo.orcamentoDiario) : comCusto(g, null);
   });
 }
 
-// Custo total de uma semana salva, somando os conjuntos com orçamento informado.
+// Custo total de uma semana salva, somando os conjuntos com custo registrado.
 export function custoTotalDaSemana(registro) {
   if (!registro.custo?.porAnuncio?.length) return null;
   const dias = diasDoPeriodo(registro.inicio, registro.fim);
-  return registro.custo.porAnuncio.reduce((total, c) => total + (c.orcamentoDiario || 0) * dias, 0);
+  return registro.custo.porAnuncio.reduce((total, c) => total + (custoDoItem(c, dias) || 0), 0);
+}
+
+const normalizarNome = (texto) => String(texto || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+// Associa o valor investido vindo do Meta aos grupos "anúncio — conjunto" da
+// semana. A associação é pelo nome: o anúncio e o conjunto gravados no lead
+// precisam ter o mesmo nome usado no Meta (maiúsculas e espaços são ignorados).
+// O que foi investido em anúncios sem lead na semana é devolvido à parte.
+export function associarGastoDoMeta(grupos, linhas) {
+  const grupoPorNome = new Map((grupos || []).map((g) => [normalizarNome(g.grupo), g.grupo]));
+  const gastoPorGrupo = new Map();
+  const semLeads = [];
+  let gastoTotal = 0;
+  for (const linha of linhas || []) {
+    gastoTotal += linha.gasto;
+    const chave = normalizarNome(chaveAnuncioEConjunto({ anuncio: linha.anuncio.trim(), conjunto: linha.conjunto.trim() }));
+    const grupo = grupoPorNome.get(chave);
+    if (grupo) gastoPorGrupo.set(grupo, (gastoPorGrupo.get(grupo) || 0) + linha.gasto);
+    else if (linha.gasto > 0) semLeads.push({ anuncio: linha.anuncio, conjunto: linha.conjunto, campanha: linha.campanha, gasto: doisDecimais(linha.gasto) });
+  }
+  return {
+    porGrupo: [...gastoPorGrupo].map(([grupo, gasto]) => ({ grupo, gastoReal: doisDecimais(gasto) })),
+    gastoTotal: doisDecimais(gastoTotal),
+    gastoAssociado: doisDecimais([...gastoPorGrupo.values()].reduce((a, b) => a + b, 0)),
+    semLeads: semLeads.sort((a, b) => b.gasto - a.gasto),
+  };
 }
 
 function somarGrupos(listas) {
@@ -251,7 +284,7 @@ export function combinarSemanas(registros) {
     for (const r of registros) {
       const dias = diasDoPeriodo(r.inicio, r.fim);
       for (const c of r.custo.porAnuncio) {
-        custoPorGrupo.set(c.grupo, (custoPorGrupo.get(c.grupo) || 0) + (c.orcamentoDiario || 0) * dias);
+        custoPorGrupo.set(c.grupo, (custoPorGrupo.get(c.grupo) || 0) + (custoDoItem(c, dias) || 0));
       }
     }
     combinado.porAnuncioEConjunto = combinado.porAnuncioEConjunto.map((g) =>

@@ -17,7 +17,8 @@ import { montarMapeamento, nomeDaEtapa } from "./mapeamento.js";
 import { normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
 import { calcularEscopo, etapasParaInterface } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
-import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas } from "./trafego.js";
+import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta } from "./trafego.js";
+import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -118,6 +119,8 @@ function lerPeriodo(req) {
 function responderErro(res, erro, mensagem) {
   const status = erro.response?.status;
   console.error(`${mensagem}:`, erro.message);
+  // Erros já preparados para exibição (por exemplo, os do Meta).
+  if (erro.status && !erro.response) return res.status(erro.status).json({ error: erro.message });
   if (status === 401 || status === 403) {
     return res.status(502).json({ error: "O Kommo recusou o token de acesso. Verifique KOMMO_TOKEN e KOMMO_SUBDOMAIN." });
   }
@@ -144,6 +147,7 @@ app.get("/api/situacao", async (req, res) => {
   const situacao = {
     kommoConfigurado: kommo.kommoConfigurado(),
     armazenamentoPersistente: armazenamento.armazenamentoPersistente(),
+    metaConfigurado: metaConfigurado(),
     mapeamento: null,
   };
   if (situacao.kommoConfigurado) {
@@ -660,13 +664,58 @@ app.post("/api/trafego/custo", async (req, res) => {
       orcamentoMensal: valor(custo.orcamentoMensal),
       orcamentoDiarioTotal: valor(custo.orcamentoDiarioTotal),
       brandingDiario: valor(custo.brandingDiario),
-      porAnuncio: (Array.isArray(custo.porAnuncio) ? custo.porAnuncio : [])
-        .map((c) => ({ grupo: texto(c.grupo, 300), orcamentoDiario: valor(c.orcamentoDiario) }))
-        .filter((c) => c.grupo && c.orcamentoDiario !== null),
+      porAnuncio: juntarCusto(
+        (Array.isArray(custo.porAnuncio) ? custo.porAnuncio : []).map((c) => ({ grupo: texto(c.grupo, 300), orcamentoDiario: valor(c.orcamentoDiario) })),
+        (registro.custo?.porAnuncio || []).map((c) => ({ grupo: c.grupo, gastoReal: c.gastoReal ?? null })),
+      ),
+      meta: registro.custo?.meta || null,
     };
     res.json(await armazenamento.gravarSemana(registro));
   } catch (erro) {
     responderErro(res, erro, "Falha ao salvar o custo");
+  }
+});
+
+// Une, por grupo, o orçamento diário digitado e o valor investido importado do
+// Meta. Ficam só os grupos com pelo menos um dos dois valores.
+function juntarCusto(orcamentos, gastos) {
+  const porGrupo = new Map();
+  const item = (grupo) => porGrupo.get(grupo) || porGrupo.set(grupo, { grupo, orcamentoDiario: null, gastoReal: null }).get(grupo);
+  for (const o of orcamentos) if (o.grupo) item(o.grupo).orcamentoDiario = o.orcamentoDiario ?? null;
+  for (const g of gastos) if (g.grupo) item(g.grupo).gastoReal = g.gastoReal ?? null;
+  return [...porGrupo.values()].filter((c) => c.orcamentoDiario !== null || c.gastoReal !== null);
+}
+
+// Importa do Meta o valor investido na semana e o associa aos anúncios e
+// conjuntos dos leads. O orçamento digitado é preservado; onde houver valor
+// importado, é ele que entra no cálculo do custo.
+app.post("/api/trafego/importar-gasto-meta", async (req, res) => {
+  try {
+    if (!metaConfigurado()) {
+      return res.status(400).json({ error: "Integração com o Meta não configurada. Defina META_TOKEN e META_CONTA_ANUNCIOS no servidor." });
+    }
+    const registro = await semanaDaRequisicao(req, res);
+    if (!registro) return;
+    const linhas = await buscarGastoDoMeta(registro.inicio, registro.fim);
+    const associacao = associarGastoDoMeta(registro.analise?.porAnuncioEConjunto || [], linhas);
+    registro.custo = {
+      orcamentoMensal: registro.custo?.orcamentoMensal ?? null,
+      orcamentoDiarioTotal: registro.custo?.orcamentoDiarioTotal ?? null,
+      brandingDiario: registro.custo?.brandingDiario ?? null,
+      porAnuncio: juntarCusto(
+        (registro.custo?.porAnuncio || []).map((c) => ({ grupo: c.grupo, orcamentoDiario: c.orcamentoDiario ?? null })),
+        associacao.porGrupo,
+      ),
+      meta: {
+        importadoEm: new Date().toISOString(),
+        gastoTotal: associacao.gastoTotal,
+        gastoAssociado: associacao.gastoAssociado,
+        semLeads: associacao.semLeads.slice(0, 50),
+      },
+    };
+    res.json(await armazenamento.gravarSemana(registro));
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao importar o valor investido do Meta");
   }
 });
 

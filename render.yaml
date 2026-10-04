@@ -22,3 +22,8 @@ services:
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
+      # Opcionais: importação do valor investido a partir do Meta.
+      - key: META_TOKEN
+        sync: false
+      - key: META_CONTA_ANUNCIOS
+        sync: false

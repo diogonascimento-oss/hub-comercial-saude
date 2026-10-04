@@ -1,7 +1,7 @@
 // Testes da análise de tráfego e do cálculo de custo.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas } from "../trafego.js";
+import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta } from "../trafego.js";
 
 const DE = 1_000_000;
 const ATE = DE + 7 * 86400;
@@ -80,4 +80,30 @@ test("soma e comparação de semanas", () => {
   assert.deepEqual(c.leads, { atual: 4, anterior: 4, variacaoPct: 0 });
   assert.deepEqual(c.custoPorLead, { atual: 70, anterior: 35, variacaoPct: 100 });
   assert.equal(compararSemanas({ ...s2, custo: null }, s1).custoPorLead, null);
+});
+
+test("valor investido do Meta: associação pelo nome e precedência sobre o orçamento", () => {
+  const grupos = [
+    { grupo: "AD 01 — Pernambuco", totalLeads: 4, qualificados: 2, contratoFechado: 1 },
+    { grupo: "AD 02 — Bahia", totalLeads: 2, qualificados: 0, contratoFechado: 0 },
+  ];
+  const linhas = [
+    { campanha: "C", conjunto: "pernambuco ", anuncio: "ad  01", gasto: 100.5 },
+    { campanha: "C", conjunto: "Pernambuco", anuncio: "AD 01", gasto: 19.5 },
+    { campanha: "C", conjunto: "Ceará", anuncio: "AD 09", gasto: 30 },
+    { campanha: "C", conjunto: "Ceará", anuncio: "AD 10", gasto: 0 },
+  ];
+  const r = associarGastoDoMeta(grupos, linhas);
+  assert.deepEqual(r.porGrupo, [{ grupo: "AD 01 — Pernambuco", gastoReal: 120 }]);
+  assert.deepEqual([r.gastoTotal, r.gastoAssociado], [150, 120]);
+  assert.deepEqual(r.semLeads, [{ anuncio: "AD 09", conjunto: "Ceará", campanha: "C", gasto: 30 }]);
+
+  // O valor investido prevalece sobre o orçamento diário; sem ele, vale o orçamento.
+  const custo = [
+    { grupo: "AD 01 — Pernambuco", orcamentoDiario: 50, gastoReal: 120 },
+    { grupo: "AD 02 — Bahia", orcamentoDiario: 10, gastoReal: null },
+  ];
+  const [a, b] = mesclarCusto(grupos, custo, "2026-09-14", "2026-09-20");
+  assert.deepEqual([a.custoTotal, a.custoPorLead, a.custoPorContratoFechado], [120, 30, 120]);
+  assert.equal(b.custoTotal, 70);
 });

@@ -121,15 +121,15 @@
     <li><span class="text-ink">Região e estado.</span> Deduzidos do DDD do telefone. Telefones em formato não reconhecido ficam sem região.</li>
     <li><span class="text-ink">Engajamento por etapa.</span> Percentual, ou quantidade, de leads de cada grupo que alcançou Contato Iniciado, qualificação, Agendado, Protocolo Farmer e Fechado.</li>
     <li><span class="text-ink">Semana salva.</span> Guarda a análise do período como estava no momento em que foi salva, além do orçamento, das decisões e das observações. Salvar novamente a mesma semana atualiza a análise e preserva o restante.</li>
-    <li><span class="text-ink">Custo.</span> O orçamento diário é informado por anúncio e conjunto, em cada semana. O custo total é o orçamento diário multiplicado pelos dias da semana salva. Custo por lead, por qualificado e por contrato são sempre calculados, nunca digitados. O orçamento de uma semana não altera as demais.</li>
-    <li><span class="text-ink">Soma de semanas.</span> As contagens são somadas e os percentuais recalculados sobre os totais. O custo só é apresentado quando todas as semanas somadas têm orçamento registrado.</li>
+    <li><span class="text-ink">Custo.</span> Há duas fontes, por anúncio e conjunto, em cada semana salva. A primeira é o valor investido importado do Meta, que é o que foi efetivamente gasto no período. A segunda é o orçamento diário informado manualmente, multiplicado pelos dias da semana. Quando existe valor importado, é ele que entra no cálculo; o orçamento vale apenas para os grupos sem valor importado. Custo por lead, por qualificado e por contrato são sempre calculados, nunca digitados. O custo de uma semana não altera as demais.</li>
+    <li><span class="text-ink">Importação do Meta.</span> O valor investido é associado aos leads pelo nome: o anúncio e o conjunto gravados no lead, no Kommo, precisam ter o mesmo nome usado no Meta (diferenças de maiúsculas e de espaços são ignoradas). O investimento em anúncios sem lead associado na semana é listado à parte e não entra no custo por lead de nenhum grupo. A importação é feita sob demanda, por semana; reimportar atualiza os valores.</li>
+    <li><span class="text-ink">Soma de semanas.</span> As contagens são somadas e os percentuais recalculados sobre os totais. O custo só é apresentado quando todas as semanas somadas têm custo registrado.</li>
   </ul>
 
   <h2 class="titulo-secao mt-10 mb-3">11. Itens do protocolo ainda não contemplados</h2>
   <ul class="list-disc pl-5 space-y-1 text-inkdim">
     <li>Contratos assinados como indicador distinto de Fechado: depende de definição sobre qual registro do Kommo marca a assinatura.</li>
     <li>Uso da situação da reunião no cálculo das taxas: hoje ela é exibida à parte, e a taxa de comparecimento continua baseada na movimentação entre colunas.</li>
-    <li>Importação automática do investimento a partir do Meta; hoje o orçamento é informado manualmente por semana.</li>
     <li>Medição dos SLAs em horas úteis.</li>
   </ul>
 

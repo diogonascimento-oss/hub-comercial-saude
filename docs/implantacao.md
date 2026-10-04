@@ -138,7 +138,29 @@ O Worker valida, a cada chamada, a assinatura do token emitido pelo Access. Sem 
 
 ---
 
-## 11. Desenvolvimento local
+## 11. Integração com o Meta (opcional)
+
+Permite importar, por semana salva, o valor efetivamente investido em cada anúncio. Sem ela, o custo continua sendo calculado pelo orçamento diário informado manualmente.
+
+1. Em `developers.facebook.com`, criar um aplicativo do tipo "Empresa", vinculado ao Gerenciador de Negócios do escritório, e adicionar o produto "API de Marketing".
+2. Em `business.facebook.com`, em "Configurações do negócio", "Usuários", "Usuários do sistema", criar um usuário do sistema.
+3. Em "Atribuir ativos", conceder a esse usuário acesso de leitura à conta de anúncios.
+4. Em "Gerar token", selecionar o aplicativo, marcar a permissão `ads_read` e escolher a opção sem expiração.
+5. No Render, em "Environment", cadastrar:
+
+| Variável | Valor |
+|---|---|
+| `META_TOKEN` | Token gerado no passo 4 |
+| `META_CONTA_ANUNCIOS` | Identificador da conta de anúncios, no formato `act_1234567890` |
+
+6. Aguardar o serviço reiniciar. Em `/api/situacao`, o campo `metaConfigurado` deve constar como `true`.
+7. No painel, na aba "Tráfego e campanhas", abrir uma semana salva em "Gerenciar" e usar "Importar valor investido do Meta".
+
+O token não deve ser registrado no repositório nem enviado por mensagem. A associação entre o investimento e os leads é feita pelo nome do anúncio e do conjunto; por isso os campos correspondentes do lead, no Kommo, precisam ser preenchidos com os mesmos nomes usados no Meta.
+
+---
+
+## 12. Desenvolvimento local
 
 ```bash
 cd server
