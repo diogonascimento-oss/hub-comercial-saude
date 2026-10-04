@@ -68,6 +68,7 @@ function renderizarMapaDoBrasil(container, lista, aoClicar) {
   const semEstado = porSigla.get("(não informado)")?.totalLeads || 0;
   const contagens = lista
     .filter((g) => MAPA_ESTADOS_BRASIL[g.grupo])
+    .sort((a, b) => b.totalLeads - a.totalLeads || a.grupo.localeCompare(b.grupo))
     .map((g) => `<span class="tabular"><strong class="text-ink">${g.grupo}</strong> ${g.totalLeads}</span>`)
     .join("");
   container.innerHTML = `

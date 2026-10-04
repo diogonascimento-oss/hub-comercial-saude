@@ -58,23 +58,33 @@ function renderizarListaDeGrupos(container, lista, limite = 8) {
     return;
   }
   const grupos = lista.slice(0, limite);
+  // Cada quantidade abre a relação dos leads correspondentes.
+  const CONTAGENS = [
+    { campo: "totalLeads", lista: "leads", rotulo: "leads", titulo: "todos os leads" },
+    { campo: "qualificados", lista: "leadsQualificados", rotulo: "qualificados", titulo: "qualificados" },
+    { campo: "reuniao", lista: "leadsReuniao", rotulo: "reuniões", titulo: "com reunião marcada" },
+    { campo: "contratoFechado", lista: "leadsFechados", rotulo: "fechados", titulo: "contratos fechados" },
+  ];
   container.innerHTML =
     grupos
       .map((g, i) => {
         const cor = g.percentualQualificados >= 50 ? "text-positivo" : g.percentualQualificados >= 25 ? "text-goldbright" : "text-negativo";
         return `
-      <button data-indice="${i}" class="w-full text-left flex items-center justify-between gap-2 py-1.5 border-b border-line last:border-0 hover:bg-surface2">
-        <span class="min-w-0 flex-1">
-          <span class="block text-[11px] text-ink truncate" title="${esc(g.grupo)}">${esc(g.grupo)}</span>
-          <span class="block text-[10px] text-inkfaint tabular">${numero(g.totalLeads)} leads · ${numero(g.qualificados)} qualificados · ${numero(g.reuniao)} reuniões · ${numero(g.contratoFechado)} fechados</span>
-        </span>
+      <div class="flex items-center justify-between gap-2 py-1.5 border-b border-line last:border-0">
+        <div class="min-w-0 flex-1">
+          <p class="text-[11px] text-ink truncate" title="${esc(g.grupo)}">${esc(g.grupo)}</p>
+          <p class="text-[10px] text-inkfaint tabular flex flex-wrap gap-x-1">
+            ${CONTAGENS.map((c, ci) => `<button data-grupo="${i}" data-contagem="${ci}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">${numero(g[c.campo])} ${c.rotulo}</button>`).join('<span aria-hidden="true">·</span>')}
+          </p>
+        </div>
         <span class="${cor} font-semibold tabular shrink-0">${percentual(g.percentualQualificados)}</span>
-      </button>`;
+      </div>`;
       })
       .join("") + (lista.length > limite ? `<p class="text-[10px] text-inkfaint pt-2">Mais ${numero(lista.length - limite)} grupo(s) no relatório exportado.</p>` : "");
-  container.querySelectorAll("button[data-indice]").forEach((botao) => {
-    const g = grupos[Number(botao.dataset.indice)];
-    botao.addEventListener("click", () => abrirLeadsDoGrupo(g.grupo, g.leads));
+  container.querySelectorAll("button[data-grupo]").forEach((botao) => {
+    const g = grupos[Number(botao.dataset.grupo)];
+    const c = CONTAGENS[Number(botao.dataset.contagem)];
+    botao.addEventListener("click", () => abrirLeadsDoGrupo(`${g.grupo}: ${c.titulo}`, g[c.lista] || []));
   });
 }
 

@@ -90,6 +90,7 @@ function agruparEComputar(leads, chaveDoGrupo) {
     const qualificados = doGrupo.filter((l) => l.qualificado);
     const reuniao = passou("AGENDADO");
     const farmer = passou("PROTOCOLO_FARMER");
+    const fechados = passou("FECHADO");
     resultado.push({
       grupo,
       totalLeads: doGrupo.length,
@@ -100,13 +101,14 @@ function agruparEComputar(leads, chaveDoGrupo) {
       remarcacao: passou("REMARCACAO").length,
       farmer: farmer.length,
       reaquecimento: passou("REAQUECIMENTO").length,
-      contratoFechado: passou("FECHADO").length,
+      contratoFechado: fechados.length,
       desqualificados: passou("DESQUALIFICADO").length,
       // Listas para o detalhamento "quem são esses leads".
       leads: doGrupo.map(resumoDoLead),
       leadsQualificados: qualificados.map(resumoDoLead),
       leadsReuniao: reuniao.map(resumoDoLead),
       leadsFarmer: farmer.map(resumoDoLead),
+      leadsFechados: fechados.map(resumoDoLead),
     });
   }
   return resultado.sort((a, b) => b.totalLeads - a.totalLeads);
@@ -205,7 +207,7 @@ export function custoTotalDaSemana(registro) {
 function somarGrupos(listas) {
   const soma = new Map();
   const campos = ["totalLeads", "qualificados", "reuniao", "remarcacao", "farmer", "reaquecimento", "contratoFechado", "desqualificados"];
-  const listasDeLeads = ["leads", "leadsQualificados", "leadsReuniao", "leadsFarmer"];
+  const listasDeLeads = ["leads", "leadsQualificados", "leadsReuniao", "leadsFarmer", "leadsFechados"];
   for (const lista of listas) {
     for (const g of lista || []) {
       if (!soma.has(g.grupo)) {

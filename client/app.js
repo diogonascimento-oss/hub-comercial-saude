@@ -311,6 +311,8 @@ function renderizarEvolucao() {
     ? [{ nome: campanhaSelecionada === "TODAS" ? "Todas as campanhas" : campanhaSelecionada, cor: "#d8b565", traco: "", escopo: escopo() }]
     : dados.campanhas.map((c) => ({ nome: c.codigo, ...estiloDaCampanha(c.codigo), escopo: dados.escopos[c.codigo] }));
   for (const s of series) s.valores = etapas.map((e) => s.escopo.entradasPorEtapa[e.chave] || 0);
+  // Campanha de cada série, para localizar os leads no detalhamento.
+  series.forEach((s, i) => (s.campanha = unificado ? campanhaSelecionada : dados.campanhas[i].codigo));
 
   const maximo = Math.max(...series.flatMap((s) => s.valores), 1);
   if (!series.some((s) => s.valores.some((v) => v > 0))) {
@@ -334,7 +336,7 @@ function renderizarEvolucao() {
       return `<path d="${s.valores.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/>
       ${s.valores
         .map(
-          (v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="#0b0c11" stroke="${s.cor}" stroke-width="2"><title>${esc(s.nome)}, ${esc(etapas[i].nome)}: ${v}</title></circle>
+          (v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="5" fill="#0b0c11" stroke="${s.cor}" stroke-width="2" style="cursor:pointer" data-serie="${si}" data-etapa="${i}"><title>${esc(s.nome)}, ${esc(etapas[i].nome)}: ${v}</title></circle>
           <text x="${x(i).toFixed(1)}" y="${(y(v) + deslocamento).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" font-weight="600" fill="${s.cor}">${v}</text>`,
         )
         .join("")}`;
@@ -351,12 +353,22 @@ function renderizarEvolucao() {
     <div class="flex flex-wrap gap-x-5 gap-y-1 mt-1 text-[11px] text-inkdim">
       ${series.map((s) => `<span class="flex items-center gap-1.5"><svg width="20" height="8" aria-hidden="true"><line x1="0" y1="4" x2="20" y2="4" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/></svg>${esc(s.nome)}</span>`).join("")}
     </div>`;
+
+  container.querySelectorAll("circle[data-serie]").forEach((ponto) => {
+    ponto.addEventListener("click", () => {
+      const serie = series[Number(ponto.dataset.serie)];
+      const etapa = etapas[Number(ponto.dataset.etapa)];
+      const leads = dados.listas.leadsPorEtapa
+        .filter((l) => l.etapas.includes(etapa.chave) && (serie.campanha === "TODAS" || l.campanha === serie.campanha))
+        .map((l) => ({ nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
+      abrirLeadsDoGrupo(`${serie.nome}: entraram em ${etapa.nome}`, leads);
+    });
+  });
 }
 
 function renderizarFunil() {
   const e = escopo();
   renderizarEvolucao();
-  renderizarBarras("graficoEntradas", e.entradasPorEtapa);
   renderizarBarras("graficoVolume", e.volumeAtual, (chave) => (e.tempoMedioPorEtapa[chave] !== undefined ? `${e.tempoMedioPorEtapa[chave]} d` : ""));
 }
 

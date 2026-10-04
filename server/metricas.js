@@ -340,7 +340,20 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
   };
 
   if (incluirListas) {
+    // Etapas em que cada lead entrou no período, para o detalhamento do
+    // gráfico de evolução.
+    const etapasPorLead = new Map();
+    for (const [chave, porLead] of entradas) {
+      for (const leadId of porLead.keys()) {
+        if (!etapasPorLead.has(leadId)) etapasPorLead.set(leadId, []);
+        etapasPorLead.get(leadId).push(chave);
+      }
+    }
     resultado.listas = {
+      leadsPorEtapa: [...etapasPorLead].map(([leadId, etapas]) => {
+        const l = porId.get(leadId);
+        return { id: l.id, nome: l.nome, telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, etapas };
+      }),
       leadsDoPeriodo: leads
         .filter((l) => ultimaEtapaNoPeriodo.has(l.id))
         .map((l) => ({
