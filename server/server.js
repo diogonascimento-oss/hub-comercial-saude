@@ -21,7 +21,7 @@ import {
   ROTULO_SEM_RASTREIO_DE_ANUNCIO,
 } from "./config.js";
 import * as kommo from "./kommo.js";
-import { montarMapeamento, nomeDaEtapa } from "./mapeamento.js";
+import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
 import { normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
 import { calcularEscopo, etapasParaInterface } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
@@ -531,6 +531,7 @@ app.get("/api/leads/:id", async (req, res) => {
 
     // Campos de data chegam do Kommo como número de segundos; são convertidos
     // para o horário do escritório.
+    const funilDoLead = bruto.pipeline_id;
     const TIPOS_DE_DATA = { date: { dateStyle: "short" }, birthday: { dateStyle: "short" }, date_time: { dateStyle: "short", timeStyle: "short" } };
     const valorLegivel = (campo, v) => {
       const bruto = v?.value;
@@ -539,6 +540,15 @@ app.get("/api/leads/:id", async (req, res) => {
         return new Date(Number(bruto) * 1000).toLocaleString("pt-BR", { ...formato, timeZone: "America/Recife" });
       }
       if (typeof bruto === "boolean") return bruto ? "Sim" : "Não";
+      // Marcação das automações no formato "ID da coluna|data": é traduzida
+      // para o nome da etapa, mantendo o registro original ao lado.
+      const marcacao = /^(\d+)\|(\d{4})-(\d{2})-(\d{2})$/.exec(String(bruto ?? "").trim());
+      if (marcacao) {
+        const etapa = resolverEtapa(mapeamento, funilDoLead, marcacao[1]);
+        if (etapa?.nome && !/^Coluna \d+$/.test(etapa.nome)) {
+          return `${etapa.nome}, desde ${marcacao[4]}/${marcacao[3]}/${marcacao[2]} (registro: ${marcacao[0]})`;
+        }
+      }
       return String(bruto ?? "").trim();
     };
     const camposPreenchidos = (campos) =>
