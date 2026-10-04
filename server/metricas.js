@@ -59,6 +59,42 @@ export function leituraDaSituacao(valor) {
   return null;
 }
 
+// Reuniões de um lead, uma por agendamento, com o desfecho e o critério que o
+// definiu. Usa as mesmas regras de calcularEscopo, sobre todo o histórico do
+// lead, e serve à ficha do lead.
+export function reunioesDoLead(lead, eventos) {
+  const validos = eventos.filter((e) => e.para);
+  const ultimaSaida = validos.findLast((e) => e.de === "AGENDADO" && e.para !== "AGENDADO") || null;
+  const reunioes = [];
+  let aberta = null;
+  for (const ev of validos) {
+    if (ev.para === "AGENDADO" && ev.de !== "AGENDADO") {
+      aberta = { agendadaEm: ev.ts, veioDeRemarcacao: ev.de === "REMARCACAO", desfechoEm: null, resultado: "Em aberto", criterio: "" };
+      reunioes.push(aberta);
+    } else if (ev.de === "AGENDADO" && ev.para !== "AGENDADO" && aberta) {
+      const comEtiqueta = ev.para === "DESQUALIFICADO" && lead.tags.includes(ETIQUETAS.reuniaoRealizada);
+      const pelaMovimentacao = ETAPAS_REUNIAO_REALIZADA.includes(ev.para) || comEtiqueta;
+      const peloCampo = ev === ultimaSaida ? leituraDaSituacao(lead.situacaoDaReuniao) : null;
+      const realizada = peloCampo ?? pelaMovimentacao;
+      aberta.desfechoEm = ev.ts;
+      aberta.destino = ev.para;
+      if (realizada) aberta.resultado = "Realizada";
+      else if (ev.para === "REMARCACAO" || peloCampo === false) aberta.resultado = "Não realizada";
+      else if (ev.para === "DESQUALIFICADO") aberta.resultado = "Perdida antes da reunião";
+      else aberta.resultado = "Saída de Agendado sem desfecho reconhecido";
+      aberta.criterio =
+        peloCampo !== null
+          ? `campo Situação da reunião ("${lead.situacaoDaReuniao}")`
+          : comEtiqueta
+            ? "etiqueta REUNIAO_REALIZADA"
+            : "movimentação entre colunas";
+      aberta.divergente = peloCampo !== null && peloCampo !== pelaMovimentacao;
+      aberta = null;
+    }
+  }
+  return reunioes;
+}
+
 // leads: leads normalizados do escopo (uma campanha ou todas).
 // eventosPorLead: Map leadId -> eventos do período, em ordem cronológica, já
 //   sem os excluídos e com as correções aplicadas.

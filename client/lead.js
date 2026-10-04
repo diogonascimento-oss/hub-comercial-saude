@@ -92,6 +92,47 @@ function blocoDaFicha(titulo, linhas) {
     </section>`;
 }
 
+// Reuniões do lead, com o desfecho que o painel considerou e o critério usado.
+function blocoDeReunioes(l) {
+  if (!l.reunioes?.length) return "";
+  const cor = { Realizada: "text-positivo", "Não realizada": "text-negativo", "Em aberto": "text-goldbright" };
+  return `
+    <section>
+      <p class="rotulo mb-2">Reuniões (${numero(l.reunioes.length)})</p>
+      <ol class="space-y-2.5">${l.reunioes
+        .map(
+          (r, i) => `<li class="border border-line p-3">
+          <p class="flex items-baseline justify-between gap-3">
+            <span class="text-ink">${i + 1}ª reunião${r.veioDeRemarcacao ? ' <span class="text-inkfaint">(remarcação)</span>' : ""}</span>
+            <span class="font-semibold ${cor[r.resultado] || "text-inkdim"}">${esc(r.resultado)}</span>
+          </p>
+          <p class="text-inkdim mt-1">Agendada em ${dataHoraBr(r.agendadaEm)}${r.desfechoEm ? ` · saiu de Agendado em ${dataHoraBr(r.desfechoEm)}, para ${esc(r.destino)}` : " · o lead continua em Agendado"}</p>
+          ${r.criterio ? `<p class="text-[10px] text-inkfaint mt-1">Desfecho definido por: ${esc(r.criterio)}.</p>` : ""}
+          ${r.divergente ? '<p class="text-[10px] text-goldbright mt-1">O campo diz uma coisa e a coluna de destino indica outra. Prevaleceu o campo.</p>' : ""}
+        </li>`,
+        )
+        .join("")}</ol>
+      <p class="text-[10px] text-inkfaint mt-2">É assim que cada reunião deste lead entra nas taxas do painel.</p>
+    </section>`;
+}
+
+// Campos que o Make grava no lead para conduzir a sequência de mensagens automáticas.
+function blocoDaCadencia(campos) {
+  if (!campos.length) return "";
+  const rotulos = [
+    [/etapa/i, "Etapa em que a cadência está"],
+    [/passo/i, "Passo da sequência"],
+    [/pr[oó]ximo envio/i, "Próximo envio automático"],
+  ];
+  const nomeLegivel = (nome) => rotulos.find(([padrao]) => padrao.test(nome))?.[1] || nome;
+  return (
+    blocoDaFicha("Cadência de mensagens automáticas", campos.map((c) => [nomeLegivel(c.nome), esc(c.valor)])).replace(
+      "</section>",
+      '<p class="text-[10px] text-inkfaint mt-2">Preenchido pelo Make para controlar a sequência de mensagens automáticas. O passo indica em que ponto da sequência o lead está. A equipe não precisa preencher nem alterar esses campos.</p></section>',
+    )
+  );
+}
+
 function renderizarFicha(l) {
   const loc = l.localizacao;
   const localizacao = !loc.reconhecido
@@ -130,6 +171,7 @@ function renderizarFicha(l) {
       ["Motivo de perda", texto(l.motivoPerda)],
       ["Etiquetas", l.etiquetas.length ? l.etiquetas.map((t) => `<span class="inline-block border border-line px-1.5 py-0.5 mr-1 mb-1 text-[10px] text-inkdim">${esc(t)}</span>`).join("") : ""],
     ]) +
+    blocoDeReunioes(l) +
     blocoDaFicha("Origem de marketing", [
       ["Campanha Meta", texto(l.origem.campanhaMeta) || semOrigem],
       ["Conjunto de anúncios", texto(l.origem.conjunto) || semOrigem],
@@ -141,7 +183,7 @@ function renderizarFicha(l) {
       ["Farmer", texto(l.responsaveis.farmer)],
     ]) +
     blocoDaFicha("Demais campos preenchidos no Kommo", outrosCampos.map((c) => [c.nome, esc(c.valor)])) +
-    blocoDaFicha("Controle das automações (uso técnico)", camposTecnicos.map((c) => [c.nome, `<span class="font-mono text-inkdim">${esc(c.valor)}</span>`])) +
+    blocoDaCadencia(camposTecnicos) +
     `<section>
       <p class="rotulo mb-2">Histórico de movimentações (${numero(l.historico.length)})</p>
       ${

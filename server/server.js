@@ -23,7 +23,7 @@ import {
 import * as kommo from "./kommo.js";
 import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
 import { normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
-import { calcularEscopo, etapasParaInterface } from "./metricas.js";
+import { calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
 import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta } from "./trafego.js";
 import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
@@ -563,9 +563,20 @@ app.get("/api/leads/:id", async (req, res) => {
 
     const idsExcluidos = new Set(exclusoes.map((e) => String(e.eventId)));
     const correcoesPorId = new Map(correcoes.map((c) => [String(c.eventId), c]));
-    const historico = aplicarCorrecoes(eventosBrutos, correcoesPorId)
+    const eventosDoLead = aplicarCorrecoes(eventosBrutos, correcoesPorId)
       .map((ev) => normalizarEvento(ev, mapeamento))
-      .sort((a, b) => a.ts - b.ts)
+      .sort((a, b) => a.ts - b.ts);
+    // As reuniões seguem o cálculo do painel: movimentações excluídas não contam.
+    const reunioes = reunioesDoLead(lead, eventosDoLead.filter((ev) => !idsExcluidos.has(ev.id))).map((r) => ({
+      agendadaEm: iso(r.agendadaEm),
+      desfechoEm: iso(r.desfechoEm),
+      destino: r.destino ? nomeDaEtapa(r.destino) : null,
+      veioDeRemarcacao: r.veioDeRemarcacao,
+      resultado: r.resultado,
+      criterio: r.criterio,
+      divergente: Boolean(r.divergente),
+    }));
+    const historico = eventosDoLead
       .map((ev) => ({
         data: iso(ev.ts),
         de: nomeDaEtapa(ev.de),
@@ -597,6 +608,7 @@ app.get("/api/leads/:id", async (req, res) => {
       responsaveis: lead.responsaveis,
       situacaoDaReuniao: lead.situacaoDaReuniao,
       substatusFarmer: lead.substatusFarmer,
+      reunioes,
       camposDoLead: camposPreenchidos(bruto.custom_fields_values),
       camposDoContato: camposPreenchidos(contato?.custom_fields_values),
       historico,

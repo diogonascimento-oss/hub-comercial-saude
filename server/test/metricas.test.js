@@ -1,7 +1,7 @@
 // Testes do cálculo de indicadores com um cenário pequeno, conferido à mão.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calcularEscopo, leituraDaSituacao } from "../metricas.js";
+import { calcularEscopo, leituraDaSituacao, reunioesDoLead } from "../metricas.js";
 import { segundosUteis } from "../expediente.js";
 
 const HORA = 3600;
@@ -212,4 +212,20 @@ test("situação da reunião: o campo decide e a movimentação é a reserva", (
   assert.deepEqual([r.volume.reunioesMarcadas, r.volume.reunioesRealizadas, r.volume.naoRealizadas], [4, 2, 2]);
   assert.equal(r.taxas.comparecimento, 50);
   assert.deepEqual([r.registros.situacaoDaReuniao.desfechosPeloCampo, r.registros.situacaoDaReuniao.desfechosDivergentes], [2, 2]);
+});
+
+test("reuniões do lead: desfecho e critério de cada agendamento", () => {
+  const eventos = [
+    ev(1, 1 * HORA, "LEAD_QUALIFICADO", "AGENDADO"),
+    ev(1, 2 * HORA, "AGENDADO", "REMARCACAO"),
+    ev(1, 3 * HORA, "REMARCACAO", "AGENDADO"),
+    ev(1, 4 * HORA, "AGENDADO", "REMARCACAO"),
+    ev(1, 5 * HORA, "REMARCACAO", "AGENDADO"),
+  ];
+  const r = reunioesDoLead(lead(1, "AGENDADO", { situacaoDaReuniao: "Realizada" }), eventos);
+  assert.deepEqual(r.map((x) => x.resultado), ["Não realizada", "Realizada", "Em aberto"]);
+  assert.equal(r[0].criterio, "movimentação entre colunas");
+  assert.match(r[1].criterio, /campo Situação da reunião/);
+  assert.equal(r[1].divergente, true);
+  assert.equal(r[1].veioDeRemarcacao, true);
 });
