@@ -58,7 +58,7 @@
         <tr><td class="px-3 py-2 text-ink">Qualificados</td><td class="px-3 py-2">Leads que entraram em Lead Qualificado no período. Como a coluna é de passagem, também conta quem foi movido diretamente de uma etapa anterior à qualificação para Em Agendamento ou Agendado.</td></tr>
         <tr><td class="px-3 py-2 text-ink">Qualificados sem agendamento</td><td class="px-3 py-2">Qualificados no período que não entraram em Agendado depois da qualificação, dentro do período.</td></tr>
         <tr><td class="px-3 py-2 text-ink">Reuniões marcadas</td><td class="px-3 py-2">Entradas em Agendado no período. É uma contagem de agendamentos: o mesmo lead conta mais de uma vez se foi reagendado. São remarcações as entradas vindas de Remarcação e a segunda entrada em diante do mesmo lead.</td></tr>
-        <tr><td class="px-3 py-2 text-ink">Reuniões realizadas</td><td class="px-3 py-2">Saídas de Agendado para Protocolo Farmer, Reaquecimento ou Fechado, ocorridas no período. A saída para Desqualificado conta como realizada somente se o lead tiver a etiqueta REUNIAO_REALIZADA.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Reuniões realizadas</td><td class="px-3 py-2">Saídas de Agendado ocorridas no período em que a reunião aconteceu, conforme o campo "Situação da reunião". Sem o campo, contam as saídas para Protocolo Farmer, Reaquecimento ou Fechado; a saída para Desqualificado conta somente se o lead tiver a etiqueta REUNIAO_REALIZADA.</td></tr>
         <tr><td class="px-3 py-2 text-ink">Não realizadas</td><td class="px-3 py-2">Saídas de Agendado para Remarcação, quando o agendamento também ocorreu no período. Reúne ausências e pedidos de remarcação; a separação depende da etiqueta NO_SHOW (seção 6).</td></tr>
         <tr><td class="px-3 py-2 text-ink">Reuniões em aberto</td><td class="px-3 py-2">Leads agendados no período que continuam na coluna Agendado no momento da consulta.</td></tr>
         <tr><td class="px-3 py-2 text-ink">Remarcações recuperadas</td><td class="px-3 py-2">Movimentações de Remarcação para Agendado no período. "Recuperadas e realizadas" são as que, em seguida, tiveram a reunião realizada.</td></tr>
@@ -83,6 +83,7 @@
     </table>
   </div>
   <p class="mt-3 text-inkdim">As taxas de qualificação, de reunião para fechamento e de conversão final relacionam fatos ocorridos no mesmo período, e não o mesmo grupo de leads. Um contrato fechado neste mês pode vir de um lead recebido no mês anterior. Em períodos curtos essas taxas oscilam mais e podem superar 100%. Para avaliar uma campanha, recomenda-se um período de pelo menos um mês.</p>
+  <p class="mt-2 text-inkdim"><span class="text-ink">Reunião realizada.</span> O desfecho de cada reunião é definido pelo campo "Situação da reunião" do lead. Quando o campo está vazio, ou traz um valor que não permite concluir (por exemplo, "Remarcada"), vale a movimentação entre colunas: saída de Agendado para Protocolo Farmer, Reaquecimento ou Fechado é reunião realizada; saída para Remarcação é reunião não realizada. Como o campo guarda apenas a situação mais recente, ele decide somente a última saída de Agendado de cada lead; as anteriores seguem a movimentação. A seção "Perdas e registros" informa quantos desfechos foram definidos pelo campo e quantos divergem da movimentação.</p>
   <p class="mt-2 text-inkdim">As taxas de comparecimento e de não realização consideram apenas desfechos de reuniões marcadas dentro do período. Sem essa regra, a ausência de um lead agendado no mês anterior entraria na taxa deste mês sem ter entrado na base. Enquanto houver reuniões em aberto, essas duas taxas ainda podem mudar.</p>
 
   <h2 class="titulo-secao mt-10 mb-3">5. Tempos de atendimento</h2>
@@ -91,7 +92,8 @@
     <li><span class="text-ink">Até a primeira resposta:</span> da entrada em Contato Iniciado até a entrada em Em Qualificação.</li>
     <li><span class="text-ink">Da qualificação ao agendamento:</span> da qualificação até a primeira entrada em Agendado.</li>
   </ul>
-  <p class="mt-3 text-inkdim">O painel exibe a mediana, menos sensível a casos extremos, e a média. A contagem é de tempo corrido, incluindo noites, fins de semana e feriados. Ela não equivale à medição dos SLAs do protocolo, que consideram apenas o expediente de segunda a sexta, das 8h30 às 18h.</p>
+  <p class="mt-3 text-inkdim">Os três tempos são medidos em horas úteis: segunda a sexta, das 8h às 18h, no horário do escritório. O que acontece fora do expediente não conta; um lead que chega na sexta às 19h e é atendido na segunda às 9h soma uma hora. O sábado não entra na conta, porque o atendimento nesse dia é eventual, e feriados não são descontados. O painel exibe a mediana, menos sensível a casos extremos, e a média, e informa também a mediana em tempo corrido, para referência.</p>
+  <p class="mt-2 text-inkdim">O tempo médio em cada etapa e o alerta de leads parados continuam em dias corridos.</p>
 
   <h2 class="titulo-secao mt-10 mb-3">6. Indicadores baseados em etiquetas</h2>
   <p>Parte das informações do protocolo não está na coluna em que o lead se encontra, e sim em etiquetas aplicadas pela automação:</p>
@@ -137,11 +139,11 @@
     <li><span class="text-ink">Soma de semanas.</span> As contagens são somadas e os percentuais recalculados sobre os totais. O custo só é apresentado quando todas as semanas somadas têm custo registrado.</li>
   </ul>
 
-  <h2 class="titulo-secao mt-10 mb-3">11. Itens do protocolo ainda não contemplados</h2>
+  <h2 class="titulo-secao mt-10 mb-3">11. Definições adotadas</h2>
   <ul class="list-disc pl-5 space-y-1 text-inkdim">
-    <li>Contratos assinados como indicador distinto de Fechado: depende de definição sobre qual registro do Kommo marca a assinatura.</li>
-    <li>Uso da situação da reunião no cálculo das taxas: hoje ela é exibida à parte, e a taxa de comparecimento continua baseada na movimentação entre colunas.</li>
-    <li>Medição dos SLAs em horas úteis.</li>
+    <li><span class="text-ink">Contrato fechado.</span> O painel considera contrato fechado a entrada do lead na etapa Fechado. Não há indicador separado para a assinatura do contrato.</li>
+    <li><span class="text-ink">Expediente.</span> Segunda a sexta, das 8h às 18h, sem desconto de feriados.</li>
+    <li><span class="text-ink">Situação da reunião.</span> O campo do lead prevalece sobre a movimentação entre colunas, que permanece como reserva.</li>
   </ul>
 
   <footer class="mt-10 pt-4 border-t border-line text-[10px] text-inkfaint text-right">

@@ -38,6 +38,16 @@ function duracao(segundos) {
   return `${dias} dias ${horas % 24} h`;
 }
 
+// Tempo medido em horas úteis: não é convertido em dias, porque um dia de
+// expediente tem dez horas, e não vinte e quatro.
+function duracaoUtil(segundos) {
+  if (segundos === null || segundos === undefined) return "—";
+  const minutos = Math.round(segundos / 60);
+  if (minutos < 1) return "menos de 1 min";
+  if (minutos < 60) return `${minutos} min`;
+  return `${Math.floor(minutos / 60)} h ${String(minutos % 60).padStart(2, "0")} min`;
+}
+
 const nomeEtapa = (chave) => nomesDasEtapas.get(chave) || (chave?.startsWith("OUTRA:") ? chave.slice(6) : chave || "—");
 
 const CORES_DE_CATEGORIA = { triagem: "#8d8f9b", avanco: "#b6923f", sucesso: "#4fb38a", perda: "#d0685a", outra: "#5d6070" };
@@ -307,7 +317,7 @@ const REGRAS_DOS_INDICADORES = {
   qualificados: ["Qualificados", "Leads que entraram na coluna Lead Qualificado dentro do período. Também conta quem foi movido direto de uma etapa anterior à qualificação para Em Agendamento ou Agendado."],
   qualificadosSemAgendamento: ["Qualificados sem agendamento", "Leads qualificados no período que não entraram em Agendado depois da qualificação, dentro do período."],
   reunioesMarcadas: ["Leads com reunião marcada", "Leads que entraram na coluna Agendado dentro do período. O número do cartão conta agendamentos: um lead reagendado conta mais de uma vez no cartão e uma vez nesta lista."],
-  reunioesRealizadas: ["Leads com reunião realizada", "Leads que saíram de Agendado para Protocolo Farmer, Reaquecimento ou Fechado dentro do período. A saída para Desqualificado conta somente se o lead tiver a etiqueta REUNIAO_REALIZADA."],
+  reunioesRealizadas: ["Leads com reunião realizada", "Leads que saíram de Agendado dentro do período com a reunião realizada, conforme o campo Situação da reunião. Sem o campo preenchido, contam as saídas para Protocolo Farmer, Reaquecimento ou Fechado; a saída para Desqualificado conta somente se o lead tiver a etiqueta REUNIAO_REALIZADA."],
   naoRealizadas: ["Leads com reunião não realizada", "Leads que saíram de Agendado para Remarcação, quando o agendamento também ocorreu dentro do período."],
   remarcacoesRecuperadas: ["Remarcações recuperadas", "Leads movidos de Remarcação para Agendado dentro do período."],
   fechados: ["Contratos fechados", "Leads que entraram na coluna final de venda ganha dentro do período."],
@@ -481,10 +491,11 @@ function renderizarTempos() {
   const t = escopo().tempos;
   const bloco = (titulo, descricao, r) => `
     <div class="p-5">
-      <p class="font-serif text-2xl font-semibold tabular text-ink">${duracao(r.medianaSeg)}</p>
+      <p class="font-serif text-2xl font-semibold tabular text-ink">${duracaoUtil(r.medianaSeg)}</p>
       <p class="rotulo mt-2">${esc(titulo)}</p>
       <p class="text-[11px] text-inkdim mt-2 leading-relaxed">${esc(descricao)}<br>
-        Mediana de ${numero(r.amostras)} lead(s) · média: ${duracao(r.mediaSeg)}</p>
+        Mediana de ${numero(r.amostras)} lead(s), em horas úteis · média: ${duracaoUtil(r.mediaSeg)}<br>
+        Em tempo corrido: ${duracao(r.medianaCorridaSeg)}</p>
     </div>`;
   $("cartoesTempos").innerHTML = [
     bloco("Da entrada à primeira mensagem", "Da criação do lead até a mudança para Contato Iniciado.", t.atePrimeiraMensagem),
@@ -693,6 +704,13 @@ function renderizarRegistros() {
   };
   bloco("substatusFarmer", r.substatusFarmer, "Substatus Farmer", "Nenhum lead no Protocolo Farmer.");
   bloco("situacaoDaReuniao", r.situacaoDaReuniao, "Situação da reunião", "Nenhuma reunião marcada no período.");
+  const s = r.situacaoDaReuniao;
+  if (s.emUso) {
+    $("situacaoDaReuniao").insertAdjacentHTML(
+      "beforeend",
+      `<p class="text-[10px] text-inkfaint mt-3">${numero(s.desfechosPeloCampo)} desfecho(s) de reunião no período definidos por este campo${s.desfechosDivergentes ? `, ${numero(s.desfechosDivergentes)} deles diferentes do que a movimentação entre colunas indicaria` : ""}. Nos demais, vale a movimentação.</p>`,
+    );
+  }
 }
 
 function renderizarEscopo() {

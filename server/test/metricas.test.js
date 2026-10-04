@@ -1,7 +1,8 @@
 // Testes do cálculo de indicadores com um cenário pequeno, conferido à mão.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calcularEscopo } from "../metricas.js";
+import { calcularEscopo, leituraDaSituacao } from "../metricas.js";
+import { segundosUteis } from "../expediente.js";
 
 const HORA = 3600;
 const DIA = 86400;
@@ -133,13 +134,13 @@ test("tempos", () => {
   const { tempos } = calcular();
   // Criação em +1h; primeira mensagem em +2h, +3h, +2h, +2h, +2h.
   assert.equal(tempos.atePrimeiraMensagem.amostras, 5);
-  assert.equal(tempos.atePrimeiraMensagem.medianaSeg, HORA);
+  assert.equal(tempos.atePrimeiraMensagem.medianaCorridaSeg, HORA);
   // Respostas: 2h (lead 1), 6h (2), 1h (3), 3h (5).
   assert.equal(tempos.atePrimeiraResposta.amostras, 4);
-  assert.equal(tempos.atePrimeiraResposta.medianaSeg, 2.5 * HORA);
+  assert.equal(tempos.atePrimeiraResposta.medianaCorridaSeg, 2.5 * HORA);
   // Qualificação ao agendamento: 4h (lead 1) e 2h (lead 2).
   assert.equal(tempos.daQualificacaoAoAgendamento.amostras, 2);
-  assert.equal(tempos.daQualificacaoAoAgendamento.mediaSeg, 3 * HORA);
+  assert.equal(tempos.daQualificacaoAoAgendamento.mediaCorridaSeg, 3 * HORA);
 });
 
 test("etiquetas, motivos e listas", () => {
@@ -158,4 +159,52 @@ test("entradas por etapa e conversão ampla", () => {
   assert.equal(r.entradasPorEtapa.AGENDADO, 3);
   const par = r.conversaoAmpla.find((p) => p.origem === "LEAD_QUALIFICADO" && p.destino === "AGENDADO");
   assert.deepEqual(par, { origem: "LEAD_QUALIFICADO", destino: "AGENDADO", entraram: 2, chegaram: 1, taxa: 50 });
+});
+
+test("horas úteis: segunda a sexta, das 8h às 18h, no fuso do escritório", () => {
+  const ts = (iso) => Date.parse(`${iso}-03:00`) / 1000;
+  // Sexta 19h até segunda 9h: só a primeira hora de segunda conta.
+  assert.equal(segundosUteis(ts("2026-10-02T19:00:00"), ts("2026-10-05T09:00:00")), HORA);
+  // Dentro do mesmo dia útil.
+  assert.equal(segundosUteis(ts("2026-10-05T09:15:00"), ts("2026-10-05T11:45:00")), 2.5 * HORA);
+  // Terça 17h até quarta 10h: uma hora na terça e duas na quarta.
+  assert.equal(segundosUteis(ts("2026-10-06T17:00:00"), ts("2026-10-07T10:00:00")), 3 * HORA);
+  // Sábado e domingo inteiros não contam; semana cheia soma 50 horas.
+  assert.equal(segundosUteis(ts("2026-10-03T09:00:00"), ts("2026-10-04T17:00:00")), 0);
+  assert.equal(segundosUteis(ts("2026-10-05T00:00:00"), ts("2026-10-12T00:00:00")), 50 * HORA);
+  assert.equal(segundosUteis(ts("2026-10-05T10:00:00"), ts("2026-10-05T09:00:00")), 0);
+});
+
+test("situação da reunião: o campo decide e a movimentação é a reserva", () => {
+  assert.equal(leituraDaSituacao("Realizada"), true);
+  assert.equal(leituraDaSituacao("Não realizada"), false);
+  assert.equal(leituraDaSituacao("No-show"), false);
+  assert.equal(leituraDaSituacao("Remarcada"), null);
+  assert.equal(leituraDaSituacao(""), null);
+
+  const calcularCom = (leads, eventos) => {
+    const eventosPorLead = new Map();
+    for (const e of eventos) eventosPorLead.set(e.leadId, [...(eventosPorLead.get(e.leadId) || []), e]);
+    return calcularEscopo({ leads, eventosPorLead, deTs: DE, ateTs: ATE, agora: AGORA });
+  };
+  const eventos = [
+    // Lead 1: foi para o Farmer, mas o campo diz que a reunião não aconteceu.
+    ev(1, 2 * HORA, "LEAD_QUALIFICADO", "AGENDADO"), ev(1, 5 * HORA, "AGENDADO", "PROTOCOLO_FARMER"),
+    // Lead 2: foi para Remarcação, mas o campo diz que a reunião aconteceu.
+    ev(2, 2 * HORA, "LEAD_QUALIFICADO", "AGENDADO"), ev(2, 5 * HORA, "AGENDADO", "REMARCACAO"),
+    // Lead 3: campo vazio, vale a movimentação (realizada).
+    ev(3, 2 * HORA, "LEAD_QUALIFICADO", "AGENDADO"), ev(3, 5 * HORA, "AGENDADO", "FECHADO"),
+    // Lead 4: campo sem conclusão, vale a movimentação (não realizada).
+    ev(4, 2 * HORA, "LEAD_QUALIFICADO", "AGENDADO"), ev(4, 5 * HORA, "AGENDADO", "REMARCACAO"),
+  ];
+  const leads = [
+    lead(1, "PROTOCOLO_FARMER", { situacaoDaReuniao: "Não realizada" }),
+    lead(2, "REMARCACAO", { situacaoDaReuniao: "Realizada" }),
+    lead(3, "FECHADO", { situacaoDaReuniao: "" }),
+    lead(4, "REMARCACAO", { situacaoDaReuniao: "Remarcada" }),
+  ];
+  const r = calcularCom(leads, eventos);
+  assert.deepEqual([r.volume.reunioesMarcadas, r.volume.reunioesRealizadas, r.volume.naoRealizadas], [4, 2, 2]);
+  assert.equal(r.taxas.comparecimento, 50);
+  assert.deepEqual([r.registros.situacaoDaReuniao.desfechosPeloCampo, r.registros.situacaoDaReuniao.desfechosDivergentes], [2, 2]);
 });

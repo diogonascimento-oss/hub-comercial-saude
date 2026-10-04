@@ -174,6 +174,25 @@ export const PARES_CONVERSAO_AMPLA = [
   ["CONTATO_INICIADO", "FECHADO"],
 ];
 
+// Expediente usado na medição dos tempos de atendimento em horas úteis:
+// segunda a sexta, das 8h às 18h. O sábado não conta, porque o atendimento
+// nesse dia é eventual. Feriados não são descontados.
+export const EXPEDIENTE = {
+  diasDaSemana: [1, 2, 3, 4, 5], // 0 = domingo
+  horaDeInicio: 8,
+  horaDeFim: 18,
+  fusoEmHoras: -3,
+};
+
+// Leitura do campo "Situação da reunião". O valor do campo decide se a reunião
+// foi realizada; quando está vazio ou não se encaixa em nenhuma das listas,
+// vale a movimentação entre colunas. A comparação ignora maiúsculas e acentos.
+// A lista de "não realizada" é verificada primeiro.
+export const SITUACAO_DA_REUNIAO = {
+  naoRealizada: ["nao realizada", "nao compareceu", "no-show", "no show", "noshow", "faltou", "ausente", "cancelada"],
+  realizada: ["realizada", "compareceu", "concluida"],
+};
+
 // Fuso do escritório (America/Recife, sem horário de verão).
 export const FUSO_HORARIO = "-03:00";
 

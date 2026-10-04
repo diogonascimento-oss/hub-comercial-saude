@@ -12,7 +12,9 @@ import {
   ETAPAS_FORA_DO_ALERTA_DE_PARADOS,
   DIAS_PARA_LEAD_PARADO,
   PARES_CONVERSAO_AMPLA,
+  SITUACAO_DA_REUNIAO,
 } from "./config.js";
+import { segundosUteis } from "./expediente.js";
 import { nomeDaEtapa } from "./mapeamento.js";
 
 const DIA = 86400;
@@ -22,13 +24,39 @@ function taxa(numerador, denominador) {
   return denominador > 0 ? Math.round((numerador / denominador) * 1000) / 10 : null;
 }
 
-function resumirTempos(segundos) {
-  const validos = segundos.filter((s) => s >= 0).sort((a, b) => a - b);
-  if (!validos.length) return { amostras: 0, mediaSeg: null, medianaSeg: null };
+function medidas(valores) {
+  const validos = valores.filter((s) => s >= 0).sort((a, b) => a - b);
+  if (!validos.length) return { amostras: 0, media: null, mediana: null };
   const meio = Math.floor(validos.length / 2);
   const mediana = validos.length % 2 ? validos[meio] : (validos[meio - 1] + validos[meio]) / 2;
   const media = validos.reduce((a, b) => a + b, 0) / validos.length;
-  return { amostras: validos.length, mediaSeg: Math.round(media), medianaSeg: Math.round(mediana) };
+  return { amostras: validos.length, media: Math.round(media), mediana: Math.round(mediana) };
+}
+
+// Recebe pares [início, fim] e resume o intervalo em horas úteis (medida
+// principal) e em tempo corrido.
+function resumirTempos(intervalos) {
+  const uteis = medidas(intervalos.map(([de, ate]) => (ate >= de ? segundosUteis(de, ate) : -1)));
+  const corridos = medidas(intervalos.map(([de, ate]) => ate - de));
+  return {
+    amostras: uteis.amostras,
+    mediaSeg: uteis.media,
+    medianaSeg: uteis.mediana,
+    mediaCorridaSeg: corridos.media,
+    medianaCorridaSeg: corridos.mediana,
+  };
+}
+
+const semAcento = (texto) => String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+// true: o campo informa que a reunião foi realizada; false: que não foi;
+// null: campo vazio ou com valor que não permite concluir.
+export function leituraDaSituacao(valor) {
+  const texto = semAcento(valor);
+  if (!texto) return null;
+  if (SITUACAO_DA_REUNIAO.naoRealizada.some((termo) => texto.includes(termo))) return false;
+  if (SITUACAO_DA_REUNIAO.realizada.some((termo) => texto.includes(termo))) return true;
+  return null;
 }
 
 // leads: leads normalizados do escopo (uma campanha ou todas).
@@ -58,6 +86,8 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
   let naoRealizadasComEtiquetaNoShow = 0;
   let perdidasAntesDaReuniao = 0;
   let outrasSaidasDeAgendado = 0;
+  let desfechosPeloCampo = 0;
+  let desfechosDivergentes = 0;
   let entradasEmRemarcacao = 0;
   let remarcacoesRecuperadas = 0;
   let remarcacoesRecuperadasERealizadas = 0;
@@ -96,6 +126,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
       if (etapaDeNascimento) registrarEntrada(etapaDeNascimento, lead.id, lead.criadoEm);
     }
 
+    const ultimaSaidaDeAgendado = eventos.findLast((e) => e.para && e.de === "AGENDADO" && e.para !== "AGENDADO") || null;
     let vezesAgendado = 0;
     let agendamentosSemDesfecho = 0;
     let ultimoAgendamentoVeioDeRemarcacao = false;
@@ -146,16 +177,25 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
         if (instanteDaQualificacao !== null) {
           qualificadosQueAgendaram.add(lead.id);
           if (!agendamentoPosQualificacaoContado) {
-            temposDaQualificacaoAoAgendamento.push(ev.ts - instanteDaQualificacao);
+            temposDaQualificacaoAoAgendamento.push([instanteDaQualificacao, ev.ts]);
             agendamentoPosQualificacaoContado = true;
           }
         }
       }
 
       if (ev.de === "AGENDADO" && ev.para !== "AGENDADO") {
-        const realizada =
+        const realizadaPelaMovimentacao =
           ETAPAS_REUNIAO_REALIZADA.includes(ev.para) ||
           (ev.para === "DESQUALIFICADO" && tem(ETIQUETAS.reuniaoRealizada));
+        // O campo "Situação da reunião" guarda só a situação mais recente do
+        // lead; por isso decide apenas a última saída de Agendado. Nas
+        // anteriores, e quando o campo não permite concluir, vale a movimentação.
+        const peloCampo = ev === ultimaSaidaDeAgendado ? leituraDaSituacao(lead.situacaoDaReuniao) : null;
+        const realizada = peloCampo ?? realizadaPelaMovimentacao;
+        if (peloCampo !== null) {
+          desfechosPeloCampo++;
+          if (peloCampo !== realizadaPelaMovimentacao) desfechosDivergentes++;
+        }
         if (realizada) {
           reunioesRealizadas++;
           leadsComReuniaoRealizada.add(lead.id);
@@ -169,7 +209,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
           if (realizada) {
             realizadasDaCoorte++;
             if (ultimoAgendamentoVeioDeRemarcacao) remarcacoesRecuperadasERealizadas++;
-          } else if (ev.para === "REMARCACAO") {
+          } else if (ev.para === "REMARCACAO" || peloCampo === false) {
             naoRealizadas++;
             leadsComReuniaoNaoRealizada.add(lead.id);
             if (tem(ETIQUETAS.noShow)) naoRealizadasComEtiquetaNoShow++;
@@ -187,10 +227,10 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
 
       if (ev.para === "CONTATO_INICIADO" && instanteDoContatoIniciado === null) {
         instanteDoContatoIniciado = ev.ts;
-        if (criadoNoPeriodo) temposAtePrimeiraMensagem.push(ev.ts - lead.criadoEm);
+        if (criadoNoPeriodo) temposAtePrimeiraMensagem.push([lead.criadoEm, ev.ts]);
       }
       if (ev.para === "EM_QUALIFICACAO" && instanteDoContatoIniciado !== null && !respostaContada) {
-        temposAtePrimeiraResposta.push(ev.ts - instanteDoContatoIniciado);
+        temposAtePrimeiraResposta.push([instanteDoContatoIniciado, ev.ts]);
         respostaContada = true;
       }
     }
@@ -345,6 +385,10 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
       situacaoDaReuniao: {
         emUso: leads.some((l) => l.situacaoDaReuniao),
         itens: contarPorCampo(leadsComReuniao, "situacaoDaReuniao", "Sem situação registrada"),
+        // Desfechos de reunião decididos pelo campo, e quantos deles
+        // contrariam o que a movimentação entre colunas indicaria.
+        desfechosPeloCampo,
+        desfechosDivergentes,
       },
     },
     tempos: {
