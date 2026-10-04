@@ -329,7 +329,7 @@ function abrirLeadsDoIndicador(indicador) {
   const [titulo, regra] = REGRAS_DOS_INDICADORES[indicador];
   const leads = daCampanha(dados.listas.leadsPorIndicador)
     .filter((l) => l.indicadores.includes(indicador))
-    .map((l) => ({ nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
+    .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
   abrirLeadsDoGrupo(titulo, leads, regra);
 }
 
@@ -475,7 +475,7 @@ function renderizarEvolucao() {
       const etapa = etapas[Number(ponto.dataset.etapa)];
       const leads = dados.listas.leadsPorEtapa
         .filter((l) => l.etapas.includes(etapa.chave) && (serie.campanha === "TODAS" || l.campanha === serie.campanha))
-        .map((l) => ({ nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
+        .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
       abrirLeadsDoGrupo(`${serie.nome}: entraram em ${etapa.nome}`, leads);
     });
   });
@@ -1109,6 +1109,8 @@ $("btnFecharCorrecao").addEventListener("click", fecharModal);
 modal.addEventListener("click", (e) => e.target === modal && fecharModal());
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
+  // A ficha do lead abre sobre os demais diálogos; fecha primeiro.
+  if (fecharFichaDoLead()) return;
   fecharModal();
   fecharModaisDeTrafego();
 });

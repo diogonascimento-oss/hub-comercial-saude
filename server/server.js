@@ -19,6 +19,7 @@ import { calcularEscopo, etapasParaInterface } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
 import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta } from "./trafego.js";
 import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
+import { getLocalizacao } from "./localizacao.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -453,6 +454,121 @@ app.get("/api/eventos-lead/:id", async (req, res) => {
     res.json({ leadId, eventos });
   } catch (erro) {
     responderErro(res, erro, "Falha ao buscar os eventos do lead");
+  }
+});
+
+// --- Busca e ficha do lead ---------------------------------------------------
+
+const semAcento = (texto) => String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+// Estado e região prováveis, pelo DDD do telefone. É uma estimativa: o DDD
+// indica onde a linha foi habilitada, não onde a pessoa mora hoje.
+function localizacaoProvavel(telefone) {
+  const l = getLocalizacao(telefone);
+  return { ddd: l.ddd, estado: l.estado, regiao: l.regiao, reconhecido: l.formatoReconhecido };
+}
+
+// Busca por nome, telefone, título do lead no Kommo ou ID, nos três funis.
+app.get("/api/leads/busca", async (req, res) => {
+  const termo = String(req.query.q || "").trim().slice(0, 80);
+  if (termo.length < 2) return res.json({ termo, total: 0, resultados: [] });
+  try {
+    const { leads } = await obterLeads();
+    const texto = semAcento(termo);
+    const digitos = termo.replace(/\D/g, "");
+    const encontrados = leads.filter(
+      (l) =>
+        semAcento(l.nome).includes(texto) ||
+        semAcento(l.titulo).includes(texto) ||
+        (digitos.length >= 3 && (l.telefone.includes(digitos) || String(l.id).includes(digitos))),
+    );
+    encontrados.sort((a, b) => (b.atualizadoEm || 0) - (a.atualizadoEm || 0));
+    res.json({
+      termo,
+      total: encontrados.length,
+      resultados: encontrados.slice(0, 25).map((l) => ({
+        id: l.id,
+        nome: l.nome,
+        telefone: l.telefone,
+        campanha: l.campanha,
+        etapa: l.etapaNome,
+        estado: getLocalizacao(l.telefone).estado,
+      })),
+    });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao buscar leads");
+  }
+});
+
+// Ficha completa de um lead: dados atuais, origem, campos preenchidos,
+// localização provável e histórico de movimentações.
+app.get("/api/leads/:id", async (req, res) => {
+  const leadId = String(req.params.id);
+  if (!/^\d+$/.test(leadId)) return res.status(400).json({ error: "ID de lead inválido." });
+  try {
+    const { valor: mapeamento } = await obterMapeamento();
+    const bruto = await kommo.buscarLead(leadId);
+    const campanha = mapeamento.campanhaPorFunil.get(Number(bruto.pipeline_id));
+    if (!campanha) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
+
+    const idContato = bruto._embedded?.contacts?.[0]?.id;
+    const [contato, eventosBrutos, exclusoes, correcoes] = await Promise.all([
+      idContato ? kommo.buscarContato(idContato) : null,
+      kommo.listarMudancasDeEtapaDoLead(leadId),
+      armazenamento.lerExclusoes(),
+      armazenamento.lerCorrecoes(),
+    ]);
+    const contatosPorId = new Map(contato ? [[contato.id, contato]] : []);
+    const [lead] = normalizarLeads([bruto], contatosPorId, mapeamento);
+
+    const camposPreenchidos = (campos) =>
+      (campos || [])
+        .map((c) => ({
+          nome: c.field_name || c.field_code || `Campo ${c.field_id}`,
+          valor: (c.values || []).map((v) => String(v?.value ?? "").trim()).filter(Boolean).join("; "),
+        }))
+        .filter((c) => c.valor);
+
+    const idsExcluidos = new Set(exclusoes.map((e) => String(e.eventId)));
+    const correcoesPorId = new Map(correcoes.map((c) => [String(c.eventId), c]));
+    const historico = aplicarCorrecoes(eventosBrutos, correcoesPorId)
+      .map((ev) => normalizarEvento(ev, mapeamento))
+      .sort((a, b) => a.ts - b.ts)
+      .map((ev) => ({
+        data: iso(ev.ts),
+        de: nomeDaEtapa(ev.de),
+        para: nomeDaEtapa(ev.para),
+        excluido: idsExcluidos.has(ev.id),
+        corrigido: correcoesPorId.has(ev.id),
+      }));
+
+    const agora = Math.floor(Date.now() / 1000);
+    const ultimaMudanca = historico.length ? Date.parse(historico.at(-1).data) / 1000 : lead.criadoEm;
+    res.json({
+      id: lead.id,
+      titulo: lead.titulo,
+      nome: lead.nome,
+      telefone: lead.telefone,
+      localizacao: localizacaoProvavel(lead.telefone),
+      campanha,
+      etapa: lead.etapaNome,
+      diasNaEtapa: ultimaMudanca ? Math.floor((agora - ultimaMudanca) / 86400) : null,
+      criadoEm: iso(lead.criadoEm),
+      atualizadoEm: iso(lead.atualizadoEm),
+      etiquetas: lead.tags,
+      motivoPerda: lead.motivoPerda,
+      origem: lead.origem,
+      responsaveis: lead.responsaveis,
+      situacaoDaReuniao: lead.situacaoDaReuniao,
+      substatusFarmer: lead.substatusFarmer,
+      camposDoLead: camposPreenchidos(bruto.custom_fields_values),
+      camposDoContato: camposPreenchidos(contato?.custom_fields_values),
+      historico,
+      linkNoKommo: process.env.KOMMO_SUBDOMAIN ? `https://${process.env.KOMMO_SUBDOMAIN}.kommo.com/leads/detail/${lead.id}` : null,
+    });
+  } catch (erro) {
+    if (erro.response?.status === 404 || erro.response?.status === 204) return res.status(404).json({ error: "Lead não encontrado no Kommo." });
+    responderErro(res, erro, "Falha ao consultar o lead");
   }
 });
 

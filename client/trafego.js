@@ -42,14 +42,15 @@ function abrirLeadsDoGrupo(titulo, leads, regra = "") {
     ? leads
         .map(
           (l) => `
-      <div class="flex items-center justify-between gap-3 border-b border-line py-1.5">
+      <button ${l.leadId ? `data-lead="${esc(String(l.leadId))}"` : "disabled"} class="w-full flex items-center justify-between gap-3 border-b border-line py-1.5 text-left hover:bg-surface2" title="Abrir a ficha do lead">
         <span class="text-ink truncate">${esc(l.nome)}</span>
         <span class="text-inkdim font-mono shrink-0">${esc(l.telefone || "sem telefone")}</span>
         <span class="text-inkfaint text-[10px] shrink-0 w-28 text-right">${esc(l.etapaMaisAvancada || "")}</span>
-      </div>`,
+      </button>`,
         )
         .join("")
     : '<p class="text-inkdim">Nenhum lead neste grupo.</p>';
+  $("corpoLeadsDoGrupo").querySelectorAll("button[data-lead]").forEach((b) => b.addEventListener("click", () => abrirFichaDoLead(b.dataset.lead)));
   abrirDialogo("modalLeads");
 }
 
@@ -80,7 +81,10 @@ function renderizarListaDeGrupos(container, lista, limite = 8) {
             ${CONTAGENS.map((c, ci) => `<button data-grupo="${i}" data-contagem="${ci}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">${numero(g[c.campo])} ${c.rotulo}</button>`).join('<span aria-hidden="true">·</span>')}
           </p>
         </div>
-        <span class="${cor} font-semibold tabular shrink-0">${percentual(g.percentualQualificados)}</span>
+        <span class="shrink-0 text-right leading-tight" title="Leads qualificados sobre o total de leads do grupo">
+          <span class="${cor} font-semibold tabular block">${percentual(g.percentualQualificados)}</span>
+          <span class="text-[9px] text-inkfaint uppercase tracking-wide">qualificados</span>
+        </span>
       </div>`;
       })
       .join("") + (lista.length > limite ? `<p class="text-[10px] text-inkfaint pt-2">Mais ${numero(lista.length - limite)} grupo(s) no relatório exportado.</p>` : "");
@@ -91,7 +95,8 @@ function renderizarListaDeGrupos(container, lista, limite = 8) {
   });
 }
 
-// Barras numeradas, com a legenda dos nomes completos abaixo.
+// Barras horizontais: uma por grupo, com o nome acima e a quantidade de leads
+// do período à direita. A barra mais longa é o grupo com mais leads.
 function renderizarBarrasDeGrupos(container, lista, limite = 12) {
   if (!lista?.length) {
     container.innerHTML = '<p class="text-xs text-inkdim">Sem dados no período.</p>';
@@ -99,19 +104,20 @@ function renderizarBarrasDeGrupos(container, lista, limite = 12) {
   }
   const grupos = lista.slice(0, limite);
   const maximo = Math.max(...grupos.map((g) => g.totalLeads), 1);
+  const total = grupos.reduce((soma, g) => soma + g.totalLeads, 0);
   container.innerHTML = `
-    <div class="space-y-2">${grupos
+    <p class="text-[10px] text-inkfaint mb-3">Quantidade de leads do período em cada grupo. Clique em uma barra para ver os leads.</p>
+    <div class="space-y-3">${grupos
       .map(
         (g, i) => `
-      <button data-indice="${i}" class="w-full flex items-center gap-3 hover:bg-surface2" title="${esc(g.grupo)}">
-        <span class="w-5 text-[11px] font-mono font-bold text-right" style="color:${CORES_DE_SERIE[i % CORES_DE_SERIE.length]}">${i + 1}</span>
-        <span class="flex-1 h-3.5 bg-surface2 block"><span class="barra h-full block" style="width:${(g.totalLeads / maximo) * 100}%;background:${CORES_DE_SERIE[i % CORES_DE_SERIE.length]}"></span></span>
-        <span class="w-10 text-sm tabular text-ink text-right">${numero(g.totalLeads)}</span>
+      <button data-indice="${i}" class="w-full text-left hover:bg-surface2 block" title="${esc(g.grupo)}">
+        <span class="flex items-baseline justify-between gap-3 mb-1">
+          <span class="text-[11px] text-ink truncate">${esc(g.grupo)}</span>
+          <span class="text-[11px] tabular text-ink shrink-0">${numero(g.totalLeads)} leads <span class="text-inkfaint">· ${percentual(total ? Math.round((g.totalLeads / total) * 1000) / 10 : 0)} do total</span></span>
+        </span>
+        <span class="h-3 bg-surface2 block"><span class="barra h-full block" style="width:${(g.totalLeads / maximo) * 100}%;background:${CORES_DE_SERIE[i % CORES_DE_SERIE.length]}"></span></span>
       </button>`,
       )
-      .join("")}</div>
-    <div class="grid grid-cols-1 gap-1 mt-3 pt-3 border-t border-line">${grupos
-      .map((g, i) => `<p class="text-[10px] text-inkdim truncate"><strong style="color:${CORES_DE_SERIE[i % CORES_DE_SERIE.length]}">${i + 1}</strong> ${esc(g.grupo)}</p>`)
       .join("")}</div>`;
   container.querySelectorAll("button[data-indice]").forEach((botao) => {
     const g = grupos[Number(botao.dataset.indice)];
