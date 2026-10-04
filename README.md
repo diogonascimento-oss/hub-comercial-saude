@@ -263,3 +263,5 @@ Uso interno. Robson Menezes Advogados. Todos os direitos reservados.
 ## 10. Responsável técnico
 
 Diogo Nascimento
+
+Desenvolvido por [diogocoding](https://github.com/diogocoding).

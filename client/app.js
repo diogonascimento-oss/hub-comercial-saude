@@ -860,6 +860,7 @@ ${corpo}
     </table>
   </div>
   <p class="contador" id="contador"></p>
+  <p style="margin-top:32px;padding-top:10px;border-top:1px solid #ddd;font-size:10px;color:#999;text-align:right">Desenvolvido por <a href="https://github.com/diogocoding" style="color:#999;text-decoration:none">diogocoding</a></p>
   <script>
     var filtro = document.getElementById("filtro");
     var linhas = Array.prototype.slice.call(document.querySelectorAll("tbody tr"));

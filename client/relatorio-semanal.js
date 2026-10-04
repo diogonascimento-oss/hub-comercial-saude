@@ -152,6 +152,7 @@ function documentoHTML(titulo, subtitulo, corpo) {
   <h1>${esc(titulo)}</h1>
   <p class="sub">Robson Menezes Advogados · Núcleo de Saúde · ${esc(subtitulo)} · Gerado em ${new Date().toLocaleString("pt-BR")}</p>
   ${corpo}
+  <p style="margin-top:32px;padding-top:10px;border-top:1px solid #ddd;font-size:10px;color:#999;text-align:right">Desenvolvido por <a href="https://github.com/diogocoding" style="color:#999;text-decoration:none">diogocoding</a></p>
 </body>
 </html>`;
 }
