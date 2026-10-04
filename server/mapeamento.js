@@ -106,7 +106,21 @@ export function montarMapeamento(funis) {
     });
   }
 
+  // Nomes das colunas de todos os funis da conta, inclusive os que o painel não
+  // acompanha. Servem para descrever de onde o lead veio quando ele entra em um
+  // dos três funis a partir de outro. Além da chave "funil:coluna", guarda só o
+  // ID da coluna, que é único na conta (exceto 142 e 143, comuns a todos).
+  const colunasDeTodosOsFunis = new Map();
+  for (const funil of funis || []) {
+    for (const coluna of funil._embedded?.statuses || []) {
+      const nome = `${coluna.name} (funil ${funil.name})`;
+      colunasDeTodosOsFunis.set(`${funil.id}:${coluna.id}`, nome);
+      if (![142, 143].includes(Number(coluna.id))) colunasDeTodosOsFunis.set(`:${coluna.id}`, nome);
+    }
+  }
+
   return {
+    colunasDeTodosOsFunis,
     campanhas,
     campanhaPorFunil,
     etapaPorColuna,
@@ -121,7 +135,10 @@ export function resolverEtapa(mapeamento, funilId, colunaId, nomeAlternativo) {
   if (colunaId == null && !nomeAlternativo) return null;
   const registro = mapeamento.etapaPorColuna.get(`${funilId}:${colunaId}`);
   if (registro) return registro;
-  const nome = nomeAlternativo || `Coluna ${colunaId}`;
+  // Coluna de um funil que o painel não acompanha: usa o nome real, quando conhecido.
+  const deOutroFunil =
+    mapeamento.colunasDeTodosOsFunis?.get(`${funilId}:${colunaId}`) || mapeamento.colunasDeTodosOsFunis?.get(`:${colunaId}`);
+  const nome = nomeAlternativo || deOutroFunil || `Coluna ${colunaId}`;
   return { chave: `OUTRA:${nome}`, nome, campanha: mapeamento.campanhaPorFunil.get(Number(funilId)) || null, mapeada: false };
 }
 

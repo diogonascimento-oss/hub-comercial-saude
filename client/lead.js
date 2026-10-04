@@ -107,7 +107,10 @@ function renderizarFicha(l) {
 
   // Campos do Kommo já exibidos nos blocos acima não se repetem na lista geral.
   const jaExibidos = new Set([l.origem.campanhaMeta, l.origem.conjunto, l.origem.anuncio, l.responsaveis.sdr, l.responsaveis.closer, l.responsaveis.farmer, l.situacaoDaReuniao, l.substatusFarmer].filter(Boolean));
-  const outrosCampos = l.camposDoLead.filter((c) => !jaExibidos.has(c.valor));
+  const restantes = l.camposDoLead.filter((c) => !jaExibidos.has(c.valor));
+  const outrosCampos = restantes.filter((c) => !c.tecnico);
+  const camposTecnicos = restantes.filter((c) => c.tecnico);
+  const semOrigem = l.origemSemRastreio ? esc(l.origemSemRastreio) : naoInformado;
 
   $("corpoFicha").innerHTML =
     blocoDaFicha("Identificação", [
@@ -128,9 +131,9 @@ function renderizarFicha(l) {
       ["Etiquetas", l.etiquetas.length ? l.etiquetas.map((t) => `<span class="inline-block border border-line px-1.5 py-0.5 mr-1 mb-1 text-[10px] text-inkdim">${esc(t)}</span>`).join("") : ""],
     ]) +
     blocoDaFicha("Origem de marketing", [
-      ["Campanha Meta", texto(l.origem.campanhaMeta) || naoInformado],
-      ["Conjunto de anúncios", texto(l.origem.conjunto) || naoInformado],
-      ["Anúncio", texto(l.origem.anuncio) || naoInformado],
+      ["Campanha Meta", texto(l.origem.campanhaMeta) || semOrigem],
+      ["Conjunto de anúncios", texto(l.origem.conjunto) || semOrigem],
+      ["Anúncio", texto(l.origem.anuncio) || semOrigem],
     ]) +
     blocoDaFicha("Responsáveis", [
       ["SDR", texto(l.responsaveis.sdr)],
@@ -138,6 +141,7 @@ function renderizarFicha(l) {
       ["Farmer", texto(l.responsaveis.farmer)],
     ]) +
     blocoDaFicha("Demais campos preenchidos no Kommo", outrosCampos.map((c) => [c.nome, esc(c.valor)])) +
+    blocoDaFicha("Controle das automações (uso técnico)", camposTecnicos.map((c) => [c.nome, `<span class="font-mono text-inkdim">${esc(c.valor)}</span>`])) +
     `<section>
       <p class="rotulo mb-2">Histórico de movimentações (${numero(l.historico.length)})</p>
       ${

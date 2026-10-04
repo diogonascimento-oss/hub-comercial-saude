@@ -11,7 +11,15 @@ import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { CAMPANHAS, ETAPAS, ETAPA_POR_CHAVE, FUSO_HORARIO, METAS_MENSAIS } from "./config.js";
+import {
+  CAMPANHAS,
+  ETAPAS,
+  ETAPA_POR_CHAVE,
+  FUSO_HORARIO,
+  METAS_MENSAIS,
+  CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO,
+  ROTULO_SEM_RASTREIO_DE_ANUNCIO,
+} from "./config.js";
 import * as kommo from "./kommo.js";
 import { montarMapeamento, nomeDaEtapa } from "./mapeamento.js";
 import { normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
@@ -521,11 +529,25 @@ app.get("/api/leads/:id", async (req, res) => {
     const contatosPorId = new Map(contato ? [[contato.id, contato]] : []);
     const [lead] = normalizarLeads([bruto], contatosPorId, mapeamento);
 
+    // Campos de data chegam do Kommo como número de segundos; são convertidos
+    // para o horário do escritório.
+    const TIPOS_DE_DATA = { date: { dateStyle: "short" }, birthday: { dateStyle: "short" }, date_time: { dateStyle: "short", timeStyle: "short" } };
+    const valorLegivel = (campo, v) => {
+      const bruto = v?.value;
+      const formato = TIPOS_DE_DATA[campo.field_type];
+      if (formato && /^\d{9,10}$/.test(String(bruto))) {
+        return new Date(Number(bruto) * 1000).toLocaleString("pt-BR", { ...formato, timeZone: "America/Recife" });
+      }
+      if (typeof bruto === "boolean") return bruto ? "Sim" : "Não";
+      return String(bruto ?? "").trim();
+    };
     const camposPreenchidos = (campos) =>
       (campos || [])
         .map((c) => ({
           nome: c.field_name || c.field_code || `Campo ${c.field_id}`,
-          valor: (c.values || []).map((v) => String(v?.value ?? "").trim()).filter(Boolean).join("; "),
+          valor: (c.values || []).map((v) => valorLegivel(c, v)).filter(Boolean).join("; "),
+          // Campos de controle usados pelas automações, sem leitura direta pela equipe.
+          tecnico: /^cad[êe]ncia\s*:/i.test(c.field_name || ""),
         }))
         .filter((c) => c.valor);
 
@@ -558,6 +580,10 @@ app.get("/api/leads/:id", async (req, res) => {
       etiquetas: lead.tags,
       motivoPerda: lead.motivoPerda,
       origem: lead.origem,
+      origemSemRastreio:
+        CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO.includes(campanha) && !lead.origem.conjunto && !lead.origem.anuncio
+          ? ROTULO_SEM_RASTREIO_DE_ANUNCIO
+          : null,
       responsaveis: lead.responsaveis,
       situacaoDaReuniao: lead.situacaoDaReuniao,
       substatusFarmer: lead.substatusFarmer,
