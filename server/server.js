@@ -263,27 +263,22 @@ async function resumoDoPeriodo(periodo, agora) {
   return resumo;
 }
 
-// Período de comparação.
-//
-// Quando o filtro começa no dia 1, compara com os mesmos dias do mês anterior
-// (ou com o mês anterior inteiro, se o filtro cobre o mês inteiro): 1 a 3 de
-// outubro é comparado com 1 a 3 de setembro. Nos demais casos, usa o intervalo
-// de mesma quantidade de dias imediatamente antes do filtro.
+// Período de comparação: as mesmas datas, um mês antes. O filtro de 16 a 30
+// de setembro é comparado com 16 a 30 de agosto. Quando o dia não existe no
+// mês anterior (31, ou 29 e 30 em fevereiro), ou quando o filtro termina no
+// último dia do mês, usa-se o último dia do mês anterior.
 function periodoAnteriorA(periodo) {
-  const [ano, mes, dia] = periodo.inicio.split("-").map(Number);
-  const [anoFim, mesFim, diaFim] = periodo.fim.split("-").map(Number);
   const dois = (n) => String(n).padStart(2, "0");
-  const ultimoDia = (a, m) => new Date(Date.UTC(a, m, 0)).getUTCDate();
-
-  if (dia === 1 && ano === anoFim && mes === mesFim) {
+  const ultimoDia = (ano, mes) => new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  const umMesAntes = (data, ateOFimDoMes) => {
+    const [ano, mes, dia] = data.split("-").map(Number);
     const anoAnterior = mes === 1 ? ano - 1 : ano;
     const mesAnterior = mes === 1 ? 12 : mes - 1;
-    const cobreOMesInteiro = diaFim === ultimoDia(ano, mes);
-    const fim = cobreOMesInteiro ? ultimoDia(anoAnterior, mesAnterior) : Math.min(diaFim, ultimoDia(anoAnterior, mesAnterior));
-    return periodoDe(`${anoAnterior}-${dois(mesAnterior)}-01`, `${anoAnterior}-${dois(mesAnterior)}-${dois(fim)}`);
-  }
-  const duracao = periodo.ateTs - periodo.deTs + 1;
-  return periodoDe(dataLocal(periodo.deTs - duracao), dataLocal(periodo.deTs - 1));
+    const limite = ultimoDia(anoAnterior, mesAnterior);
+    const ehFimDoMes = ateOFimDoMes && dia === ultimoDia(ano, mes);
+    return `${anoAnterior}-${dois(mesAnterior)}-${dois(ehFimDoMes ? limite : Math.min(dia, limite))}`;
+  };
+  return periodoDe(umMesAntes(periodo.inicio, false), umMesAntes(periodo.fim, true));
 }
 
 app.get("/api/metrics", async (req, res) => {
