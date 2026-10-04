@@ -270,8 +270,15 @@ function renderizarTrafego() {
   $("totalQualificadosTrafego").textContent = numero(a.totalQualificados);
 
   const aviso = $("avisoSemOrigem");
-  if (a.totalLeads > 0 && a.leadsSemOrigem > 0) {
-    aviso.textContent = `${numero(a.leadsSemOrigem)} de ${numero(a.totalLeads)} lead(s) estão sem conjunto de anúncios e sem anúncio preenchidos no Kommo e aparecem como "(não informado)".`;
+  const avisos = [];
+  if (a.leadsSemOrigem > 0) {
+    avisos.push(`${numero(a.leadsSemOrigem)} de ${numero(a.totalLeads)} lead(s) estão sem conjunto de anúncios e sem anúncio preenchidos no Kommo e aparecem como "(não informado)".`);
+  }
+  if (a.leadsSemRastreioDeAnuncio > 0) {
+    avisos.push(`${numero(a.leadsSemRastreioDeAnuncio)} lead(s) vieram de anúncio que abre o WhatsApp, canal em que o anúncio de origem não é registrado; aparecem como "WhatsApp (anúncio não rastreado)".`);
+  }
+  if (a.totalLeads > 0 && avisos.length) {
+    aviso.textContent = avisos.join(" ");
     aviso.classList.remove("hidden");
   } else aviso.classList.add("hidden");
 

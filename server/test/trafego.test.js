@@ -107,3 +107,17 @@ test("valor investido do Meta: associação pelo nome e precedência sobre o or�
   assert.deepEqual([a.custoTotal, a.custoPorLead, a.custoPorContratoFechado], [120, 30, 120]);
   assert.equal(b.custoTotal, 70);
 });
+
+test("campanha sem rastreio de anúncio recebe rótulo próprio e não conta como sem origem", () => {
+  const leads = [
+    { ...lead(1, "", "", "81999990001"), campanha: "IR-W" },
+    { ...lead(2, "Pernambuco", "AD 01", "81999990002"), campanha: "IR-W" },
+    { ...lead(3, "", "", "81999990003"), campanha: "IR-Q" },
+  ];
+  const a = analisarTrafego({ leads, eventosPorLead: new Map(), deTs: DE, ateTs: ATE });
+  assert.deepEqual([a.leadsSemOrigem, a.leadsSemRastreioDeAnuncio], [1, 1]);
+  assert.deepEqual(
+    a.porConjunto.map((g) => g.grupo).sort(),
+    ["(não informado)", "Pernambuco", "WhatsApp (anúncio não rastreado)"],
+  );
+});

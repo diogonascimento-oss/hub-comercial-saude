@@ -2,7 +2,12 @@
 // conjunto de anúncios e anúncio) e a localização do telefone com o avanço do
 // lead no funil. Funções puras, sem consulta a serviços externos.
 
-import { ETAPAS_PRE_QUALIFICACAO, ORDEM_ETAPAS } from "./config.js";
+import {
+  ETAPAS_PRE_QUALIFICACAO,
+  ORDEM_ETAPAS,
+  CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO,
+  ROTULO_SEM_RASTREIO_DE_ANUNCIO,
+} from "./config.js";
 import { nomeDaEtapa } from "./mapeamento.js";
 import { getLocalizacao } from "./localizacao.js";
 
@@ -54,14 +59,19 @@ export function consolidarLeads({ leads, eventosPorLead, deTs, ateTs, apenasNovo
       }
     }
 
+    // Campanha sem rastreio de anúncio e sem nenhum campo de origem preenchido.
+    const semRastreio =
+      CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO.includes(lead.campanha) && !lead.origem?.conjunto && !lead.origem?.anuncio;
+
     consolidados.push({
       leadId: lead.id,
       nome: lead.nome,
       telefone: lead.telefone,
       campanha: lead.campanha,
-      campanhaMeta: lead.origem?.campanhaMeta || "",
-      conjunto: lead.origem?.conjunto || "",
-      anuncio: lead.origem?.anuncio || "",
+      campanhaMeta: lead.origem?.campanhaMeta || (semRastreio ? ROTULO_SEM_RASTREIO_DE_ANUNCIO : ""),
+      conjunto: lead.origem?.conjunto || (semRastreio ? ROTULO_SEM_RASTREIO_DE_ANUNCIO : ""),
+      anuncio: lead.origem?.anuncio || (semRastreio ? ROTULO_SEM_RASTREIO_DE_ANUNCIO : ""),
+      semRastreioDeAnuncio: semRastreio,
       etapasVisitadas,
       qualificado,
       etapaMaisAvancada: nomeDaEtapa(maisAvancada),
@@ -136,7 +146,8 @@ function engajamentoPorEtapa(leads, chaveDoGrupo) {
 
 // O mesmo anúncio pode rodar com orçamentos diferentes em cada conjunto, por
 // isso o custo é lançado pela combinação anúncio + conjunto.
-const chaveAnuncioEConjunto = (l) => `${l.anuncio || "(sem anúncio)"} — ${l.conjunto || "(sem conjunto)"}`;
+const chaveAnuncioEConjunto = (l) =>
+  l.semRastreioDeAnuncio ? ROTULO_SEM_RASTREIO_DE_ANUNCIO : `${l.anuncio || "(sem anúncio)"} — ${l.conjunto || "(sem conjunto)"}`;
 
 export function analisarTrafego(parametros) {
   const leads = consolidarLeads(parametros);
@@ -163,6 +174,7 @@ export function analisarTrafego(parametros) {
     engajamentoPorEstado: engajamentoPorEtapa(leads, (l) => l.localizacao.estado),
     leadsSemTelefoneReconhecido: leads.filter((l) => !l.localizacao.formatoReconhecido).length,
     leadsSemOrigem: leads.filter((l) => !l.conjunto && !l.anuncio).length,
+    leadsSemRastreioDeAnuncio: leads.filter((l) => l.semRastreioDeAnuncio).length,
     todosOsLeads: leads.map(resumoDoLead),
     leadsQualificadosTotal: leads.filter((l) => l.qualificado).map(resumoDoLead),
     apenasNovos: Boolean(parametros.apenasNovos),

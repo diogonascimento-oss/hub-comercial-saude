@@ -193,6 +193,14 @@ export const SITUACAO_DA_REUNIAO = {
   realizada: ["realizada", "compareceu", "concluida"],
 };
 
+// Campanhas em que o anúncio de origem não é registrado no lead. No anúncio
+// que abre o WhatsApp, o lead chega como uma conversa, sem a identificação do
+// anúncio. Enquanto os campos de origem estiverem vazios, esses leads aparecem
+// com o rótulo abaixo e não entram no aviso de leads sem origem. Se os campos
+// passarem a ser preenchidos, o valor preenchido prevalece.
+export const CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO = ["IR-W"];
+export const ROTULO_SEM_RASTREIO_DE_ANUNCIO = "WhatsApp (anúncio não rastreado)";
+
 // Fuso do escritório (America/Recife, sem horário de verão).
 export const FUSO_HORARIO = "-03:00";
 
