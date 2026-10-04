@@ -179,6 +179,11 @@ test("situação da reunião: o campo decide e a movimentação é a reserva", (
   assert.equal(leituraDaSituacao("Realizada"), true);
   assert.equal(leituraDaSituacao("Não realizada"), false);
   assert.equal(leituraDaSituacao("No-show"), false);
+  assert.equal(leituraDaSituacao("No-show (falta do cliente)"), false);
+  assert.equal(leituraDaSituacao("Cancelada pelo cliente"), false);
+  assert.equal(leituraDaSituacao("Falha interna do escritório"), false);
+  assert.equal(leituraDaSituacao("Agendada"), null);
+  assert.equal(leituraDaSituacao("Confirmada"), null);
   assert.equal(leituraDaSituacao("Remarcada"), null);
   assert.equal(leituraDaSituacao(""), null);
 

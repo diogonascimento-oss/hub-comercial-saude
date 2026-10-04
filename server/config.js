@@ -188,8 +188,12 @@ export const EXPEDIENTE = {
 // foi realizada; quando está vazio ou não se encaixa em nenhuma das listas,
 // vale a movimentação entre colunas. A comparação ignora maiúsculas e acentos.
 // A lista de "não realizada" é verificada primeiro.
+// Opções cadastradas no Kommo (campo 1127427): Agendada, Confirmada, Realizada,
+// No-show (falta do cliente), Cancelada pelo cliente, Falha interna do
+// escritório e Remarcada. "Agendada", "Confirmada" e "Remarcada" não dizem se a
+// reunião aconteceu; nesses casos vale a movimentação.
 export const SITUACAO_DA_REUNIAO = {
-  naoRealizada: ["nao realizada", "nao compareceu", "no-show", "no show", "noshow", "faltou", "ausente", "cancelada"],
+  naoRealizada: ["nao realizada", "nao compareceu", "no-show", "no show", "noshow", "faltou", "ausente", "cancelada", "falha interna"],
   realizada: ["realizada", "compareceu", "concluida"],
 };
 
