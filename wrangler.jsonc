@@ -1,7 +1,7 @@
 {
   // Configuração do Cloudflare Workers: entrega a interface (pasta client/) e
   // executa worker/index.js para as chamadas /api/*.
-  "name": "hub-comercial-saude",
+  "name": "saude",
   "main": "worker/index.js",
   "compatibility_date": "2026-09-01",
   "assets": {

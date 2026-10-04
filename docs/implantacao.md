@@ -81,7 +81,7 @@ Observação: no plano gratuito o servidor hiberna após cerca de 15 minutos sem
 
 | Campo | Valor |
 |---|---|
-| Nome do projeto | `hub-comercial-saude` |
+| Nome do projeto | `saude` |
 | Build command | `npm run build:css` |
 | Deploy command | `npx wrangler deploy` |
 | Diretório raiz | `/` |
