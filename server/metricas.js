@@ -252,6 +252,16 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
     return { origem, destino, entraram: naOrigem.size, chegaram, taxa: taxa(chegaram, naOrigem.size) };
   });
 
+  // Registros do protocolo gravados em campos de seleção do lead. Refletem a
+  // situação atual de cada lead.
+  const contarPorCampo = (lista, campo, semValor) => {
+    const contagem = new Map();
+    for (const l of lista) contagem.set(l[campo] || semValor, (contagem.get(l[campo] || semValor) || 0) + 1);
+    return [...contagem].map(([valor, total]) => ({ valor, total })).sort((a, b) => b.total - a.total);
+  };
+  const leadsNoFarmer = leads.filter((l) => l.etapa === "PROTOCOLO_FARMER");
+  const leadsComReuniao = [...leadsComReuniaoMarcada].map((id) => porId.get(id));
+
   const qualificados = leadsQualificados.size;
   const fechados = leadsFechados.size;
   const reunioesEmAberto = agendamentoEmAberto.size;
@@ -312,6 +322,16 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
       fechadosEnviadosAoTintin: {
         total: contarComEtiqueta(leadsFechados, ETIQUETAS.tintinFechado),
         emUso: etiquetaEmUso(ETIQUETAS.tintinFechado),
+      },
+    },
+    registros: {
+      substatusFarmer: {
+        emUso: leads.some((l) => l.substatusFarmer),
+        itens: contarPorCampo(leadsNoFarmer, "substatusFarmer", "Sem substatus"),
+      },
+      situacaoDaReuniao: {
+        emUso: leads.some((l) => l.situacaoDaReuniao),
+        itens: contarPorCampo(leadsComReuniao, "situacaoDaReuniao", "Sem situação registrada"),
       },
     },
     tempos: {

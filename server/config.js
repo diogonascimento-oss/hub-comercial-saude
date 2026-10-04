@@ -115,7 +115,26 @@ export const CAMPOS = {
   campanhaMeta: 1127409,
   conjunto: 1127411,
   anuncio: 1127413,
+  // Responsáveis por lead, usados nos indicadores por pessoa.
+  sdrResponsavel: 1127415,
+  closerResponsavel: 1127417,
+  farmerResponsavel: 1127419,
+  // Registros do protocolo gravados em campos de seleção.
+  situacaoDaReuniao: 1127427,
+  substatusFarmer: 1127429,
 };
+
+// Metas do mês corrente, somadas as três campanhas.
+//
+// A meta de contratos foi definida pelo escritório. As de reuniões foram
+// derivadas dela com as taxas de agosto de 2026 registradas no protocolo
+// (26,9% de fechamento sobre reuniões realizadas e 45,6% de comparecimento) e
+// arredondadas. São provisórias, até o escritório definir os números finais.
+export const METAS_MENSAIS = [
+  { chave: "fechados", rotulo: "Contratos fechados", meta: 30 },
+  { chave: "reunioesRealizadas", rotulo: "Reuniões realizadas", meta: 110 },
+  { chave: "reunioesMarcadas", rotulo: "Reuniões marcadas", meta: 240 },
+];
 
 // Etiquetas definidas no protocolo de automações. Alguns indicadores dependem
 // delas, porque a informação não está na coluna em que o lead se encontra.

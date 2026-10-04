@@ -101,10 +101,19 @@
     <li><span class="text-ink">Leads ativos sem movimentação.</span> Leads sem atualização há mais de 7 dias, exceto os que estão em Fechado, Desqualificado ou Reaquecimento.</li>
   </ul>
 
-  <h2 class="titulo-secao mt-10 mb-3">8. Correção de movimentações indevidas</h2>
+  <h2 class="titulo-secao mt-10 mb-3">8. Metas, comparação e responsáveis</h2>
+  <ul class="list-disc pl-5 space-y-2 text-inkdim">
+    <li><span class="text-ink">Metas do mês.</span> As barras do cabeçalho medem sempre o mês corrente, do dia 1 até hoje, somadas as três campanhas, independentemente do período selecionado no filtro. A meta de contratos fechados foi definida pelo escritório. As metas de reuniões realizadas e marcadas foram derivadas dela com as taxas de agosto de 2026 registradas no protocolo (26,9% de fechamento sobre reuniões realizadas e 45,6% de comparecimento) e são provisórias.</li>
+    <li><span class="text-ink">Comparação com o período anterior.</span> Cada indicador é comparado com o período imediatamente anterior, de mesma duração. Para um filtro de 16 a 30, a comparação é com o período de 1 a 15. Quando o período anterior tem valor zero, o percentual não é calculado.</li>
+    <li><span class="text-ink">Desempenho por responsável.</span> Os leads são agrupados pelo nome gravado nos campos "SDR responsável", "Closer responsável" e "Farmer responsável", e cada grupo é calculado com as mesmas regras do funil. Leads sem o campo preenchido não entram. Nomes escritos de formas diferentes são tratados como pessoas diferentes.</li>
+    <li><span class="text-ink">Substatus do Farmer e situação da reunião.</span> Lidos dos campos de seleção de mesmo nome. Refletem a situação atual do lead: o substatus, entre os leads que estão agora no Protocolo Farmer; a situação da reunião, entre os leads com reunião marcada no período.</li>
+    <li><span class="text-ink">Funil lado a lado.</span> Mostra, por campanha, leads recebidos, qualificados, reuniões marcadas, realizadas e contratos fechados, com o percentual em relação ao marco anterior.</li>
+  </ul>
+
+  <h2 class="titulo-secao mt-10 mb-3">9. Correção de movimentações indevidas</h2>
   <p class="text-inkdim">O Kommo não permite excluir nem editar eventos do histórico. Quando um lead é movido por engano, o painel permite excluir o evento do cálculo ou ajustar a etapa e o horário considerados. As marcações ficam armazenadas fora do Kommo, registram o usuário e a data, podem ser revertidas e são aplicadas antes de cada cálculo. A exportação do histórico completo mantém os eventos excluídos, sinalizados, para auditoria.</p>
 
-  <h2 class="titulo-secao mt-10 mb-3">9. Tráfego e campanhas</h2>
+  <h2 class="titulo-secao mt-10 mb-3">10. Tráfego e campanhas</h2>
   <ul class="list-disc pl-5 space-y-2 text-inkdim">
     <li><span class="text-ink">Origem.</span> Campanha Meta, conjunto de anúncios e anúncio são lidos dos campos de mesmo nome no lead. Leads sem esses campos preenchidos aparecem como "(não informado)", e o painel informa quantos são.</li>
     <li><span class="text-ink">Leads considerados.</span> Com a opção "somente leads criados no período", entram os leads criados no intervalo, que é a leitura adequada para avaliar uma campanha. Sem a opção, entram todos os leads com movimentação no período.</li>
@@ -116,11 +125,10 @@
     <li><span class="text-ink">Soma de semanas.</span> As contagens são somadas e os percentuais recalculados sobre os totais. O custo só é apresentado quando todas as semanas somadas têm orçamento registrado.</li>
   </ul>
 
-  <h2 class="titulo-secao mt-10 mb-3">10. Itens do protocolo ainda não contemplados</h2>
+  <h2 class="titulo-secao mt-10 mb-3">11. Itens do protocolo ainda não contemplados</h2>
   <ul class="list-disc pl-5 space-y-1 text-inkdim">
     <li>Contratos assinados como indicador distinto de Fechado: depende de definição sobre qual registro do Kommo marca a assinatura.</li>
-    <li>Substatus do Protocolo Farmer: depende do campo utilizado para registrá-los.</li>
-    <li>Distinção entre ausência do cliente, cancelamento prévio e falha interna: depende de registro específico, além da etiqueta NO_SHOW.</li>
+    <li>Uso da situação da reunião no cálculo das taxas: hoje ela é exibida à parte, e a taxa de comparecimento continua baseada na movimentação entre colunas.</li>
     <li>Importação automática do investimento a partir do Meta; hoje o orçamento é informado manualmente por semana.</li>
     <li>Medição dos SLAs em horas úteis.</li>
   </ul>

@@ -50,6 +50,10 @@ const DDDS = ["81", "81", "81", "83", "84", "85", "11", "21", "71", "87"];
 const CAMPANHAS_META = ["Captação Tema 324", "Captação Reajuste"];
 const CONJUNTOS = ["Pernambuco 30-55", "Nordeste amplo", "Capitais Sudeste", "Lookalike clientes"];
 const ANUNCIOS = ["AD 01 - Decisão judicial", "AD 02 - Quatro sinais", "AD 03 - Depoimento", "AD 04 - Carrossel"];
+const SDRS = ["Bianca", "Rafael"];
+const CLOSERS = ["Dra. Helena", "Dr. Marcos"];
+const FARMERS = ["Tatiane"];
+const SUBSTATUS = ["Proposta enviada", "Dúvida/objeção", "Assinatura pendente", "Pagamento pendente"];
 const MOTIVOS = ["Sem interesse", "Sem resposta após cadência", "Considerou os honorários elevados", "Fechou com concorrente", "Sem aderência jurídica preliminar"];
 const VOLUMES = [120, 70, 160, 40];
 // Chance de avançar em cada passo, por funil.
@@ -160,6 +164,10 @@ for (const [indice, funil] of funis.entries()) {
       updated_at: Math.max(t, criadoEm),
       custom_fields_values: chance(0.9)
         ? [
+            { field_id: CAMPOS.sdrResponsavel, field_name: "SDR responsável", values: [{ value: escolher(SDRS) }] },
+            ...(atual >= 6 ? [{ field_id: CAMPOS.closerResponsavel, field_name: "Closer responsável", values: [{ value: escolher(CLOSERS) }] }] : []),
+            ...(atual >= 6 && atual <= 10 ? [{ field_id: CAMPOS.situacaoDaReuniao, field_name: "Situação da reunião", values: [{ value: tags.includes("REUNIAO_REALIZADA") ? "Realizada" : tags.includes("NO_SHOW") ? "No-show (falta do cliente)" : "Agendada" }] }] : []),
+            ...(atual === 8 ? [{ field_id: CAMPOS.farmerResponsavel, field_name: "Farmer responsável", values: [{ value: escolher(FARMERS) }] }, { field_id: CAMPOS.substatusFarmer, field_name: "Substatus Farmer", values: [{ value: escolher(SUBSTATUS) }] }] : []),
             { field_id: CAMPOS.campanhaMeta, field_name: "Campanha Meta", values: [{ value: CAMPANHAS_META[indice === 2 ? 1 : 0] }] },
             { field_id: CAMPOS.conjunto, field_name: "Conjunto de anúncios", values: [{ value: escolher(CONJUNTOS) }] },
             { field_id: CAMPOS.anuncio, field_name: "Anúncio / Criativo", values: [{ value: escolher(ANUNCIOS) }] },

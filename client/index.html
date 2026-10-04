@@ -20,10 +20,13 @@
           <p class="rotulo mt-1">Núcleo de Saúde · Hub Comercial</p>
         </div>
       </div>
-      <p class="text-xs text-inkdim">
-        Última atualização: <span id="ultimaAtualizacao" class="text-ink tabular">—</span>
-        <span class="text-inkfaint mx-1.5">|</span> atualização automática a cada 5 minutos
-      </p>
+      <div class="flex flex-col gap-3 md:items-end">
+        <div id="metas" class="flex flex-wrap gap-x-6 gap-y-2"></div>
+        <p class="text-xs text-inkdim">
+          Última atualização: <span id="ultimaAtualizacao" class="text-ink tabular">—</span>
+          <span class="text-inkfaint mx-1.5">|</span> atualização automática a cada 5 minutos
+        </p>
+      </div>
     </div>
   </header>
 
@@ -77,6 +80,7 @@
     <section aria-labelledby="tIndicadores">
       <h3 id="tIndicadores" class="titulo-secao mb-3">1. Indicadores do período</h3>
       <div id="cartoes" class="grade grid-cols-2 lg:grid-cols-4"></div>
+      <p id="periodoAnterior" class="mt-2 text-[11px] text-inkfaint"></p>
       <p id="avisoEmAberto" class="hidden mt-3 border border-gold/25 bg-gold/5 text-goldbright text-xs px-4 py-2.5"></p>
       <p id="avisoForaDaBase" class="hidden mt-2 text-[11px] text-inkdim"></p>
     </section>
@@ -85,10 +89,13 @@
     <section aria-labelledby="tEvolucao">
       <div class="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
         <h3 id="tEvolucao" class="titulo-secao">2. Evolução dos leads ao longo das etapas</h3>
-        <select id="modoEvolucao" class="bg-surface2 border border-line text-[11px] text-ink px-2 py-1" aria-label="Linhas do gráfico"><option value="separado">Uma linha por campanha</option><option value="unificado">Linha unificada</option></select>
+        <div class="flex items-center gap-2 flex-wrap">
+          <select id="etapasEvolucao" class="bg-surface2 border border-line text-[11px] text-ink px-2 py-1" aria-label="Etapas exibidas"><option value="principal">Caminho principal</option><option value="todas">Todas as etapas</option></select>
+          <select id="modoEvolucao" class="bg-surface2 border border-line text-[11px] text-ink px-2 py-1" aria-label="Linhas do gráfico"><option value="separado">Uma linha por campanha</option><option value="unificado">Linha unificada</option></select>
+        </div>
       </div>
       <div class="border border-line p-5">
-        <p class="text-[11px] text-inkfaint mb-3">Leads que entraram em cada etapa no período, na ordem do funil. Um lead conta em todas as etapas por que passou. A linha unificada segue a campanha selecionada acima. Clique em um ponto para ver os leads.</p>
+        <p class="text-[11px] text-inkfaint mb-3">Leads que entraram em cada etapa no período. O caminho principal vai do contato inicial ao fechamento; a opção "Todas as etapas" acrescenta, à direita, os desvios (Remarcação, Reaquecimento e Desqualificado). A linha unificada segue a campanha selecionada acima. Clique em um ponto para ver os leads.</p>
         <div id="graficoEvolucao"></div>
       </div>
     </section>
@@ -128,7 +135,7 @@
       <div class="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
         <h3 id="tComparativo" class="titulo-secao">5. Comparativo por campanha</h3>
         <div class="flex items-center gap-2">
-          <select id="modoComparativo" class="bg-surface2 border border-line text-[11px] text-ink px-2 py-1" aria-label="Modo de exibição do comparativo"><option value="tabela">Tabela</option><option value="grafico">Gráfico</option></select>
+          <select id="modoComparativo" class="bg-surface2 border border-line text-[11px] text-ink px-2 py-1" aria-label="Modo de exibição do comparativo"><option value="tabela">Tabela</option><option value="funil">Funil lado a lado</option><option value="grafico">Gráfico por indicador</option></select>
           <button id="btnExportarComparativo" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Exportar CSV</button>
         </div>
       </div>
@@ -143,9 +150,16 @@
       </div>
     </section>
 
+    <!-- Responsáveis -->
+    <section aria-labelledby="tPessoas">
+      <h3 id="tPessoas" class="titulo-secao mb-3">6. Desempenho por responsável</h3>
+      <div id="porPessoa" class="grid grid-cols-1 lg:grid-cols-3 gap-px bg-line border border-line"></div>
+      <p class="text-[11px] text-inkfaint mt-2">Agrupa os leads pelo nome gravado nos campos "SDR responsável", "Closer responsável" e "Farmer responsável". Leads sem o campo preenchido não entram.</p>
+    </section>
+
     <!-- Volume atual -->
     <section aria-labelledby="tFunil">
-      <h3 id="tFunil" class="titulo-secao mb-3">6. Volume atual por etapa</h3>
+      <h3 id="tFunil" class="titulo-secao mb-3">7. Volume atual por etapa</h3>
       <div class="border border-line p-5">
         <p class="text-[11px] text-inkfaint mb-4">Situação da base neste momento, independente do período. À direita, média de dias desde a última atualização.</p>
         <div id="graficoVolume" class="space-y-2.5"></div>
@@ -154,7 +168,8 @@
 
     <!-- 5. Conversão -->
     <section aria-labelledby="tConversao">
-      <h3 id="tConversao" class="titulo-secao mb-3">7. Conversão entre etapas</h3>
+      <details class="recolhivel">
+      <summary><h3 id="tConversao" class="titulo-secao inline">8. Conversão entre etapas</h3><span class="indicador-recolhivel"></span></summary>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-px bg-line border border-line">
         <div class="bg-bg p-5">
           <p class="rotulo">Etapas-chave</p>
@@ -162,9 +177,11 @@
           <div id="conversaoAmpla" class="text-xs"></div>
         </div>
         <div class="bg-bg p-5">
-          <p class="rotulo">Transições mais frequentes</p>
-          <p class="text-[11px] text-inkfaint mt-1 mb-3">Movimentações diretas de uma coluna para outra.</p>
-          <div id="conversaoEntreEtapas" class="text-xs"></div>
+          <details class="recolhivel">
+            <summary><span class="rotulo">Transições mais frequentes</span><span class="indicador-recolhivel"></span></summary>
+            <p class="text-[11px] text-inkfaint mt-2 mb-3">Movimentações diretas de uma coluna para outra.</p>
+            <div id="conversaoEntreEtapas" class="text-xs"></div>
+          </details>
         </div>
         <div class="bg-bg p-5">
           <div class="flex items-center justify-between gap-2 flex-wrap">
@@ -175,11 +192,13 @@
           <div id="destinos" class="text-xs mt-3"></div>
         </div>
       </div>
+      </details>
     </section>
 
     <!-- 6. Perdas e etiquetas -->
     <section aria-labelledby="tPerdas">
-      <h3 id="tPerdas" class="titulo-secao mb-3">8. Perdas e registros do protocolo</h3>
+      <details class="recolhivel">
+      <summary><h3 id="tPerdas" class="titulo-secao inline">9. Perdas e registros do protocolo</h3><span class="indicador-recolhivel"></span></summary>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-px bg-line border border-line">
         <div class="bg-bg p-5">
           <p class="rotulo mb-3">Desqualificados no período, por motivo</p>
@@ -191,10 +210,23 @@
           <div id="porEtiqueta" class="text-xs"></div>
         </div>
         <div class="bg-bg p-5">
-          <p class="rotulo mb-3">Etiquetas mais frequentes na base</p>
-          <div id="etiquetasFrequentes" class="space-y-2.5 text-xs"></div>
+          <details class="recolhivel">
+            <summary><span class="rotulo">Etiquetas mais frequentes na base</span><span class="indicador-recolhivel"></span></summary>
+            <div id="etiquetasFrequentes" class="space-y-2.5 text-xs mt-3"></div>
+          </details>
+        </div>
+        <div class="bg-bg p-5">
+          <p class="rotulo">Protocolo Farmer por substatus</p>
+          <p class="text-[11px] text-inkfaint mt-1 mb-3">Leads que estão agora no Protocolo Farmer, pelo campo "Substatus Farmer".</p>
+          <div id="substatusFarmer" class="space-y-2.5 text-xs"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <p class="rotulo">Situação das reuniões</p>
+          <p class="text-[11px] text-inkfaint mt-1 mb-3">Leads com reunião marcada no período, pelo campo "Situação da reunião".</p>
+          <div id="situacaoDaReuniao" class="space-y-2.5 text-xs"></div>
         </div>
       </div>
+      </details>
     </section>
 
    </div>
@@ -324,7 +356,7 @@
     <!-- 8. Registro -->
     <section aria-labelledby="tRegistro">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-        <h3 id="tRegistro" class="titulo-secao">9. Leads movimentados no período <span id="totalLeads" class="text-inkdim ml-1">0</span></h3>
+        <h3 id="tRegistro" class="titulo-secao">10. Leads movimentados no período <span id="totalLeads" class="text-inkdim ml-1">0</span></h3>
         <div class="flex items-center gap-2 flex-wrap">
           <label class="sr-only" for="buscaLeads">Buscar</label>
           <input id="buscaLeads" type="search" placeholder="Buscar por nome, telefone ou etapa" class="bg-surface2 border border-line px-3 py-1.5 text-xs text-ink w-64 placeholder:text-inkfaint">

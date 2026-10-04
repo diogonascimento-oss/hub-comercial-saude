@@ -86,7 +86,15 @@ Todos os indicadores são exibidos por campanha (IR-Q, IR-W e REA-Q) e no consol
 
 Indicadores que dependem das etiquetas aplicadas pela automação: reuniões confirmadas, ausências, propostas enviadas e eventos enviados ao TinTin/Meta.
 
-### 3.5 Painéis de apoio
+### 3.5 Metas, comparação e responsáveis
+
+- Metas do mês corrente no cabeçalho: contratos fechados, reuniões realizadas e reuniões marcadas. Definidas em `METAS_MENSAIS`, no arquivo `server/config.js`.
+- Variação de cada indicador em relação ao período anterior de mesma duração.
+- Desempenho por SDR, Closer e Farmer, a partir dos campos de responsável do lead.
+- Protocolo Farmer por substatus e situação das reuniões, a partir dos campos de seleção do lead.
+- Comparativo por campanha em tabela, em funil lado a lado ou em gráfico por indicador.
+
+### 3.6 Painéis de apoio
 
 - Distribuição dos leads por etapa, no período e na situação atual.
 - Conversão entre etapas e destino dos leads a partir de cada etapa.
@@ -95,7 +103,7 @@ Indicadores que dependem das etiquetas aplicadas pela automação: reuniões con
 - Relação de leads do período, com busca e exportação em CSV.
 - Exportação do histórico completo de movimentações, em CSV ou HTML, com ou sem os dados de campanha.
 
-### 3.6 Tráfego e campanhas
+### 3.7 Tráfego e campanhas
 
 Aba própria, com a origem de marketing dos leads:
 
@@ -109,7 +117,7 @@ Aba própria, com a origem de marketing dos leads:
 
 As regras de contagem e as limitações de cada indicador estão documentadas no próprio painel, no endereço `/documentacao`.
 
-### 3.7 Fora do escopo desta versão
+### 3.8 Fora do escopo desta versão
 
 - Importação automática do investimento a partir do Meta. O orçamento é informado manualmente por semana.
 - Medição dos SLAs em horas úteis.

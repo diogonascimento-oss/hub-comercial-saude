@@ -147,10 +147,11 @@ function colunasDoComparativo() {
 }
 
 function renderizarComparativo() {
-  const emGrafico = $("modoComparativo").value === "grafico";
-  $("tabelaComparativo").classList.toggle("hidden", emGrafico);
-  $("graficoComparativo").classList.toggle("hidden", !emGrafico);
-  if (emGrafico) return renderizarComparativoEmGrafico();
+  const modo = $("modoComparativo").value;
+  $("tabelaComparativo").classList.toggle("hidden", modo !== "tabela");
+  $("graficoComparativo").classList.toggle("hidden", modo === "tabela");
+  if (modo === "grafico") return renderizarComparativoEmGrafico();
+  if (modo === "funil") return renderizarFunilLadoALado();
 
   const colunas = colunasDoComparativo();
   $("cabecalhoComparativo").innerHTML = `
@@ -167,6 +168,53 @@ function renderizarComparativo() {
         .join("")}
     </tr>`,
   ).join("");
+}
+
+// Funil lado a lado: os cinco marcos do caminho do lead em cada campanha, com
+// a barra proporcional aos leads recebidos e a conversão em relação ao marco
+// anterior.
+const MARCOS_DO_FUNIL = [
+  ["Leads recebidos", "leadsRecebidos"],
+  ["Qualificados", "qualificados"],
+  ["Reuniões marcadas", "reunioesMarcadas"],
+  ["Reuniões realizadas", "reunioesRealizadas"],
+  ["Contratos fechados", "fechados"],
+];
+
+function renderizarFunilLadoALado() {
+  const colunas = [...dados.campanhas.map((c) => ({ codigo: c.codigo, titulo: c.codigo, nome: c.nome, cor: estiloDaCampanha(c.codigo).cor })), { codigo: "TODAS", titulo: "Total", nome: "Três campanhas", cor: "#d8b565" }];
+  $("graficoComparativo").innerHTML = `
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+      ${colunas
+        .map((c) => {
+          const v = dados.escopos[c.codigo].volume;
+          const valores = MARCOS_DO_FUNIL.map(([, chave]) => v[chave]);
+          const maximo = Math.max(...valores, 1);
+          return `
+        <div>
+          <p class="font-serif text-base font-semibold text-ink">${esc(c.titulo)}</p>
+          <p class="text-[11px] text-inkfaint mb-3">${esc(c.nome)}</p>
+          ${MARCOS_DO_FUNIL.map(([rotulo], i) => {
+            const anterior = i > 0 ? valores[i - 1] : null;
+            const conversao = anterior ? Math.round((valores[i] / anterior) * 1000) / 10 : null;
+            return `
+            <div class="mb-2.5">
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-[11px] text-inkdim">${rotulo}</span>
+                <span class="text-[10px] text-inkfaint tabular">${i > 0 ? `${percentual(conversao)} do anterior` : ""}</span>
+              </div>
+              <div class="flex items-center gap-2 mt-0.5">
+                <div class="flex-1 h-6 bg-surface2 flex justify-center"><div class="barra h-full" style="width:${(valores[i] / maximo) * 100}%;background:${c.cor}"></div></div>
+                <span class="w-10 font-serif text-lg font-semibold tabular text-ink text-right">${numero(valores[i])}</span>
+              </div>
+            </div>`;
+          }).join("")}
+          <p class="text-[11px] text-inkdim mt-3">Conversão final: <span class="text-ink font-semibold">${percentual(dados.escopos[c.codigo].taxas.conversaoFinal)}</span></p>
+        </div>`;
+        })
+        .join("")}
+    </div>
+    <p class="text-[10px] text-inkfaint mt-4">Cada barra é proporcional ao maior valor da própria campanha. Os números são fatos do período, não o mesmo grupo de leads: uma etapa pode superar a anterior quando há leads recebidos antes do período.</p>`;
 }
 
 // Comparativo em gráfico: para cada indicador, uma barra por campanha. Nos
@@ -239,11 +287,24 @@ function renderizarSeletorDeCampanha() {
   }
 }
 
-function cartao(valor, rotulo, detalhe, corDoValor = "text-ink") {
+// Variação de um volume em relação ao período anterior, de mesma duração.
+// menorEhMelhor inverte a cor para indicadores em que a alta é ruim.
+function comparacaoComAnterior(chave, menorEhMelhor = false) {
+  const atual = escopo().volume[chave];
+  const anterior = dados.escoposAnteriores?.[campanhaSelecionada]?.volume[chave];
+  if (anterior === undefined) return "";
+  if (anterior === 0) return `<span class="text-inkfaint">Período anterior: 0</span>`;
+  const pct = Math.round(((atual - anterior) / anterior) * 1000) / 10;
+  const cor = pct === 0 ? "text-inkdim" : pct > 0 !== menorEhMelhor ? "text-positivo" : "text-negativo";
+  return `<span class="text-inkfaint">Período anterior: ${numero(anterior)}</span> <span class="${cor} font-semibold tabular">${pct > 0 ? "+" : ""}${pct.toLocaleString("pt-BR")}%</span>`;
+}
+
+function cartao(valor, rotulo, detalhe, corDoValor = "text-ink", comparacao = "") {
   return `
     <div class="p-5">
       <p class="font-serif text-3xl font-semibold tabular ${corDoValor}">${valor}</p>
       <p class="rotulo mt-2">${esc(rotulo)}</p>
+      ${comparacao ? `<p class="text-[11px] mt-2">${comparacao}</p>` : ""}
       ${detalhe ? `<p class="text-[11px] text-inkdim mt-2 leading-relaxed">${detalhe}</p>` : ""}
     </div>`;
 }
@@ -253,17 +314,23 @@ function renderizarCartoes() {
   const noShow = etiquetas.noShow.emUso
     ? `${numero(etiquetas.noShow.total)} com a etiqueta NO_SHOW`
     : "Etiqueta NO_SHOW ainda não utilizada";
+  const c = comparacaoComAnterior;
 
   $("cartoes").innerHTML = [
-    cartao(numero(v.leadsRecebidos), "Leads recebidos", `${numero(v.contatados)} contatados · ${numero(v.comPrimeiraResposta)} com primeira resposta`),
-    cartao(numero(v.qualificados), "Qualificados", `Taxa de qualificação: <span class="${classeDaTaxa(t.qualificacao)}">${percentual(t.qualificacao)}</span><br>${numero(v.qualificadosSemAgendamento)} sem agendamento`),
-    cartao(numero(v.reunioesMarcadas), "Reuniões marcadas", `${numero(v.reunioesMarcadasNovas)} novas · ${numero(v.remarcacoes)} remarcações<br>Qualificado para agendado: <span class="${classeDaTaxa(t.qualificadoParaAgendado)}">${percentual(t.qualificadoParaAgendado)}</span>`, "text-goldbright"),
-    cartao(numero(v.reunioesRealizadas), "Reuniões realizadas", `Comparecimento: <span class="${classeDaTaxa(t.comparecimento)}">${percentual(t.comparecimento)}</span>`, "text-positivo"),
-    cartao(numero(v.naoRealizadas), "Não realizadas", `${percentual(t.naoRealizacao)} das marcadas<br>${esc(noShow)}`, "text-negativo"),
-    cartao(numero(v.remarcacoesRecuperadas), "Remarcações recuperadas", `De ${numero(v.entradasEmRemarcacao)} entradas em Remarcação: ${percentual(t.remarcacaoRecuperada)}<br>${numero(v.remarcacoesRecuperadasERealizadas)} recuperadas e realizadas`),
-    cartao(numero(v.fechados), "Contratos fechados", `Reunião para fechamento: <span class="${classeDaTaxa(t.reuniaoParaFechamento)}">${percentual(t.reuniaoParaFechamento)}</span><br>Conversão final: ${percentual(t.conversaoFinal)}`, "text-positivo"),
-    cartao(numero(v.desqualificados), "Desqualificados", `${numero(v.perdidasAntesDaReuniao)} perdidos entre o agendamento e a reunião`),
+    cartao(numero(v.leadsRecebidos), "Leads recebidos", `${numero(v.contatados)} contatados · ${numero(v.comPrimeiraResposta)} com primeira resposta`, "text-ink", c("leadsRecebidos")),
+    cartao(numero(v.qualificados), "Qualificados", `Taxa de qualificação: <span class="${classeDaTaxa(t.qualificacao)}">${percentual(t.qualificacao)}</span><br>${numero(v.qualificadosSemAgendamento)} sem agendamento`, "text-ink", c("qualificados")),
+    cartao(numero(v.reunioesMarcadas), "Reuniões marcadas", `${numero(v.reunioesMarcadasNovas)} novas · ${numero(v.remarcacoes)} remarcações<br>Qualificado para agendado: <span class="${classeDaTaxa(t.qualificadoParaAgendado)}">${percentual(t.qualificadoParaAgendado)}</span>`, "text-goldbright", c("reunioesMarcadas")),
+    cartao(numero(v.reunioesRealizadas), "Reuniões realizadas", `Comparecimento: <span class="${classeDaTaxa(t.comparecimento)}">${percentual(t.comparecimento)}</span>`, "text-positivo", c("reunioesRealizadas")),
+    cartao(numero(v.naoRealizadas), "Não realizadas", `${percentual(t.naoRealizacao)} das marcadas<br>${esc(noShow)}`, "text-negativo", c("naoRealizadas", true)),
+    cartao(numero(v.remarcacoesRecuperadas), "Remarcações recuperadas", `De ${numero(v.entradasEmRemarcacao)} entradas em Remarcação: ${percentual(t.remarcacaoRecuperada)}<br>${numero(v.remarcacoesRecuperadasERealizadas)} recuperadas e realizadas`, "text-ink", c("remarcacoesRecuperadas")),
+    cartao(numero(v.fechados), "Contratos fechados", `Reunião para fechamento: <span class="${classeDaTaxa(t.reuniaoParaFechamento)}">${percentual(t.reuniaoParaFechamento)}</span><br>Conversão final: ${percentual(t.conversaoFinal)}`, "text-positivo", c("fechados")),
+    cartao(numero(v.desqualificados), "Desqualificados", `${numero(v.perdidasAntesDaReuniao)} perdidos entre o agendamento e a reunião`, "text-ink", c("desqualificados", true)),
   ].join("");
+
+  const dataBr = (iso) => iso.split("-").reverse().join("/");
+  $("periodoAnterior").textContent = dados.periodoAnterior
+    ? `Comparação com o período anterior de mesma duração: ${dataBr(dados.periodoAnterior.inicio)} a ${dataBr(dados.periodoAnterior.fim)}.`
+    : "";
 
   const emAberto = $("avisoEmAberto");
   if (v.reunioesEmAberto > 0) {
@@ -305,7 +372,12 @@ function renderizarBarras(idDoContainer, contagem, detalhe) {
 // que segue a campanha selecionada.
 function renderizarEvolucao() {
   const container = $("graficoEvolucao");
-  const etapas = dados.etapas.filter((e) => e.categoria !== "outra");
+  const DESVIOS = ["REMARCACAO", "REAQUECIMENTO", "DESQUALIFICADO"];
+  const conhecidas = dados.etapas.filter((e) => e.categoria !== "outra");
+  const principais = conhecidas.filter((e) => !DESVIOS.includes(e.chave));
+  const desvios = $("etapasEvolucao").value === "todas" ? conhecidas.filter((e) => DESVIOS.includes(e.chave)) : [];
+  // Caminho principal à esquerda; desvios, quando exibidos, à direita.
+  const etapas = [...principais, ...desvios];
   const unificado = $("modoEvolucao").value === "unificado";
   const series = unificado
     ? [{ nome: campanhaSelecionada === "TODAS" ? "Todas as campanhas" : campanhaSelecionada, cor: "#d8b565", traco: "", escopo: escopo() }]
@@ -333,7 +405,8 @@ function renderizarEvolucao() {
     .map((s, si) => {
       // Com várias linhas, o rótulo alterna acima e abaixo do ponto para reduzir a sobreposição.
       const deslocamento = unificado || si !== 1 ? -9 : 15;
-      return `<path d="${s.valores.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/>
+      // A linha liga apenas o caminho principal; os desvios são pontos soltos.
+      return `<path d="${s.valores.slice(0, principais.length).map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/>
       ${s.valores
         .map(
           (v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="5" fill="#0b0c11" stroke="${s.cor}" stroke-width="2" style="cursor:pointer" data-serie="${si}" data-etapa="${i}"><title>${esc(s.nome)}, ${esc(etapas[i].nome)}: ${v}</title></circle>
@@ -342,13 +415,18 @@ function renderizarEvolucao() {
         .join("")}`;
     })
     .join("");
+  const xDoSeparador = desvios.length ? x(principais.length - 1) + passo / 2 : null;
+  const separador = desvios.length
+    ? `<line x1="${xDoSeparador}" y1="${MT - 8}" x2="${xDoSeparador}" y2="${base}" stroke="#33364a" stroke-dasharray="3,4"/>
+       <text x="${xDoSeparador + 8}" y="${MT - 10}" font-family="IBM Plex Mono, monospace" font-size="9" fill="#6b6d7a">DESVIOS DO CAMINHO PRINCIPAL</text>`
+    : "";
   const rotulos = etapas
     .map((e, i) => `<g transform="translate(${x(i).toFixed(1)},${base + 14}) rotate(-28)"><text text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="${corEtapa(e.chave)}">${esc(e.nome)}</text></g>`)
     .join("");
 
   container.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução dos leads ao longo das etapas" style="display:block;width:100%;height:auto">
-      ${marcas}<line x1="${ML}" y1="${base}" x2="${W - MR}" y2="${base}" stroke="#33364a"/>${linhas}${rotulos}
+      ${marcas}<line x1="${ML}" y1="${base}" x2="${W - MR}" y2="${base}" stroke="#33364a"/>${separador}${linhas}${rotulos}
     </svg>
     <div class="flex flex-wrap gap-x-5 gap-y-1 mt-1 text-[11px] text-inkdim">
       ${series.map((s) => `<span class="flex items-center gap-1.5"><svg width="20" height="8" aria-hidden="true"><line x1="0" y1="4" x2="20" y2="4" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/></svg>${esc(s.nome)}</span>`).join("")}
@@ -534,7 +612,65 @@ function renderizarLeads() {
     : '<tr><td colspan="6" class="px-4 py-8 text-center text-inkdim text-xs">Nenhum lead movimentado no período.</td></tr>';
 }
 
+function renderizarMetas() {
+  const itens = dados.metas?.itens || [];
+  const [ano, mes] = (dados.metas?.mes || "").split("-");
+  $("metas").innerHTML = itens
+    .map((m) => {
+      const pct = m.meta > 0 ? Math.min((m.atual / m.meta) * 100, 100) : 0;
+      const cor = pct >= 100 ? "#4fb38a" : pct >= 60 ? "#b6923f" : "#d0685a";
+      return `
+      <div class="min-w-[150px]" title="Meta do mês ${mes}/${ano}, somadas as três campanhas">
+        <div class="flex justify-between items-baseline gap-3">
+          <span class="rotulo">${esc(m.rotulo)}</span>
+          <span class="font-serif text-sm font-semibold text-ink tabular">${numero(m.atual)} / ${numero(m.meta)}</span>
+        </div>
+        <div class="h-1 bg-surface2 mt-1.5"><div class="barra h-full" style="width:${pct}%;background:${cor}"></div></div>
+      </div>`;
+    })
+    .join("");
+}
+
+// Colunas exibidas para cada papel.
+const COLUNAS_POR_PAPEL = {
+  sdr: [["Leads", "leadsRecebidos"], ["Qualif.", "qualificados"], ["Reuniões marcadas", "reunioesMarcadas"]],
+  closer: [["Realizadas", "reunioesRealizadas"], ["Não realizadas", "naoRealizadas"], ["Fechados", "fechados"]],
+  farmer: [["Realizadas", "reunioesRealizadas"], ["Fechados", "fechados"]],
+};
+
+function renderizarPorPessoa() {
+  const porPessoa = escopo().porPessoa || {};
+  $("porPessoa").innerHTML = (dados.papeis || [])
+    .map((papel) => {
+      const pessoas = porPessoa[papel.chave] || [];
+      const colunas = COLUNAS_POR_PAPEL[papel.chave];
+      const corpo = pessoas.length
+        ? `<table class="w-full text-xs">
+            <thead><tr class="text-inkfaint text-[10px] text-left"><th class="font-normal pb-1.5">Nome</th>${colunas.map(([rotulo]) => `<th class="font-normal pb-1.5 text-right">${rotulo}</th>`).join("")}</tr></thead>
+            <tbody>${pessoas
+              .map((pessoa) => `<tr class="border-t border-line"><td class="py-1.5 text-ink truncate max-w-[140px]" title="${esc(pessoa.nome)}">${esc(pessoa.nome)}</td>${colunas.map(([, chave]) => `<td class="py-1.5 text-right tabular text-ink">${numero(pessoa[chave])}</td>`).join("")}</tr>`)
+              .join("")}</tbody>
+          </table>`
+        : `<p class="text-xs text-inkdim">Campo "${esc(papel.rotulo)} responsável" ainda não preenchido nos leads.</p>`;
+      return `<div class="bg-bg p-5"><p class="rotulo mb-3">${esc(papel.rotulo)}</p>${corpo}</div>`;
+    })
+    .join("");
+}
+
+function renderizarRegistros() {
+  const r = escopo().registros;
+  const bloco = (id, registro, nomeDoCampo, vazio) => {
+    $(id).innerHTML = !registro.emUso
+      ? `<p class="text-xs text-inkdim">Campo "${nomeDoCampo}" ainda não preenchido nos leads.</p>`
+      : listaComBarras(registro.itens.map((i) => ({ rotulo: i.valor, total: i.total })), (i) => i.rotulo, vazio);
+  };
+  bloco("substatusFarmer", r.substatusFarmer, "Substatus Farmer", "Nenhum lead no Protocolo Farmer.");
+  bloco("situacaoDaReuniao", r.situacaoDaReuniao, "Situação da reunião", "Nenhuma reunião marcada no período.");
+}
+
 function renderizarEscopo() {
+  renderizarPorPessoa();
+  renderizarRegistros();
   renderizarCartoes();
   renderizarFunil();
   renderizarTempos();
@@ -552,6 +688,7 @@ function renderizarTudo() {
   $("avisoMapeamento").classList.toggle("hidden", dados.mapeamento.completo);
   $("listaPendencias").innerHTML = pendencias.map((p) => `<li>${esc(p)}</li>`).join("");
 
+  renderizarMetas();
   renderizarComparativo();
   renderizarSeletorDeCampanha();
   renderizarEscopo();
@@ -879,6 +1016,7 @@ async function executarAcaoDeCorrecao(acao, eventId) {
 $("btnFiltrar").addEventListener("click", atualizar);
 $("modoComparativo").addEventListener("change", () => dados && renderizarComparativo());
 $("modoEvolucao").addEventListener("change", () => dados && renderizarEvolucao());
+$("etapasEvolucao").addEventListener("change", () => dados && renderizarEvolucao());
 $("seletorOrigem").addEventListener("change", renderizarDestinos);
 $("buscaLeads").addEventListener("input", () => dados && renderizarLeads());
 $("btnExportarComparativo").addEventListener("click", exportarComparativo);

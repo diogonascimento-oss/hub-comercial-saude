@@ -11,7 +11,7 @@ import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { CAMPANHAS, ETAPAS, ETAPA_POR_CHAVE, FUSO_HORARIO } from "./config.js";
+import { CAMPANHAS, ETAPAS, ETAPA_POR_CHAVE, FUSO_HORARIO, METAS_MENSAIS } from "./config.js";
 import * as kommo from "./kommo.js";
 import { montarMapeamento, nomeDaEtapa } from "./mapeamento.js";
 import { normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
@@ -66,20 +66,34 @@ async function obterMapeamento() {
 }
 
 // Leads dos três funis e mudanças de etapa do período.
+// Leads dos três funis. A consulta é a mais pesada e não depende do período,
+// por isso tem cache próprio, compartilhado entre os períodos consultados.
+let cacheLeads = null; // { em, promessa }
+
+function obterLeads() {
+  if (cacheLeads && Date.now() - cacheLeads.em < CACHE_DADOS_MS) return cacheLeads.promessa;
+  const promessa = (async () => {
+    const { valor: mapeamento } = await obterMapeamento();
+    if (!mapeamento.idsDosFunis.length) return { mapeamento, leads: [] };
+    const leadsBrutos = await kommo.listarLeadsDosFunis(mapeamento.idsDosFunis);
+    const idsDeContatos = leadsBrutos.map((l) => l._embedded?.contacts?.[0]?.id).filter(Boolean);
+    const contatosPorId = await kommo.listarContatosPorIds(idsDeContatos);
+    return { mapeamento, leads: normalizarLeads(leadsBrutos, contatosPorId, mapeamento) };
+  })();
+  cacheLeads = { em: Date.now(), promessa };
+  promessa.catch(() => (cacheLeads = null));
+  return promessa;
+}
+
+// Leads e mudanças de etapa do período.
 async function obterDados(deTs, ateTs) {
   const chave = `${deTs}:${ateTs}`;
   const emCache = cacheDados.get(chave);
   if (emCache && Date.now() - emCache.em < CACHE_DADOS_MS) return emCache.promessa;
 
   const promessa = (async () => {
-    const { valor: mapeamento } = await obterMapeamento();
-    if (!mapeamento.idsDosFunis.length) {
-      return { mapeamento, leads: [], eventosBrutos: [] };
-    }
-    const leadsBrutos = await kommo.listarLeadsDosFunis(mapeamento.idsDosFunis);
-    const idsDeContatos = leadsBrutos.map((l) => l._embedded?.contacts?.[0]?.id).filter(Boolean);
-    const contatosPorId = await kommo.listarContatosPorIds(idsDeContatos);
-    const leads = normalizarLeads(leadsBrutos, contatosPorId, mapeamento);
+    const { mapeamento, leads } = await obterLeads();
+    if (!mapeamento.idsDosFunis.length) return { mapeamento, leads, eventosBrutos: [] };
     const eventosBrutos = await kommo.listarMudancasDeEtapa(deTs, ateTs);
     return { mapeamento, leads, eventosBrutos };
   })();
@@ -193,6 +207,62 @@ async function prepararPeriodo(periodo) {
   };
 }
 
+// Data (AAAA-MM-DD) de um instante, no fuso do escritório.
+const DESLOCAMENTO_DO_FUSO_S = -3 * 3600;
+const dataLocal = (ts) => new Date((ts + DESLOCAMENTO_DO_FUSO_S) * 1000).toISOString().slice(0, 10);
+
+const PAPEIS = [
+  { chave: "sdr", rotulo: "SDR" },
+  { chave: "closer", rotulo: "Closer" },
+  { chave: "farmer", rotulo: "Farmer" },
+];
+
+// Indicadores por responsável: os leads são agrupados pelo nome gravado no
+// campo de cada papel, e cada grupo é calculado com as mesmas regras do funil.
+function indicadoresPorPessoa(leadsDoEscopo, base) {
+  const resultado = {};
+  for (const papel of PAPEIS) {
+    const grupos = new Map();
+    for (const lead of leadsDoEscopo) {
+      const nome = lead.responsaveis?.[papel.chave]?.trim();
+      if (!nome) continue;
+      if (!grupos.has(nome)) grupos.set(nome, []);
+      grupos.get(nome).push(lead);
+    }
+    resultado[papel.chave] = [...grupos]
+      .map(([nome, leadsDaPessoa]) => {
+        const { volume, taxas } = calcularEscopo({ ...base, leads: leadsDaPessoa });
+        return {
+          nome,
+          leadsNaBase: leadsDaPessoa.length,
+          leadsRecebidos: volume.leadsRecebidos,
+          qualificados: volume.qualificados,
+          reunioesMarcadas: volume.reunioesMarcadas,
+          reunioesRealizadas: volume.reunioesRealizadas,
+          naoRealizadas: volume.naoRealizadas,
+          fechados: volume.fechados,
+          comparecimento: taxas.comparecimento,
+          reuniaoParaFechamento: taxas.reuniaoParaFechamento,
+        };
+      })
+      .sort((a, b) => b.leadsNaBase - a.leadsNaBase);
+  }
+  return resultado;
+}
+
+// Volumes e taxas de cada escopo em um período, sem listas.
+async function resumoDoPeriodo(periodo, agora) {
+  const { leads, eventosPorLead } = await prepararPeriodo(periodo);
+  const base = { eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, agora };
+  const resumir = (lista) => {
+    const { volume, taxas } = calcularEscopo({ ...base, leads: lista });
+    return { volume, taxas };
+  };
+  const resumo = { TODAS: resumir(leads) };
+  for (const c of CAMPANHAS) resumo[c.codigo] = resumir(leads.filter((l) => l.campanha === c.codigo));
+  return resumo;
+}
+
 app.get("/api/metrics", async (req, res) => {
   const periodo = lerPeriodo(req);
   if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
@@ -206,19 +276,34 @@ app.get("/api/metrics", async (req, res) => {
     const escopos = {};
     const todas = calcularEscopo({ ...base, leads, incluirListas: true });
     const { listas, ...indicadoresGerais } = todas;
-    escopos.TODAS = indicadoresGerais;
+    escopos.TODAS = { ...indicadoresGerais, porPessoa: indicadoresPorPessoa(leads, base) };
     for (const campanha of CAMPANHAS) {
-      escopos[campanha.codigo] = calcularEscopo({ ...base, leads: leads.filter((l) => l.campanha === campanha.codigo) });
+      const doEscopo = leads.filter((l) => l.campanha === campanha.codigo);
+      escopos[campanha.codigo] = { ...calcularEscopo({ ...base, leads: doEscopo }), porPessoa: indicadoresPorPessoa(doEscopo, base) };
     }
+
+    // Período imediatamente anterior, de mesma duração, para comparação.
+    const duracao = periodo.ateTs - periodo.deTs + 1;
+    const anterior = periodoDe(dataLocal(periodo.deTs - duracao), dataLocal(periodo.deTs - 1));
+    const escoposAnteriores = await resumoDoPeriodo(anterior, agora);
+
+    // Metas: sempre sobre o mês corrente, independentemente do filtro.
+    const hoje = dataLocal(agora);
+    const mes = periodoDe(`${hoje.slice(0, 8)}01`, hoje);
+    const doMes = (await resumoDoPeriodo(mes, agora)).TODAS.volume;
 
     res.json({
       periodo: { inicio: periodo.inicio, fim: periodo.fim },
+      periodoAnterior: { inicio: anterior.inicio, fim: anterior.fim },
       geradoEm: new Date().toISOString(),
       campanhas: CAMPANHAS.map((c) => ({ codigo: c.codigo, nome: c.nome })),
       etapas: etapasParaInterface(chavesEncontradas),
+      papeis: PAPEIS,
       mapeamento: { completo: mapeamento.completo, pendencias: mapeamento.pendencias },
       avisos,
+      metas: { mes: hoje.slice(0, 7), itens: METAS_MENSAIS.map((m) => ({ ...m, atual: doMes[m.chave] })) },
       escopos,
+      escoposAnteriores,
       listas,
     });
   } catch (erro) {

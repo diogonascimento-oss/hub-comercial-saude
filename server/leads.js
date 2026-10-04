@@ -100,6 +100,13 @@ export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento) {
         conjunto: valorDoCampo(lead.custom_fields_values, CAMPOS.conjunto),
         anuncio: valorDoCampo(lead.custom_fields_values, CAMPOS.anuncio),
       },
+      responsaveis: {
+        sdr: valorDoCampo(lead.custom_fields_values, CAMPOS.sdrResponsavel),
+        closer: valorDoCampo(lead.custom_fields_values, CAMPOS.closerResponsavel),
+        farmer: valorDoCampo(lead.custom_fields_values, CAMPOS.farmerResponsavel),
+      },
+      situacaoDaReuniao: valorDoCampo(lead.custom_fields_values, CAMPOS.situacaoDaReuniao),
+      substatusFarmer: valorDoCampo(lead.custom_fields_values, CAMPOS.substatusFarmer),
       criadoEm: Number(lead.created_at) || null,
       atualizadoEm: Number(lead.updated_at) || null,
     });

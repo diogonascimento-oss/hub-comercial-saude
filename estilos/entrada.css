@@ -45,3 +45,10 @@ table.comparativo tbody tr { border-top: 1px solid rgba(255, 255, 255, 0.07); }
 table.comparativo tr.destaque td { background: rgba(182, 146, 63, 0.05); }
 
 @media (prefers-reduced-motion: reduce) { .barra { transition: none; } }
+
+/* Seções e painéis recolhidos por padrão. */
+details.recolhivel > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; }
+details.recolhivel > summary::-webkit-details-marker { display: none; }
+details.recolhivel > summary .indicador-recolhivel::after { content: "Mostrar"; font-size: 10px; color: #9a9ca8; border: 1px solid rgba(255, 255, 255, 0.12); padding: 1px 8px; }
+details.recolhivel[open] > summary .indicador-recolhivel::after { content: "Ocultar"; }
+details.recolhivel[open] > summary { margin-bottom: 12px; }
