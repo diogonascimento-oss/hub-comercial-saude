@@ -17,6 +17,7 @@ const percentual = (t) => (t === null || t === undefined ? "—" : `${t.toLocale
 const BLOCOS = [
   { chave: "metas", nome: "Metas do mês", tela: "telaResumo" },
   { chave: "indicadores", nome: "Indicadores do mês", tela: "telaResumo" },
+  { chave: "reunioesHoje", nome: "Reuniões de hoje", tela: "telaResumo" },
   { chave: "campanhas", nome: "Resumo por campanha", tela: "telaResumo" },
   { chave: "etapas", nome: "Leads em cada etapa", tela: "telaResumo" },
   { chave: "evolucao", nome: "Evolução ao longo das etapas", tela: "telaEvolucao" },
@@ -49,13 +50,19 @@ let telaAtual = 0;
 let relogioDasTelas = null;
 
 function aplicarAjustes() {
-  for (const el of document.querySelectorAll("[data-bloco]")) el.hidden = !ajustes.blocos[el.dataset.bloco];
-  $("base").hidden = !ajustes.blocos.campanhas && !ajustes.blocos.etapas;
+  aplicarVisibilidade();
   telasAtivas = [...new Set(BLOCOS.filter((b) => ajustes.blocos[b.chave]).map((b) => b.tela))];
   if (!telasAtivas.length) telasAtivas = ["telaResumo"];
   mostrarTela(Math.min(telaAtual, telasAtivas.length - 1));
   clearInterval(relogioDasTelas);
   if (telasAtivas.length > 1) relogioDasTelas = setInterval(() => mostrarTela((telaAtual + 1) % telasAtivas.length), ajustes.segundos * 1000);
+}
+
+// Chamada também depois de cada atualização, porque os cartões são redesenhados.
+function aplicarVisibilidade() {
+  for (const el of document.querySelectorAll("[data-bloco]")) el.hidden = !ajustes.blocos[el.dataset.bloco];
+  $("indicadores").hidden = !ajustes.blocos.indicadores && !ajustes.blocos.reunioesHoje;
+  $("base").hidden = !ajustes.blocos.campanhas && !ajustes.blocos.etapas;
 }
 
 function mostrarTela(indice) {
@@ -122,16 +129,28 @@ function renderizarMetas(metas, hoje) {
     .join("");
 }
 
-function renderizarIndicadores(doMes, deHoje) {
+function renderizarIndicadores(doMes, deHoje, reunioes) {
   const v = doMes.volume, t = doMes.taxas;
-  const cartao = (rotulo, valor, detalhe) => `
-    <div class="cartao ind">
+  const cartao = (rotulo, valor, detalhe, bloco = "indicadores") => `
+    <div class="cartao ind${bloco === "reunioesHoje" ? " destaque" : ""}" data-bloco="${bloco}">
       <p class="rotulo">${rotulo}</p>
       <div><p class="valor serifa num">${numero(valor)}</p><p class="detalhe">${detalhe}</p></div>
     </div>`;
+  // Reuniões com data para hoje, pelo campo "Data da Reunião" do lead.
+  const r = reunioes || { emUso: false, total: 0, horarios: [] };
+  const detalheDeHoje = !r.emUso
+    ? "Campo ainda sem uso"
+    : !r.total
+      ? "Nenhuma com data para hoje"
+      : r.proxima
+        ? `Próxima às <strong>${esc(r.proxima)}</strong> · faltam ${numero(r.aindaPorAcontecer)}`
+        : r.horarios.length
+          ? "Todas já passaram do horário"
+          : "Sem horário informado";
   $("indicadores").innerHTML = [
+    cartao("Reuniões de hoje", r.total, detalheDeHoje, "reunioesHoje"),
     cartao("Leads no mês", v.leadsRecebidos, `Hoje: <strong>${numero(deHoje?.volume.leadsRecebidos)}</strong>`),
-    cartao("Qualificados", v.qualificados, `Taxa de qualificação: <strong>${percentual(t.qualificacao)}</strong>`),
+    cartao("Qualificados", v.qualificados, `Qualificação: <strong>${percentual(t.qualificacao)}</strong>`),
     cartao("Reuniões marcadas", v.reunioesMarcadas, `Hoje: <strong>${numero(deHoje?.volume.reunioesMarcadas)}</strong>`),
     cartao("Reuniões realizadas", v.reunioesRealizadas, `Comparecimento: <strong>${percentual(t.comparecimento)}</strong>`),
     cartao("Contratos fechados", v.fechados, `Conversão final: <strong>${percentual(t.conversaoFinal)}</strong>`),
@@ -286,11 +305,12 @@ async function atualizar() {
       chamarApi(`/analise-trafego?inicio=${inicioDoMes}&fim=${hoje}&apenasNovos=true&resumo=1`),
     ]);
     renderizarMetas(mes.metas, hoje);
-    renderizarIndicadores(mes.escopos.TODAS, dia.escopos.TODAS);
+    renderizarIndicadores(mes.escopos.TODAS, dia.escopos.TODAS, mes.reunioesDeHoje);
     renderizarCampanhas(mes.campanhas, mes.escopos);
     renderizarEtapas(mes.etapas, mes.escopos.TODAS.volumeAtual);
     renderizarEvolucao(mes.campanhas, mes.etapas, mes.escopos);
     renderizarMapa(trafego);
+    aplicarVisibilidade();
     $("mes").textContent = new Date(`${hoje}T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }).replace(/^./, (c) => c.toUpperCase());
     $("atualizado").textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
     $("aviso").textContent = "";

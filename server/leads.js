@@ -65,6 +65,16 @@ export function valorDoCampo(campos, idDoCampo) {
     .join("; ");
 }
 
+// Data da reunião gravada no lead, em segundos. O campo é localizado pelo nome
+// ("Data da Reunião"), porque o ID dele não consta da configuração.
+function dataDaReuniao(lead) {
+  const campo = (lead.custom_fields_values || []).find((c) =>
+    /^data da reuni[aã]o$/i.test(String(c.field_name || "").trim()),
+  );
+  const valor = Number(campo?.values?.[0]?.value);
+  return Number.isFinite(valor) && valor > 0 ? valor : null;
+}
+
 function motivoDePerda(lead) {
   const doCampo = valorDoCampo(lead.custom_fields_values, CAMPOS.motivoDesqualificacao);
   if (doCampo) return doCampo;
@@ -108,6 +118,7 @@ export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento) {
       },
       situacaoDaReuniao: valorDoCampo(lead.custom_fields_values, CAMPOS.situacaoDaReuniao),
       substatusFarmer: valorDoCampo(lead.custom_fields_values, CAMPOS.substatusFarmer),
+      dataDaReuniao: dataDaReuniao(lead),
       criadoEm: Number(lead.created_at) || null,
       atualizadoEm: Number(lead.updated_at) || null,
     });

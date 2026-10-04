@@ -224,6 +224,26 @@ async function prepararPeriodo(periodo) {
 const DESLOCAMENTO_DO_FUSO_S = -3 * 3600;
 const dataLocal = (ts) => new Date((ts + DESLOCAMENTO_DO_FUSO_S) * 1000).toISOString().slice(0, 10);
 
+// Reuniões com data marcada para hoje, pelo campo "Data da Reunião" do lead.
+// Só totais e horários; nenhum dado pessoal.
+function reunioesDeHoje(leads, agora) {
+  const hoje = dataLocal(agora);
+  const doDia = leads.filter((l) => l.dataDaReuniao && dataLocal(l.dataDaReuniao) === hoje && l.etapa !== "DESQUALIFICADO");
+  const hora = (ts) => new Date((ts + DESLOCAMENTO_DO_FUSO_S) * 1000).toISOString().slice(11, 16);
+  // Campo só com a data, sem horário, chega como meia-noite.
+  const comHorario = doDia.filter((l) => hora(l.dataDaReuniao) !== "00:00").sort((a, b) => a.dataDaReuniao - b.dataDaReuniao);
+  const porCampanha = {};
+  for (const l of doDia) porCampanha[l.campanha] = (porCampanha[l.campanha] || 0) + 1;
+  return {
+    emUso: leads.some((l) => l.dataDaReuniao),
+    total: doDia.length,
+    porCampanha,
+    horarios: comHorario.map((l) => hora(l.dataDaReuniao)),
+    aindaPorAcontecer: comHorario.filter((l) => l.dataDaReuniao > agora).length,
+    proxima: comHorario.find((l) => l.dataDaReuniao > agora) ? hora(comHorario.find((l) => l.dataDaReuniao > agora).dataDaReuniao) : null,
+  };
+}
+
 const PAPEIS = [
   { chave: "sdr", rotulo: "SDR" },
   { chave: "closer", rotulo: "Closer" },
@@ -333,6 +353,7 @@ app.get("/api/metrics", async (req, res) => {
       mapeamento: { completo: mapeamento.completo, pendencias: mapeamento.pendencias },
       avisos,
       metas: { mes: hoje.slice(0, 7), itens: METAS_MENSAIS.map((m) => ({ ...m, atual: doMes[m.chave] })) },
+      reunioesDeHoje: reunioesDeHoje(leads, agora),
       escopos,
       escoposAnteriores,
       listas: resumo ? undefined : listas,

@@ -46,9 +46,12 @@
   .meta .rodape { display:flex; justify-content:space-between; margin-top:1.1vh; font-size:1.8vh; color:var(--fraca); }
 
   #indicadores { grid-auto-flow:column; grid-auto-columns:1fr; flex:20; }
-  .ind .valor { font-size:8vh; font-weight:600; line-height:1; }
-  .ind .detalhe { font-size:1.8vh; color:var(--fraca); margin-top:.8vh; }
+  .ind .valor { font-size:7.4vh; font-weight:600; line-height:1; }
+  .ind .detalhe { font-size:1.6vh; color:var(--fraca); margin-top:.8vh; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ind .rotulo { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ind .detalhe strong { color:var(--tinta); font-weight:600; }
+  .ind.destaque { border-color:rgba(216,181,101,.45); }
+  .ind.destaque .valor { color:var(--ouroclaro); }
 
   #base { grid-auto-flow:column; grid-auto-columns:1fr; flex:37; }
   #base .cartao { justify-content:flex-start; overflow:hidden; padding-bottom:1.4vh; }
@@ -124,7 +127,7 @@
     <!-- Tela 1: resumo do mês -->
     <div id="telaResumo" class="tela">
       <section id="metas" class="grade" data-bloco="metas" aria-label="Metas do mês"></section>
-      <section id="indicadores" class="grade" data-bloco="indicadores" aria-label="Indicadores do mês"></section>
+      <section id="indicadores" class="grade" aria-label="Indicadores do mês"></section>
       <section id="base" class="grade">
         <div class="cartao" data-bloco="campanhas">
           <p class="rotulo">Mês por campanha</p>
