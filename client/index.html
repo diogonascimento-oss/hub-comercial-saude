@@ -25,10 +25,28 @@
   <header class="border-b border-line bg-surface">
     <div class="max-w-[1400px] mx-auto px-5 md:px-10 py-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
       <div class="flex items-center gap-4">
-        <div class="w-11 h-11 border border-gold/60 text-goldbright flex items-center justify-center font-serif font-semibold text-lg">RM</div>
-        <div>
-          <h1 class="font-serif text-lg font-semibold text-ink leading-tight">Robson Menezes Advogados</h1>
-          <p class="rotulo mt-1">Núcleo de Saúde · Hub Comercial</p>
+        <!-- Monograma do escritório, redesenhado em vetor nas cores do painel. -->
+        <svg class="h-11 w-auto shrink-0" viewBox="60 50 1392 670" role="img" aria-label="Robson Menezes Advogados">
+          <defs>
+            <linearGradient id="ouroDoMonograma" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#e6c983"/>
+              <stop offset="0.55" stop-color="#d8b565"/>
+              <stop offset="1" stop-color="#a8853a"/>
+            </linearGradient>
+          </defs>
+          <g fill="url(#ouroDoMonograma)">
+            <path d="M72 60H465A215 215 0 0 1 526 482L660 708H535L350 385H465A110 110 0 0 0 465 165H72Z"/>
+            <path d="M792 65L1128 392L1440 88V240L1128 548L905 330V708H792Z"/>
+          </g>
+          <g fill="#b6923f" opacity="0.6">
+            <path d="M122 388H240L432 708H305Z"/>
+            <path d="M1440 420V572L1297 708H1135Z"/>
+          </g>
+        </svg>
+        <div class="border-l border-gold/30 pl-4">
+          <h1 class="font-serif text-[17px] font-normal text-ink leading-none uppercase tracking-[0.22em]">Robson Menezes</h1>
+          <p class="text-[9px] text-inkdim uppercase tracking-[0.5em] mt-1.5">Advogados</p>
+          <p class="rotulo mt-2 text-goldbright/90">Núcleo de Saúde · Hub Comercial</p>
         </div>
       </div>
       <div class="flex flex-col gap-3 md:items-end">
