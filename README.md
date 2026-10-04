@@ -93,14 +93,25 @@ Indicadores que dependem das etiquetas aplicadas pela automação: reuniões con
 - Leads ativos sem movimentação.
 - Reuniões em aberto, sem desfecho registrado.
 - Relação de leads do período, com busca e exportação em CSV.
-- Exportação do histórico completo de movimentações, para auditoria.
+- Exportação do histórico completo de movimentações, em CSV ou HTML, com ou sem os dados de campanha.
+
+### 3.6 Tráfego e campanhas
+
+Aba própria, com a origem de marketing dos leads:
+
+- Leads, qualificados, reuniões e contratos por conjunto de anúncios, por anúncio e por região.
+- Distribuição por estado, em barras ou em mapa, a partir do DDD do telefone.
+- Engajamento por etapa de cada conjunto de anúncios e de cada estado.
+- Histórico semanal salvo, com orçamento, decisões e observações de cada semana.
+- Comparação com a semana anterior e soma de várias semanas.
+- Custo por lead, por qualificado e por contrato, calculado a partir do orçamento informado.
+- Relatório semanal em HTML, para leitura e impressão.
 
 As regras de contagem e as limitações de cada indicador estão documentadas no próprio painel, no endereço `/documentacao`.
 
-### 3.6 Fora do escopo desta versão
+### 3.7 Fora do escopo desta versão
 
-- Análise de tráfego por público, anúncio e região, com custo por campanha.
-- Histórico semanal salvo, com registro de decisões e observações.
+- Importação automática do investimento a partir do Meta. O orçamento é informado manualmente por semana.
 - Medição dos SLAs em horas úteis.
 
 ---
@@ -110,7 +121,10 @@ As regras de contagem e as limitações de cada indicador estão documentadas no
 ```
 ├── client/                 Interface: HTML e JavaScript, sem framework
 │   ├── index.html
-│   ├── app.js
+│   ├── app.js              Aba do funil, exportações e correção de eventos
+│   ├── trafego.js          Aba de tráfego e campanhas
+│   ├── relatorio-semanal.js  Relatórios em HTML para download
+│   ├── mapa-brasil.js      Mapa por estado
 │   ├── documentacao.html   Metodologia de cálculo dos indicadores
 │   └── estilos.css         Gerado por "npm run build:css"; não editar
 ├── worker/
@@ -121,8 +135,10 @@ As regras de contagem e as limitações de cada indicador estão documentadas no
 │   ├── kommo.js            Cliente da API do Kommo (somente leitura)
 │   ├── mapeamento.js       Associação entre colunas do Kommo e etapas do painel
 │   ├── leads.js            Normalização de leads e eventos
-│   ├── metricas.js         Cálculo dos indicadores
-│   ├── armazenamento.js    Exclusões e correções de eventos (Upstash)
+│   ├── metricas.js         Cálculo dos indicadores do funil
+│   ├── trafego.js          Análise de tráfego, custo e soma de semanas
+│   ├── localizacao.js      Estado e região a partir do DDD
+│   ├── armazenamento.js    Exclusões, correções e semanas salvas (Upstash)
 │   ├── dev/                Kommo simulado, com dados fictícios
 │   └── test/
 ├── estilos/entrada.css     Fonte dos estilos
@@ -136,7 +152,7 @@ As regras de contagem e as limitações de cada indicador estão documentadas no
 | Interface | Cloudflare Workers (Static Assets) | Publicação automática a cada alteração na branch `main` |
 | Repasse | Cloudflare Workers | Valida o token do Cloudflare Access e acrescenta o token da API |
 | API | Render | Consulta e processa a API v4 do Kommo |
-| Persistência | Upstash Redis | Armazena somente exclusões e correções de eventos |
+| Persistência | Upstash Redis | Armazena exclusões e correções de eventos e as semanas salvas de tráfego |
 | Controle de acesso | Cloudflare Access | Autenticação por e-mail, validada antes da entrega da página |
 
 Todos os serviços são utilizados no plano gratuito.

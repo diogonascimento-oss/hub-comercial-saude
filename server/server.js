@@ -17,6 +17,7 @@ import { montarMapeamento, nomeDaEtapa } from "./mapeamento.js";
 import { normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
 import { calcularEscopo, etapasParaInterface } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
+import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas } from "./trafego.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -148,42 +149,56 @@ app.get("/api/etapas", (req, res) => {
   res.json({ etapas: ETAPAS.map((e) => ({ chave: e.chave, nome: e.nome, categoria: e.categoria })) });
 });
 
+// Leads e eventos do período prontos para cálculo: sem os eventos excluídos,
+// com as correções aplicadas e agrupados por lead.
+async function prepararPeriodo(periodo) {
+  const { mapeamento, leads, eventosBrutos } = await obterDados(periodo.deTs, periodo.ateTs);
+
+  const idsExcluidos = new Set((await armazenamento.lerExclusoes()).map((e) => String(e.eventId)));
+  const correcoesPorId = new Map((await armazenamento.lerCorrecoes()).map((c) => [String(c.eventId), c]));
+
+  const leadsPorId = new Map(leads.map((l) => [l.id, l]));
+  const eventosPorLead = new Map();
+  let eventosDeLeadsForaDaBase = 0;
+
+  const eventos = aplicarCorrecoes(
+    eventosBrutos.filter((ev) => !idsExcluidos.has(String(ev.id))),
+    correcoesPorId,
+  ).map((ev) => normalizarEvento(ev, mapeamento));
+
+  const chavesEncontradas = [];
+  for (const ev of eventos) {
+    // Eventos de outros funis da conta não pertencem a este painel.
+    const pertenceAosFunis = mapeamento.campanhaPorFunil.has(Number(ev.funilId)) || leadsPorId.has(ev.leadId);
+    if (!pertenceAosFunis) continue;
+    // Lead excluído, mesclado ou removido por duplicidade de telefone.
+    if (!leadsPorId.has(ev.leadId)) {
+      eventosDeLeadsForaDaBase++;
+      continue;
+    }
+    if (ev.ts < periodo.deTs || ev.ts > periodo.ateTs) continue; // correção moveu o evento para fora do período
+    if (!eventosPorLead.has(ev.leadId)) eventosPorLead.set(ev.leadId, []);
+    eventosPorLead.get(ev.leadId).push(ev);
+    chavesEncontradas.push(ev.de, ev.para);
+  }
+  for (const lista of eventosPorLead.values()) lista.sort((a, b) => a.ts - b.ts);
+  leads.forEach((l) => chavesEncontradas.push(l.etapa));
+
+  return {
+    mapeamento,
+    leads,
+    eventosPorLead,
+    chavesEncontradas,
+    avisos: { eventosDeLeadsForaDaBase, correcoesAtivas: correcoesPorId.size, exclusoesAtivas: idsExcluidos.size },
+  };
+}
+
 app.get("/api/metrics", async (req, res) => {
   const periodo = lerPeriodo(req);
   if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
 
   try {
-    const { mapeamento, leads, eventosBrutos } = await obterDados(periodo.deTs, periodo.ateTs);
-
-    const idsExcluidos = new Set((await armazenamento.lerExclusoes()).map((e) => String(e.eventId)));
-    const correcoesPorId = new Map((await armazenamento.lerCorrecoes()).map((c) => [String(c.eventId), c]));
-
-    const leadsPorId = new Map(leads.map((l) => [l.id, l]));
-    const eventosPorLead = new Map();
-    let eventosDeLeadsForaDaBase = 0;
-
-    const eventos = aplicarCorrecoes(
-      eventosBrutos.filter((ev) => !idsExcluidos.has(String(ev.id))),
-      correcoesPorId,
-    ).map((ev) => normalizarEvento(ev, mapeamento));
-
-    const chavesEncontradas = [];
-    for (const ev of eventos) {
-      // Eventos de outros funis da conta não pertencem a este painel.
-      const pertenceAosFunis = mapeamento.campanhaPorFunil.has(Number(ev.funilId)) || leadsPorId.has(ev.leadId);
-      if (!pertenceAosFunis) continue;
-      // Lead excluído, mesclado ou removido por duplicidade de telefone.
-      if (!leadsPorId.has(ev.leadId)) {
-        eventosDeLeadsForaDaBase++;
-        continue;
-      }
-      if (ev.ts < periodo.deTs || ev.ts > periodo.ateTs) continue; // correção moveu o evento para fora do período
-      if (!eventosPorLead.has(ev.leadId)) eventosPorLead.set(ev.leadId, []);
-      eventosPorLead.get(ev.leadId).push(ev);
-      chavesEncontradas.push(ev.de, ev.para);
-    }
-    for (const lista of eventosPorLead.values()) lista.sort((a, b) => a.ts - b.ts);
-    leads.forEach((l) => chavesEncontradas.push(l.etapa));
+    const { mapeamento, leads, eventosPorLead, chavesEncontradas, avisos } = await prepararPeriodo(periodo);
 
     const agora = Math.floor(Date.now() / 1000);
     const base = { eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, agora };
@@ -202,7 +217,7 @@ app.get("/api/metrics", async (req, res) => {
       campanhas: CAMPANHAS.map((c) => ({ codigo: c.codigo, nome: c.nome })),
       etapas: etapasParaInterface(chavesEncontradas),
       mapeamento: { completo: mapeamento.completo, pendencias: mapeamento.pendencias },
-      avisos: { eventosDeLeadsForaDaBase, correcoesAtivas: correcoesPorId.size, exclusoesAtivas: idsExcluidos.size },
+      avisos,
       escopos,
       listas,
     });
@@ -430,6 +445,236 @@ app.delete("/api/corrigir-evento/:eventId", async (req, res) => {
     res.json({ ok: true });
   } catch (erro) {
     responderErro(res, erro, "Falha ao reverter a correção");
+  }
+});
+
+// --- Tráfego e campanhas -------------------------------------------------------
+
+const DATA = /^\d{4}-\d{2}-\d{2}$/;
+
+function periodoDe(inicio, fim) {
+  return lerPeriodo({ query: { inicio, fim } });
+}
+
+// Análise de tráfego de um período, opcionalmente restrita a uma campanha.
+async function calcularAnaliseDeTrafego(periodo, { apenasNovos, campanha }) {
+  const { leads, eventosPorLead } = await prepararPeriodo(periodo);
+  const doEscopo = campanha && campanha !== "TODAS" ? leads.filter((l) => l.campanha === campanha) : leads;
+  return analisarTrafego({ leads: doEscopo, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
+}
+
+app.get("/api/analise-trafego", async (req, res) => {
+  const periodo = lerPeriodo(req);
+  if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
+  try {
+    res.json(
+      await calcularAnaliseDeTrafego(periodo, {
+        apenasNovos: req.query.apenasNovos === "true",
+        campanha: req.query.campanha,
+      }),
+    );
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao montar a análise de tráfego");
+  }
+});
+
+// Lê a semana indicada na requisição (query ou corpo). Responde 400 ou 404 e
+// devolve null quando não há o que processar.
+async function semanaDaRequisicao(req, res) {
+  const inicio = req.body?.inicio || req.query.inicio;
+  const fim = req.body?.fim || req.query.fim;
+  if (!DATA.test(inicio || "") || !DATA.test(fim || "")) {
+    res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
+    return null;
+  }
+  const registro = await armazenamento.lerSemana(inicio, fim);
+  if (!registro) {
+    res.status(404).json({ error: "Semana não encontrada. Salve a semana antes." });
+    return null;
+  }
+  return registro;
+}
+
+const texto = (valor, limite = 1000) => String(valor ?? "").trim().slice(0, limite);
+
+// Salva o período como uma semana do histórico. Regravar a mesma semana
+// atualiza a análise e preserva custo, decisões e observações.
+app.post("/api/trafego/salvar-semana", async (req, res) => {
+  const periodo = periodoDe(req.body?.inicio, req.body?.fim);
+  if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
+  try {
+    const analise = await calcularAnaliseDeTrafego(periodo, { apenasNovos: Boolean(req.body.apenasNovos) });
+    const existente = await armazenamento.lerSemana(periodo.inicio, periodo.fim);
+    const registro = await armazenamento.gravarSemana({
+      inicio: periodo.inicio,
+      fim: periodo.fim,
+      analise,
+      custo: existente?.custo || null,
+      decisoes: existente?.decisoes || [],
+      observacoes: existente?.observacoes || [],
+      criadoEm: existente?.criadoEm || new Date().toISOString(),
+    });
+    res.json(registro);
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao salvar a semana");
+  }
+});
+
+app.get("/api/trafego/semanas", async (req, res) => {
+  try {
+    res.json(await armazenamento.lerListaDeSemanas());
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao listar as semanas salvas");
+  }
+});
+
+app.get("/api/trafego/semana", async (req, res) => {
+  try {
+    const registro = await semanaDaRequisicao(req, res);
+    if (registro) res.json(registro);
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao ler a semana");
+  }
+});
+
+app.delete("/api/trafego/semana", async (req, res) => {
+  try {
+    const registro = await semanaDaRequisicao(req, res);
+    if (!registro) return;
+    await armazenamento.removerSemana(registro.inicio, registro.fim);
+    res.json({ ok: true });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao excluir a semana");
+  }
+});
+
+// Orçamento da semana. Só valores de custo: leads e qualificados vêm do Kommo.
+app.post("/api/trafego/custo", async (req, res) => {
+  try {
+    const registro = await semanaDaRequisicao(req, res);
+    if (!registro) return;
+    const custo = req.body.custo || {};
+    const valor = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 && v !== null && v !== "" ? Number(v) : null);
+    registro.custo = {
+      orcamentoMensal: valor(custo.orcamentoMensal),
+      orcamentoDiarioTotal: valor(custo.orcamentoDiarioTotal),
+      brandingDiario: valor(custo.brandingDiario),
+      porAnuncio: (Array.isArray(custo.porAnuncio) ? custo.porAnuncio : [])
+        .map((c) => ({ grupo: texto(c.grupo, 300), orcamentoDiario: valor(c.orcamentoDiario) }))
+        .filter((c) => c.grupo && c.orcamentoDiario !== null),
+    };
+    res.json(await armazenamento.gravarSemana(registro));
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao salvar o custo");
+  }
+});
+
+// Decisões e observações de uma semana: incluir, editar e excluir.
+function rotasDeAnotacao(caminho, lista, nomeDoId, montar) {
+  app.post(caminho, async (req, res) => {
+    try {
+      const registro = await semanaDaRequisicao(req, res);
+      if (!registro) return;
+      const item = montar(req.body);
+      if (!item) return res.status(400).json({ error: "Texto obrigatório." });
+      registro[lista].push({ id: crypto.randomUUID(), ...item, criadoEm: new Date().toISOString(), usuario: req.get("x-usuario") || null });
+      res.json(await armazenamento.gravarSemana(registro));
+    } catch (erro) {
+      responderErro(res, erro, "Falha ao gravar");
+    }
+  });
+  app.put(caminho, async (req, res) => {
+    try {
+      const registro = await semanaDaRequisicao(req, res);
+      if (!registro) return;
+      const item = registro[lista].find((x) => x.id === req.body[nomeDoId]);
+      if (!item) return res.status(404).json({ error: "Registro não encontrado nesta semana." });
+      const novo = montar({ ...item, ...req.body });
+      if (!novo) return res.status(400).json({ error: "Texto obrigatório." });
+      Object.assign(item, novo, { editadoEm: new Date().toISOString() });
+      res.json(await armazenamento.gravarSemana(registro));
+    } catch (erro) {
+      responderErro(res, erro, "Falha ao editar");
+    }
+  });
+  app.delete(caminho, async (req, res) => {
+    try {
+      const registro = await semanaDaRequisicao(req, res);
+      if (!registro) return;
+      registro[lista] = registro[lista].filter((x) => x.id !== req.query[nomeDoId]);
+      res.json(await armazenamento.gravarSemana(registro));
+    } catch (erro) {
+      responderErro(res, erro, "Falha ao excluir");
+    }
+  });
+}
+
+rotasDeAnotacao("/api/trafego/decisao", "decisoes", "decisaoId", (corpo) => {
+  const decisao = texto(corpo.decisao);
+  return decisao ? { assunto: texto(corpo.assunto, 120), decisao } : null;
+});
+rotasDeAnotacao("/api/trafego/observacao", "observacoes", "observacaoId", (corpo) => {
+  const conteudo = texto(corpo.texto);
+  return conteudo ? { texto: conteudo } : null;
+});
+
+// Análise da semana salva, com o custo cruzado quando houver orçamento.
+app.get("/api/trafego/analise-com-custo", async (req, res) => {
+  try {
+    const { inicio, fim } = req.query;
+    if (!DATA.test(inicio || "") || !DATA.test(fim || "")) {
+      return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
+    }
+    // Período ainda não salvo como semana é uma situação normal, não um erro.
+    const registro = await armazenamento.lerSemana(inicio, fim);
+    if (!registro) return res.json({ semanaSalva: false, porAnuncioEConjunto: [] });
+    const grupos = registro.analise.porAnuncioEConjunto || [];
+    res.json({
+      ...registro.analise,
+      semanaSalva: true,
+      custo: registro.custo,
+      porAnuncioEConjunto: registro.custo
+        ? mesclarCusto(grupos, registro.custo.porAnuncio, registro.inicio, registro.fim)
+        : grupos,
+    });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao calcular o custo");
+  }
+});
+
+app.get("/api/trafego/comparar-semana-anterior", async (req, res) => {
+  try {
+    const atual = await semanaDaRequisicao(req, res);
+    if (!atual) return;
+    const anteriores = (await armazenamento.lerListaDeSemanas()).filter((s) => s.fim < atual.inicio);
+    const referencia = anteriores[anteriores.length - 1];
+    const anterior = referencia ? await armazenamento.lerSemana(referencia.inicio, referencia.fim) : null;
+    if (!anterior) return res.json({ semAnterior: true, mensagem: "Não há semana salva anterior a esta para comparar." });
+    res.json({ semAnterior: false, ...compararSemanas(atual, anterior) });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao comparar as semanas");
+  }
+});
+
+// Soma várias semanas salvas em um relatório único.
+app.post("/api/trafego/rollup", async (req, res) => {
+  const semanas = Array.isArray(req.body?.semanas) ? req.body.semanas.slice(0, 60) : [];
+  if (semanas.length < 2) return res.status(400).json({ error: "Selecione ao menos duas semanas." });
+  try {
+    const registros = [];
+    for (const s of semanas) {
+      const registro = DATA.test(s.inicio || "") && DATA.test(s.fim || "") ? await armazenamento.lerSemana(s.inicio, s.fim) : null;
+      if (!registro) return res.status(404).json({ error: `Semana ${s.inicio} a ${s.fim} não encontrada.` });
+      registros.push(registro);
+    }
+    registros.sort((a, b) => a.inicio.localeCompare(b.inicio));
+    res.json({
+      periodo: { inicio: registros[0].inicio, fim: registros[registros.length - 1].fim },
+      semanasIncluidas: registros.length,
+      ...combinarSemanas(registros),
+    });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao somar as semanas");
   }
 });
 

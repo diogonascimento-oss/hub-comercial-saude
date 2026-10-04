@@ -41,9 +41,53 @@ async function gravar(chave, lista) {
   await cliente().post(`/set/${chave}`, JSON.stringify(lista));
 }
 
+async function lerRegistro(chave) {
+  if (!configurado()) return memoria.get(chave) ?? null;
+  const r = await cliente().get(`/get/${chave}`);
+  return r.data?.result ? JSON.parse(r.data.result) : null;
+}
+
+async function remover(chave) {
+  if (!configurado()) {
+    memoria.delete(chave);
+    return;
+  }
+  await cliente().post(`/del/${chave}`);
+}
+
 export const armazenamentoPersistente = configurado;
 
 export const lerExclusoes = () => ler(CHAVE_EXCLUSOES);
 export const gravarExclusoes = (lista) => gravar(CHAVE_EXCLUSOES, lista);
 export const lerCorrecoes = () => ler(CHAVE_CORRECOES);
 export const gravarCorrecoes = (lista) => gravar(CHAVE_CORRECOES, lista);
+
+// --- Histórico semanal de tráfego ---------------------------------------------
+//
+// Cada semana salva guarda a análise daquele período, o orçamento informado, as
+// decisões e as observações. O custo fica preso à semana: mudar o orçamento de
+// um anúncio depois não altera as semanas já salvas.
+
+const CHAVE_LISTA_DE_SEMANAS = "hubsaude:trafego:semanas";
+const chaveDaSemana = (inicio, fim) => `hubsaude:trafego:semana:${inicio}_${fim}`;
+
+export const lerListaDeSemanas = () => ler(CHAVE_LISTA_DE_SEMANAS);
+export const lerSemana = (inicio, fim) => lerRegistro(chaveDaSemana(inicio, fim));
+
+export async function gravarSemana(registro) {
+  registro.atualizadoEm = new Date().toISOString();
+  await gravar(chaveDaSemana(registro.inicio, registro.fim), registro);
+  const lista = await lerListaDeSemanas();
+  if (!lista.some((s) => s.inicio === registro.inicio && s.fim === registro.fim)) {
+    lista.push({ inicio: registro.inicio, fim: registro.fim });
+    lista.sort((a, b) => a.inicio.localeCompare(b.inicio));
+    await gravar(CHAVE_LISTA_DE_SEMANAS, lista);
+  }
+  return registro;
+}
+
+export async function removerSemana(inicio, fim) {
+  await remover(chaveDaSemana(inicio, fim));
+  const lista = (await lerListaDeSemanas()).filter((s) => !(s.inicio === inicio && s.fim === fim));
+  await gravar(CHAVE_LISTA_DE_SEMANAS, lista);
+}

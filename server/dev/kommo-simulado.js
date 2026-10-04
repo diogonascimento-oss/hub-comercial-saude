@@ -10,7 +10,7 @@
 // Nenhum dado aqui é real.
 
 import express from "express";
-import { CAMPANHAS, ETAPAS } from "../config.js";
+import { CAMPANHAS, CAMPOS, ETAPAS } from "../config.js";
 
 const PORTA = process.env.PORTA_SIMULADO || 4010;
 const DIA = 86400;
@@ -47,6 +47,9 @@ const funis = [
 const PRIMEIROS = ["Ana", "Bruno", "Carla", "Daniel", "Elisa", "Fábio", "Gisele", "Heitor", "Ingrid", "Jonas", "Karen", "Lucas", "Marta", "Nelson", "Olívia", "Paulo"];
 const SOBRENOMES = ["Almeida", "Barros", "Campos", "Dantas", "Esteves", "Farias", "Gouveia", "Holanda", "Lins", "Moura", "Nóbrega", "Pessoa"];
 const DDDS = ["81", "81", "81", "83", "84", "85", "11", "21", "71", "87"];
+const CAMPANHAS_META = ["Captação Tema 324", "Captação Reajuste"];
+const CONJUNTOS = ["Pernambuco 30-55", "Nordeste amplo", "Capitais Sudeste", "Lookalike clientes"];
+const ANUNCIOS = ["AD 01 - Decisão judicial", "AD 02 - Quatro sinais", "AD 03 - Depoimento", "AD 04 - Carrossel"];
 const MOTIVOS = ["Sem interesse", "Sem resposta após cadência", "Considerou os honorários elevados", "Fechou com concorrente", "Sem aderência jurídica preliminar"];
 const VOLUMES = [120, 70, 160, 40];
 // Chance de avançar em cada passo, por funil.
@@ -155,7 +158,13 @@ for (const [indice, funil] of funis.entries()) {
       status_id: coluna(atual),
       created_at: criadoEm,
       updated_at: Math.max(t, criadoEm),
-      custom_fields_values: null,
+      custom_fields_values: chance(0.9)
+        ? [
+            { field_id: CAMPOS.campanhaMeta, field_name: "Campanha Meta", values: [{ value: CAMPANHAS_META[indice === 2 ? 1 : 0] }] },
+            { field_id: CAMPOS.conjunto, field_name: "Conjunto de anúncios", values: [{ value: escolher(CONJUNTOS) }] },
+            { field_id: CAMPOS.anuncio, field_name: "Anúncio / Criativo", values: [{ value: escolher(ANUNCIOS) }] },
+          ]
+        : null,
       _embedded: {
         tags: tags.map((name, i) => ({ id: i + 1, name })),
         contacts: [{ id: idContato, is_main: true }],

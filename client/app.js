@@ -154,7 +154,7 @@ function renderizarComparativo() {
 
 function renderizarSeletorDeCampanha() {
   const opcoes = [{ codigo: "TODAS", nome: "Todas as campanhas" }, ...dados.campanhas];
-  $("seletorCampanha").innerHTML = opcoes
+  const html = opcoes
     .map(
       (c) => `
     <button role="tab" aria-selected="${c.codigo === campanhaSelecionada}" data-campanha="${esc(c.codigo)}"
@@ -163,13 +163,18 @@ function renderizarSeletorDeCampanha() {
     </button>`,
     )
     .join("");
-  $("seletorCampanha").querySelectorAll("button").forEach((botao) =>
-    botao.addEventListener("click", () => {
-      campanhaSelecionada = botao.dataset.campanha;
-      renderizarSeletorDeCampanha();
-      renderizarEscopo();
-    }),
-  );
+  // O mesmo seletor aparece nas duas abas e vale para ambas.
+  for (const id of ["seletorCampanha", "seletorCampanhaTrafego"]) {
+    $(id).innerHTML = html;
+    $(id).querySelectorAll("button").forEach((botao) =>
+      botao.addEventListener("click", () => {
+        campanhaSelecionada = botao.dataset.campanha;
+        renderizarSeletorDeCampanha();
+        renderizarEscopo();
+        atualizarTrafego();
+      }),
+    );
+  }
 }
 
 function cartao(valor, rotulo, detalhe, corDoValor = "text-ink") {
@@ -448,6 +453,7 @@ async function atualizar() {
     dados = await chamarApi(`/metrics?inicio=${inicio}&fim=${fim}`);
     mostrarErro("");
     renderizarTudo();
+    atualizarTrafego();
   } catch (erro) {
     mostrarErro(`${erro.message}${dados ? " Os números exibidos são da última consulta bem-sucedida." : ""}`);
   } finally {
@@ -500,24 +506,117 @@ function exportarEmAberto() {
   );
 }
 
-async function exportarHistorico() {
+function baixarArquivo(nome, conteudo, tipo) {
+  const url = URL.createObjectURL(new Blob([conteudo], { type: tipo }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nome;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Histórico em HTML: tabela autocontida, com filtro, em estilo claro para
+// leitura e impressão fora do painel.
+function historicoEmHTML(cabecalho, linhas, inicio, fim) {
+  const iExcluido = cabecalho.indexOf("Excluído do cálculo");
+  const iCorrigido = cabecalho.indexOf("Corrigido");
+  const iEstimada = cabecalho.indexOf("Chegada estimada");
+  const corpo = linhas
+    .map((linha) => {
+      const celulas = linha
+        .map((v, i) => {
+          const alerta = i === iExcluido && v === "Sim" ? ' class="alerta"' : (i === iCorrigido || i === iEstimada) && v === "Sim" ? ' class="aviso"' : "";
+          return `<td${alerta}>${esc(v)}</td>`;
+        })
+        .join("");
+      return `<tr${linha[iExcluido] === "Sim" ? ' class="excluida"' : ""}>${celulas}</tr>`;
+    })
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Histórico de movimentações - ${inicio} a ${fim}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 24px; background: #f7f7f5; color: #1a1a1a; }
+  h1 { font-size: 18px; color: #0f1b2d; margin: 0 0 4px; }
+  p.sub { font-size: 12px; color: #666; margin: 0 0 18px; }
+  input { padding: 6px 10px; font-size: 13px; border: 1px solid #d5d5d5; width: 300px; margin-bottom: 12px; }
+  .rolagem { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; background: #fff; font-size: 12.5px; }
+  th, td { border: 1px solid #e2e2e2; padding: 6px 10px; text-align: left; white-space: nowrap; }
+  thead th { position: sticky; top: 0; background: #0f1b2d; color: #fff; font-weight: 600; }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  tr.excluida { opacity: 0.55; font-style: italic; }
+  td.alerta { color: #b3261e; font-weight: 600; }
+  td.aviso { color: #8a6d00; font-weight: 600; }
+  p.contador { font-size: 12px; color: #666; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h1>Histórico completo de movimentações</h1>
+  <p class="sub">Robson Menezes Advogados · Núcleo de Saúde · Período: ${inicio} a ${fim} · Gerado em ${new Date().toLocaleString("pt-BR")}</p>
+  <input type="search" id="filtro" placeholder="Filtrar por nome, etapa, campanha" aria-label="Filtrar">
+  <div class="rolagem">
+    <table>
+      <thead><tr>${cabecalho.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+      <tbody>
+${corpo}
+      </tbody>
+    </table>
+  </div>
+  <p class="contador" id="contador"></p>
+  <script>
+    var filtro = document.getElementById("filtro");
+    var linhas = Array.prototype.slice.call(document.querySelectorAll("tbody tr"));
+    var contador = document.getElementById("contador");
+    function contar() {
+      var visiveis = linhas.filter(function (l) { return l.style.display !== "none"; }).length;
+      contador.textContent = visiveis + " de " + linhas.length + " linhas exibidas";
+    }
+    filtro.addEventListener("input", function () {
+      var termo = filtro.value.toLowerCase();
+      linhas.forEach(function (l) { l.style.display = l.textContent.toLowerCase().indexOf(termo) >= 0 ? "" : "none"; });
+      contar();
+    });
+    contar();
+  <\/script>
+</body>
+</html>`;
+}
+
+// formato: "csv" ou "html". As colunas de campanha, conjunto e anúncio entram
+// conforme a opção marcada no menu.
+async function exportarHistorico(formato) {
   const botao = $("btnExportarHistorico");
   const rotulo = botao.textContent;
+  const inicio = $("dataInicio").value;
+  const fim = $("dataFim").value;
+  const comCampanha = $("incluirCampanha").checked;
   botao.disabled = true;
   botao.textContent = "Gerando";
   try {
-    const r = await chamarApi(`/historico-completo?inicio=${$("dataInicio").value}&fim=${$("dataFim").value}`);
+    const r = await chamarApi(`/historico-completo?inicio=${inicio}&fim=${fim}`);
     if (!r.historico.length) {
       mostrarErro("Nenhuma movimentação encontrada no período para exportar.");
       return;
     }
     const dataHora = (iso) => (iso ? new Date(iso).toLocaleString("pt-BR") : "");
     const simNao = (v) => (v ? "Sim" : "Não");
-    baixarCSV(
-      `historico_completo_${sufixoDoPeriodo()}.csv`,
-      ["ID do lead", "Nome", "Telefone", "Campanha", "Data", "Etapa de origem", "Etapa de destino", "Corrigido", "Motivo da correção", "Excluído do cálculo", "Motivo da exclusão", "Criação do lead", "Chegada em Contato Inicial", "Chegada estimada", "Etiquetas", "Motivo de perda", "Campanha Meta", "Conjunto", "Anúncio"],
-      r.historico.map((h) => [h.leadId, h.nome, h.telefone, h.campanha, dataHora(h.data), h.etapaOrigem, h.etapaDestino, simNao(h.corrigido), h.motivoCorrecao, simNao(h.excluidoDoCalculo), h.motivoExclusao, dataHora(h.dataCriacaoLead), dataHora(h.chegadaContatoInicial), simNao(h.chegadaContatoInicialEstimada), h.tags, h.motivoPerda, h.campanhaMeta, h.conjunto, h.anuncio]),
-    );
+    const cabecalho = ["ID do lead", "Nome", "Telefone", "Campanha", "Data", "Etapa de origem", "Etapa de destino", "Corrigido", "Motivo da correção", "Excluído do cálculo", "Motivo da exclusão", "Criação do lead", "Chegada em Contato Inicial", "Chegada estimada", "Etiquetas", "Motivo de perda"];
+    if (comCampanha) cabecalho.push("Campanha Meta", "Conjunto de anúncios", "Anúncio");
+    const linhas = r.historico.map((h) => {
+      const linha = [h.leadId, h.nome, h.telefone, h.campanha, dataHora(h.data), h.etapaOrigem, h.etapaDestino, simNao(h.corrigido), h.motivoCorrecao, simNao(h.excluidoDoCalculo), h.motivoExclusao, dataHora(h.dataCriacaoLead), dataHora(h.chegadaContatoInicial), simNao(h.chegadaContatoInicialEstimada), h.tags, h.motivoPerda];
+      if (comCampanha) linha.push(h.campanhaMeta, h.conjunto, h.anuncio);
+      return linha;
+    });
+    if (formato === "html") {
+      baixarArquivo(`historico_completo_${sufixoDoPeriodo()}.html`, historicoEmHTML(cabecalho, linhas, inicio, fim), "text/html;charset=utf-8;");
+    } else {
+      baixarCSV(`historico_completo_${sufixoDoPeriodo()}.csv`, cabecalho, linhas);
+    }
     mostrarErro("");
   } catch (erro) {
     mostrarErro(erro.message);
@@ -656,12 +755,45 @@ $("btnExportarComparativo").addEventListener("click", exportarComparativo);
 $("btnExportarLeads").addEventListener("click", exportarLeads);
 $("btnExportarParados").addEventListener("click", exportarParados);
 $("btnExportarEmAberto").addEventListener("click", exportarEmAberto);
-$("btnExportarHistorico").addEventListener("click", exportarHistorico);
+$("btnExportarHistorico").addEventListener("click", (e) => {
+  e.stopPropagation();
+  $("menuHistorico").classList.toggle("hidden");
+});
+$("menuHistorico").addEventListener("click", (e) => e.stopPropagation());
+document.addEventListener("click", () => $("menuHistorico").classList.add("hidden"));
+$("btnHistoricoCSV").addEventListener("click", () => {
+  $("menuHistorico").classList.add("hidden");
+  exportarHistorico("csv");
+});
+$("btnHistoricoHTML").addEventListener("click", () => {
+  $("menuHistorico").classList.add("hidden");
+  exportarHistorico("html");
+});
+
+// Abas
+let abaAtiva = "funil";
+function mostrarAba(aba) {
+  abaAtiva = aba;
+  const trafego = aba === "trafego";
+  $("abaFunil").classList.toggle("hidden", trafego);
+  $("abaTrafego").classList.toggle("hidden", !trafego);
+  for (const [id, ativa] of [["abaBotaoFunil", !trafego], ["abaBotaoTrafego", trafego]]) {
+    $(id).setAttribute("aria-selected", String(ativa));
+    $(id).className = `px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 ${ativa ? "aba-ativa" : "border-transparent text-inkdim hover:text-ink"}`;
+  }
+  if (trafego) atualizarTrafego();
+}
+$("abaBotaoFunil").addEventListener("click", () => mostrarAba("funil"));
+$("abaBotaoTrafego").addEventListener("click", () => mostrarAba("trafego"));
 
 $("btnAbrirCorrecao").addEventListener("click", abrirModal);
 $("btnFecharCorrecao").addEventListener("click", fecharModal);
 modal.addEventListener("click", (e) => e.target === modal && fecharModal());
-document.addEventListener("keydown", (e) => e.key === "Escape" && fecharModal());
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  fecharModal();
+  fecharModaisDeTrafego();
+});
 $("btnBuscarEventos").addEventListener("click", buscarEventos);
 $("leadIdCorrecao").addEventListener("keydown", (e) => e.key === "Enter" && buscarEventos());
 $("eventosCorrecao").addEventListener("click", (e) => {
@@ -676,4 +808,5 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && desatualizado) atualizar();
 });
 
-atualizar();
+// A primeira carga aguarda todos os scripts da página (trafego.js vem depois).
+window.addEventListener("DOMContentLoaded", atualizar);

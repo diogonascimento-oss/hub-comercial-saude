@@ -59,7 +59,13 @@
     </div>
   </div>
 
+  <div class="max-w-[1400px] mx-auto px-5 md:px-10 mt-6 flex gap-1 border-b border-line" role="tablist">
+    <button id="abaBotaoFunil" role="tab" aria-selected="true" class="px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 aba-ativa">Funil de leads</button>
+    <button id="abaBotaoTrafego" role="tab" aria-selected="false" class="px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 border-transparent text-inkdim hover:text-ink">Tráfego e campanhas</button>
+  </div>
+
   <main class="max-w-[1400px] mx-auto px-5 md:px-10 mt-8 space-y-10 pb-16">
+   <div id="abaFunil" class="space-y-10">
 
     <!-- 1. Comparativo -->
     <section aria-labelledby="tComparativo">
@@ -183,6 +189,130 @@
       </div>
     </section>
 
+   </div>
+
+   <div id="abaTrafego" class="hidden space-y-10">
+
+    <div>
+      <p class="rotulo mb-2">Esta aba mostra</p>
+      <div id="seletorCampanhaTrafego" class="flex flex-wrap gap-1 border-b border-line" role="tablist"></div>
+    </div>
+
+    <section aria-labelledby="tTrafegoResumo">
+      <div class="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
+        <h3 id="tTrafegoResumo" class="titulo-secao">1. Leads do período por origem</h3>
+        <label class="flex items-center gap-2 text-[11px] text-inkdim">
+          <input type="checkbox" id="apenasNovos" checked class="accent-gold">
+          Considerar somente leads criados no período
+        </label>
+      </div>
+      <div class="grade grid-cols-2">
+        <button id="cartaoLeadsTrafego" class="p-5 text-left bg-[#0f1017] hover:bg-surface2">
+          <p id="totalLeadsTrafego" class="font-serif text-3xl font-semibold tabular text-goldbright">0</p>
+          <p class="rotulo mt-2">Leads no período</p>
+        </button>
+        <button id="cartaoQualificadosTrafego" class="p-5 text-left bg-[#0f1017] hover:bg-surface2">
+          <p id="totalQualificadosTrafego" class="font-serif text-3xl font-semibold tabular text-positivo">0</p>
+          <p class="rotulo mt-2">Qualificados no período</p>
+        </button>
+      </div>
+      <p id="avisoSemOrigem" class="hidden mt-3 border border-gold/25 bg-gold/5 text-goldbright text-xs px-4 py-2.5"></p>
+    </section>
+
+    <section aria-labelledby="tTrafegoCruzamentos">
+      <h3 id="tTrafegoCruzamentos" class="titulo-secao mb-3">2. Conjunto de anúncios, anúncio e região</h3>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-px bg-line border border-line">
+        <div class="bg-bg p-5">
+          <div class="flex items-center justify-between mb-1 gap-2">
+            <p class="rotulo">Por conjunto de anúncios</p>
+            <select class="bg-surface2 border border-line text-[10px] text-ink px-1.5 py-0.5" id="modoPorConjunto" aria-label="Modo de exibição"><option value="lista">Lista</option><option value="grafico">Gráfico</option></select>
+          </div>
+          <div class="mb-2"></div>
+          <div id="tabelaPorConjunto" class="text-xs"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <div class="flex items-center justify-between mb-1 gap-2">
+            <p class="rotulo">Por anúncio</p>
+            <select class="bg-surface2 border border-line text-[10px] text-ink px-1.5 py-0.5" id="modoPorAnuncio" aria-label="Modo de exibição"><option value="lista">Lista</option><option value="grafico">Gráfico</option></select>
+          </div>
+          <div class="mb-2"></div>
+          <div id="tabelaPorAnuncio" class="text-xs"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <div class="flex items-center justify-between mb-1 gap-2">
+            <p class="rotulo">Por região (DDD do telefone)</p>
+            <select class="bg-surface2 border border-line text-[10px] text-ink px-1.5 py-0.5" id="modoPorRegiao" aria-label="Modo de exibição"><option value="lista">Lista</option><option value="grafico">Gráfico</option></select>
+          </div>
+          <div class="mb-2"></div>
+          <div id="tabelaPorRegiao" class="text-xs"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <div class="flex items-center justify-between mb-1 gap-2">
+            <p class="rotulo">Conjunto de anúncios por região</p>
+            <select class="bg-surface2 border border-line text-[10px] text-ink px-1.5 py-0.5" id="modoConjuntoPorRegiao" aria-label="Modo de exibição"><option value="lista">Lista</option><option value="grafico">Gráfico</option></select>
+          </div>
+          <p class="text-[11px] text-inkfaint mb-2">Cruza o público visado pelo conjunto com a região de quem chegou.</p>
+          <div id="tabelaConjuntoPorRegiao" class="text-xs"></div>
+        </div>
+      </div>
+      <p class="text-[11px] text-inkfaint mt-2">O percentual à direita é a taxa de qualificação do grupo. Clique em uma linha para ver os leads.</p>
+    </section>
+
+    <section aria-labelledby="tSemanas">
+      <div class="border border-line p-5">
+        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <h3 id="tSemanas" class="titulo-secao">3. Histórico semanal salvo</h3>
+          <button id="btnSalvarSemana" class="bg-gold hover:bg-goldbright text-bg font-bold px-4 py-1.5 text-xs uppercase tracking-wide">Salvar período como semana</button>
+        </div>
+        <p class="text-[11px] text-inkdim mb-3">Salva o período selecionado no filtro. Em uma semana salva é possível registrar o orçamento, decisões e observações, e comparar com a semana anterior.</p>
+        <div id="listaSemanas" class="space-y-2 text-xs"></div>
+        <button id="btnSomarSemanas" class="hidden mt-3 bg-gold hover:bg-goldbright text-bg text-xs font-bold px-4 py-1.5 uppercase tracking-wide"></button>
+      </div>
+    </section>
+
+    <section aria-labelledby="tDistribuicao">
+      <h3 id="tDistribuicao" class="titulo-secao mb-3">4. Distribuição e engajamento</h3>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-px bg-line border border-line">
+        <div class="bg-bg p-5">
+          <p class="rotulo mb-3">Distribuição por conjunto de anúncios</p>
+          <div id="graficoConjunto"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <div class="flex items-center justify-between mb-3 gap-2">
+            <p class="rotulo">Distribuição por estado (DDD do telefone)</p>
+            <select id="modoEstado" class="bg-surface2 border border-line text-[10px] text-ink px-1.5 py-0.5" aria-label="Modo de exibição"><option value="barras">Barras</option><option value="mapa">Mapa</option></select>
+          </div>
+          <div id="graficoEstado"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <p class="rotulo">Engajamento por etapa: conjunto de anúncios</p>
+            <label class="text-[10px] text-inkdim flex items-center gap-1">Exibir
+              <input type="number" id="qtdEngajamentoConjunto" value="5" min="1" max="12" class="w-12 bg-surface2 border border-line px-1 py-0.5 text-ink">
+              <select id="modoEngajamentoConjunto" class="bg-surface2 border border-line text-ink px-1 py-0.5" aria-label="Unidade"><option value="percentual">%</option><option value="quantidade">Qtd.</option></select>
+            </label>
+          </div>
+          <div id="graficoEngajamentoConjunto"></div>
+        </div>
+        <div class="bg-bg p-5">
+          <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <p class="rotulo">Engajamento por etapa: estados</p>
+            <label class="text-[10px] text-inkdim flex items-center gap-1">Exibir
+              <input type="number" id="qtdEngajamentoEstado" value="5" min="1" max="12" class="w-12 bg-surface2 border border-line px-1 py-0.5 text-ink">
+              <select id="modoEngajamentoEstado" class="bg-surface2 border border-line text-ink px-1 py-0.5" aria-label="Unidade"><option value="percentual">%</option><option value="quantidade">Qtd.</option></select>
+            </label>
+          </div>
+          <div id="graficoEngajamentoEstado"></div>
+        </div>
+        <div class="bg-bg p-5 lg:col-span-2">
+          <p class="rotulo">Custo por conjunto (anúncio e conjunto de anúncios)</p>
+          <p class="text-[11px] text-inkfaint mt-1 mb-3">Calculado a partir do orçamento registrado na semana salva correspondente ao período do filtro. Considera todas as campanhas, independentemente da seleção acima.</p>
+          <div id="graficoCusto"></div>
+        </div>
+      </div>
+    </section>
+   </div>
+
     <!-- 8. Registro -->
     <section aria-labelledby="tRegistro">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
@@ -191,7 +321,17 @@
           <label class="sr-only" for="buscaLeads">Buscar</label>
           <input id="buscaLeads" type="search" placeholder="Buscar por nome, telefone ou etapa" class="bg-surface2 border border-line px-3 py-1.5 text-xs text-ink w-64 placeholder:text-inkfaint">
           <button id="btnExportarLeads" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1.5">CSV</button>
-          <button id="btnExportarHistorico" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1.5" title="Todas as mudanças de etapa do período, incluindo as excluídas do cálculo, sinalizadas">Histórico completo (CSV)</button>
+          <div class="relative">
+            <button id="btnExportarHistorico" aria-haspopup="true" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1.5" title="Todas as mudanças de etapa do período, incluindo as excluídas do cálculo, sinalizadas">Histórico completo</button>
+            <div id="menuHistorico" class="hidden absolute right-0 mt-1 w-64 bg-surface border border-line z-20">
+              <label class="flex items-start gap-2 text-[11px] text-inkdim px-3 py-2 border-b border-line cursor-pointer">
+                <input type="checkbox" id="incluirCampanha" checked class="mt-0.5 accent-gold">
+                <span>Incluir dados de campanha, conjunto e anúncio</span>
+              </label>
+              <button id="btnHistoricoCSV" class="w-full text-left text-[11px] font-semibold text-inkdim hover:text-ink hover:bg-surface2 px-3 py-2">Baixar em CSV</button>
+              <button id="btnHistoricoHTML" class="w-full text-left text-[11px] font-semibold text-inkdim hover:text-ink hover:bg-surface2 px-3 py-2 border-t border-line">Baixar em HTML</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="border border-line rolagem max-h-[420px]">
@@ -237,6 +377,51 @@
     </div>
   </div>
 
+  <!-- Gerenciar semana salva -->
+  <div id="modalSemana" class="hidden fixed inset-0 z-50 bg-black/70 items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="tituloSemana">
+    <div class="bg-surface border border-line w-full max-w-2xl max-h-[88vh] flex flex-col">
+      <div class="p-5 border-b border-line flex items-start justify-between gap-3">
+        <h3 class="font-serif text-base font-semibold text-ink">Semana <span id="tituloSemana"></span></h3>
+        <button id="btnFecharSemana" class="text-inkdim hover:text-ink text-sm border border-line px-2 py-0.5">Fechar</button>
+      </div>
+      <div class="p-5 space-y-6 rolagem text-xs">
+        <div><p class="rotulo mb-2">Comparação com a semana anterior</p><div id="comparacaoSemanal"></div></div>
+        <div><p class="rotulo mb-2">Orçamento</p><div id="formularioCusto"></div></div>
+        <div><p class="rotulo mb-2">Decisões</p><div id="listaDecisoes" class="space-y-2"></div></div>
+        <div><p class="rotulo mb-2">Observações</p><div id="listaObservacoes" class="space-y-2"></div></div>
+        <button id="btnExcluirSemana" class="border border-negativo/40 hover:bg-negativo/10 text-negativo text-[11px] font-semibold px-4 py-1.5">Excluir esta semana</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leads de um grupo -->
+  <div id="modalLeads" class="hidden fixed inset-0 z-[60] bg-black/70 items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="tituloLeads">
+    <div class="bg-surface border border-line w-full max-w-lg max-h-[80vh] flex flex-col">
+      <div class="p-4 border-b border-line flex items-center justify-between gap-3">
+        <h3 id="tituloLeads" class="font-serif text-sm font-semibold text-ink"></h3>
+        <button id="btnFecharLeads" class="text-inkdim hover:text-ink text-sm border border-line px-2 py-0.5">Fechar</button>
+      </div>
+      <div id="corpoLeadsDoGrupo" class="p-4 rolagem text-xs"></div>
+    </div>
+  </div>
+
+  <!-- Soma de semanas -->
+  <div id="modalSoma" class="hidden fixed inset-0 z-50 bg-black/70 items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="tituloSoma">
+    <div class="bg-surface border border-line w-full max-w-2xl max-h-[88vh] flex flex-col">
+      <div class="p-5 border-b border-line flex items-start justify-between gap-3">
+        <h3 class="font-serif text-base font-semibold text-ink">Semanas somadas: <span id="tituloSoma"></span></h3>
+        <div class="flex items-center gap-2">
+          <button id="btnExportarSoma" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Exportar HTML</button>
+          <button id="btnFecharSoma" class="text-inkdim hover:text-ink text-sm border border-line px-2 py-0.5">Fechar</button>
+        </div>
+      </div>
+      <div id="corpoSoma" class="p-5 rolagem text-xs"></div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
+  <script src="mapa-brasil.js"></script>
+  <script src="relatorio-semanal.js"></script>
+  <script src="trafego.js"></script>
 </body>
 </html>
