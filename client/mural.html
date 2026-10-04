@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Mural — Núcleo de Saúde | Robson Menezes Advogados</title>
+<link rel="icon" href="icones/favicon-48.png" sizes="48x48" type="image/png">
+<link rel="icon" href="icones/icone.svg" sizes="any" type="image/svg+xml">
+<meta name="theme-color" content="#0b0c11">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Tela única, sem rolagem, dimensionada pela altura do aparelho. Só números
+     agregados: nenhum nome ou telefone de lead aparece no mural. */
+  :root { --bg:#0b0c11; --sup:#12131b; --sup2:#181a24; --linha:rgba(255,255,255,.09); --tinta:#e9e7de; --fraca:#9a9ca8; --apagada:#6b6d7a; --ouro:#b6923f; --ouroclaro:#d8b565; --bom:#4fb38a; --ruim:#d0685a; }
+  * { box-sizing:border-box; margin:0; }
+  html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tinta); font-family:Inter, system-ui, sans-serif; }
+  body { display:grid; grid-template-rows:9vh minmax(0,1fr) 2.5vh; gap:1.6vh; padding:2.2vh 2.4vw 1.2vh; }
+  .serifa { font-family:Fraunces, Georgia, serif; }
+  .rotulo { font-family:"IBM Plex Mono", monospace; text-transform:uppercase; letter-spacing:.14em; color:var(--fraca); font-size:1.45vh; }
+  .num { font-variant-numeric:tabular-nums; }
+  [hidden] { display:none !important; }
+
+  header { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--linha); padding-bottom:1.4vh; }
+  header .marca { display:flex; align-items:center; gap:1.4vw; }
+  header svg { height:6vh; width:auto; }
+  header h1 { font-size:2.5vh; font-weight:400; letter-spacing:.22em; text-transform:uppercase; }
+  header .sub { margin-top:.6vh; }
+  #mes { font-size:3vh; font-weight:600; text-align:center; }
+  #relogio { font-size:5vh; font-weight:600; line-height:1; text-align:right; }
+  #atualizado { text-align:right; margin-top:.6vh; }
+
+  main { min-height:0; position:relative; }
+  .tela { position:absolute; inset:0; display:flex; flex-direction:column; gap:1.6vh; opacity:0; visibility:hidden; transition:opacity .6s ease; }
+  .tela.ativa { opacity:1; visibility:visible; }
+  .grade { display:grid; gap:1.2vw; min-height:0; }
+  .cartao { background:var(--sup); border:1px solid var(--linha); padding:2vh 1.6vw; display:flex; flex-direction:column; justify-content:space-between; min-width:0; min-height:0; }
+
+  #metas { grid-auto-flow:column; grid-auto-columns:1fr; flex:24; }
+  .meta .valor { font-size:9.5vh; font-weight:600; line-height:1; }
+  .meta .valor small { font-size:4vh; color:var(--fraca); font-weight:400; }
+  .meta .trilho { height:1.6vh; background:var(--sup2); position:relative; margin-top:1.4vh; }
+  .meta .barra { height:100%; transition:width .8s ease; }
+  .meta .ritmo { position:absolute; top:-.7vh; bottom:-.7vh; width:2px; background:var(--tinta); opacity:.7; }
+  .meta .rodape { display:flex; justify-content:space-between; margin-top:1.1vh; font-size:1.8vh; color:var(--fraca); }
+
+  #indicadores { grid-auto-flow:column; grid-auto-columns:1fr; flex:20; }
+  .ind .valor { font-size:8vh; font-weight:600; line-height:1; }
+  .ind .detalhe { font-size:1.8vh; color:var(--fraca); margin-top:.8vh; }
+  .ind .detalhe strong { color:var(--tinta); font-weight:600; }
+
+  #base { grid-auto-flow:column; grid-auto-columns:1fr; flex:37; }
+  #base .cartao { justify-content:flex-start; overflow:hidden; padding-bottom:1.4vh; }
+  table { width:100%; border-collapse:collapse; margin-top:1.2vh; }
+  th { font-family:"IBM Plex Mono", monospace; font-size:1.35vh; letter-spacing:.1em; text-transform:uppercase; color:var(--apagada); font-weight:500; text-align:right; padding:.6vh .6vw; }
+  th:first-child, td:first-child { text-align:left; }
+  td { font-size:3.1vh; text-align:right; padding:.75vh .6vw; border-top:1px solid var(--linha); }
+  td:first-child { font-size:2.3vh; }
+  td small { display:block; font-size:1.4vh; color:var(--apagada); }
+  tr.total td { color:var(--ouroclaro); font-weight:600; }
+  #porEtapa { flex:1; display:flex; flex-direction:column; justify-content:space-between; margin-top:1.2vh; min-height:0; }
+  .etapa { display:grid; grid-template-columns:15vw 1fr 4vw; align-items:center; gap:.8vw; font-size:1.8vh; line-height:1.15; }
+  .etapa .nome { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--fraca); }
+  .etapa .trilho { height:1.2vh; background:var(--sup2); }
+  .etapa .barra { display:block; height:100%; transition:width .8s ease; }
+  .etapa .qtd { text-align:right; font-size:2.1vh; font-weight:600; }
+
+  .inteira { flex:1; justify-content:flex-start; gap:1.4vh; overflow:hidden; }
+  .inteira h2 { font-size:3vh; font-weight:600; }
+  .inteira .explica { font-size:1.8vh; color:var(--fraca); }
+  #graficoEvolucao { flex:1; min-height:0; }
+  #graficoEvolucao svg { display:block; width:100%; height:100%; }
+  .legenda { display:flex; gap:2.4vw; font-size:2vh; color:var(--fraca); }
+  .legenda i { display:inline-block; width:2.4vw; height:.5vh; vertical-align:middle; margin-right:.6vw; }
+  #telaMapa .conteudo { flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:2vw; align-items:stretch; }
+  #mapa { min-height:0; }
+  #mapa svg { display:block; height:100%; width:100%; }
+  #estados { display:flex; flex-direction:column; justify-content:flex-start; gap:2.6vh; min-height:0; padding-top:1vh; }
+  #regioes { display:flex; flex-wrap:wrap; gap:.6vh 2vw; font-size:2vh; color:var(--fraca); }
+  #regioes strong { color:var(--tinta); }
+
+  footer { display:flex; justify-content:space-between; align-items:center; font-size:1.3vh; color:var(--apagada); }
+  #aviso { color:var(--ouroclaro); }
+  footer button, footer a { background:none; border:0; color:inherit; font:inherit; cursor:pointer; text-decoration:underline dotted; padding:0; margin-left:1.2vw; }
+  #pontos { display:inline-flex; gap:.5vw; margin-left:1.2vw; vertical-align:middle; }
+  #pontos i { width:.9vh; height:.9vh; border-radius:50%; background:var(--sup2); border:1px solid var(--linha); }
+  #pontos i.ativo { background:var(--ouroclaro); }
+
+  #ajustes { position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:10; }
+  #ajustes .caixa { background:var(--sup); border:1px solid var(--linha); padding:28px; width:min(92vw,460px); font-size:14px; }
+  #ajustes h2 { font-size:18px; margin-bottom:6px; }
+  #ajustes p { color:var(--fraca); font-size:12px; margin-bottom:16px; line-height:1.5; }
+  #ajustes label { display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px solid var(--linha); cursor:pointer; }
+  #ajustes label small { color:var(--apagada); margin-left:auto; font-size:11px; }
+  #ajustes input[type=checkbox] { width:16px; height:16px; accent-color:var(--ouro); }
+  #ajustes select { background:var(--sup2); color:var(--tinta); border:1px solid var(--linha); padding:5px 8px; margin-left:auto; font:inherit; }
+  #ajustes .acoes { display:flex; justify-content:flex-end; margin-top:18px; }
+  #ajustes .acoes button { background:var(--ouro); color:var(--bg); border:0; padding:8px 18px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:12px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="marca">
+      <svg viewBox="60 50 1392 670" role="img" aria-label="Robson Menezes Advogados">
+        <defs><linearGradient id="ouro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6c983"/><stop offset=".55" stop-color="#d8b565"/><stop offset="1" stop-color="#a8853a"/></linearGradient></defs>
+        <g fill="url(#ouro)"><path d="M72 60H465A215 215 0 0 1 526 482L660 708H535L350 385H465A110 110 0 0 0 465 165H72Z"/><path d="M792 65L1128 392L1440 88V240L1128 548L905 330V708H792Z"/></g>
+        <g fill="#8f7233"><path d="M122 388H240L432 708H305Z"/><path d="M1440 420V572L1297 708H1135Z"/></g>
+      </svg>
+      <div>
+        <h1 class="serifa">Robson Menezes</h1>
+        <p class="rotulo sub">Núcleo de Saúde · Hub Comercial</p>
+      </div>
+    </div>
+    <p id="mes" class="serifa"></p>
+    <div>
+      <p id="relogio" class="serifa num">--:--</p>
+      <p id="atualizado" class="rotulo">Carregando</p>
+    </div>
+  </header>
+
+  <main>
+    <!-- Tela 1: resumo do mês -->
+    <div id="telaResumo" class="tela">
+      <section id="metas" class="grade" data-bloco="metas" aria-label="Metas do mês"></section>
+      <section id="indicadores" class="grade" data-bloco="indicadores" aria-label="Indicadores do mês"></section>
+      <section id="base" class="grade">
+        <div class="cartao" data-bloco="campanhas">
+          <p class="rotulo">Mês por campanha</p>
+          <table>
+            <thead><tr><th>Campanha</th><th>Leads</th><th>Qualificados</th><th>Marcadas</th><th>Realizadas</th><th>Contratos</th></tr></thead>
+            <tbody id="porCampanha"></tbody>
+          </table>
+        </div>
+        <div class="cartao" data-bloco="etapas">
+          <p class="rotulo">Leads em cada etapa agora</p>
+          <div id="porEtapa"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Tela 2: evolução ao longo das etapas -->
+    <div id="telaEvolucao" class="tela">
+      <div class="cartao inteira">
+        <div>
+          <h2 class="serifa">Evolução dos leads ao longo das etapas</h2>
+          <p class="explica">Leads que entraram em cada etapa neste mês, por campanha.</p>
+        </div>
+        <div id="graficoEvolucao"></div>
+        <div id="legendaEvolucao" class="legenda"></div>
+      </div>
+    </div>
+
+    <!-- Tela 3: mapa -->
+    <div id="telaMapa" class="tela">
+      <div class="cartao inteira">
+        <div>
+          <h2 class="serifa">Leads do mês por estado</h2>
+          <p class="explica">Estado estimado pelo DDD do telefone. Tom mais claro indica mais leads.</p>
+        </div>
+        <div class="conteudo">
+          <div id="mapa"></div>
+          <div id="estados"></div>
+        </div>
+        <div id="regioes"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <span id="aviso" role="status"></span>
+    <span>
+      <span id="pontos" aria-hidden="true"></span>
+      <button id="btnAjustar" type="button">Ajustar</button>
+      <button id="btnTelaCheia" type="button">Tela cheia</button>
+      <a href="/">Painel completo</a>
+    </span>
+  </footer>
+
+  <div id="ajustes" hidden role="dialog" aria-modal="true" aria-labelledby="tituloAjustes">
+    <div class="caixa">
+      <h2 id="tituloAjustes" class="serifa">O que aparece no mural</h2>
+      <p>A escolha fica gravada neste aparelho. Os blocos marcados se distribuem em até três telas, que se alternam sozinhas.</p>
+      <div id="opcoesDeBlocos"></div>
+      <label>Tempo de cada tela
+        <select id="segundosPorTela">
+          <option value="15">15 segundos</option>
+          <option value="30">30 segundos</option>
+          <option value="60">1 minuto</option>
+          <option value="120">2 minutos</option>
+        </select>
+      </label>
+      <div class="acoes"><button id="btnFecharAjustes" type="button">Concluir</button></div>
+    </div>
+  </div>
+
+  <script src="mapa-brasil.js"></script>
+  <script src="mural.js"></script>
+</body>
+</html>

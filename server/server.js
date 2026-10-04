@@ -305,7 +305,7 @@ app.get("/api/metrics", async (req, res) => {
     const base = { eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, agora };
 
     const escopos = {};
-    // resumo=1 (modo TV): só os totais, sem as listas de leads e sem o período de comparação.
+    // resumo=1 (mural): só os totais, sem as listas de leads e sem o período de comparação.
     const resumo = req.query.resumo === "1";
     const todas = calcularEscopo({ ...base, leads, incluirListas: !resumo });
     const { listas, ...indicadoresGerais } = todas;
@@ -738,12 +738,16 @@ app.get("/api/analise-trafego", async (req, res) => {
   const periodo = lerPeriodo(req);
   if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
   try {
-    res.json(
-      await calcularAnaliseDeTrafego(periodo, {
-        apenasNovos: req.query.apenasNovos === "true",
-        campanha: req.query.campanha,
-      }),
-    );
+    const analise = await calcularAnaliseDeTrafego(periodo, {
+      apenasNovos: req.query.apenasNovos === "true",
+      campanha: req.query.campanha,
+    });
+    // resumo=1 (mural): só as contagens por estado e por região, sem leads.
+    if (req.query.resumo === "1") {
+      const contagens = (lista) => (lista || []).map((g) => ({ grupo: g.grupo, totalLeads: g.totalLeads }));
+      return res.json({ totalLeads: analise.totalLeads, porEstado: contagens(analise.porEstado), porRegiao: contagens(analise.porRegiao) });
+    }
+    res.json(analise);
   } catch (erro) {
     responderErro(res, erro, "Falha ao montar a análise de tráfego");
   }
