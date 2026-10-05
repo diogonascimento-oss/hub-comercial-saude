@@ -549,7 +549,7 @@ function renderizarConversao() {
   const origens = dados.etapas.map((x) => x.chave).filter((chave) => !chave.startsWith("OUTRA:") || comSaida(chave));
   const anterior = seletor.value;
   seletor.innerHTML = origens.length
-    ? origens.map((chave) => `<option value="${esc(chave)}">${esc(nomeEtapa(chave))}${comSaida(chave) ? "" : " (sem saídas no período)"}</option>`).join("")
+    ? origens.map((chave) => `<option value="${esc(chave)}">${esc(nomeEtapa(chave))}${comSaida(chave) ? "" : " (sem saídas)"}</option>`).join("")
     : '<option value="">Sem dados</option>';
   // Mantém a escolha anterior; na primeira vez, abre na primeira etapa com saídas.
   if (origens.includes(anterior)) seletor.value = anterior;
