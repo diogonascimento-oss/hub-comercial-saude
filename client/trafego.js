@@ -20,9 +20,20 @@ function abrirDialogo(id) {
   $(id).classList.remove("hidden");
   $(id).classList.add("flex");
 }
+// Fecha com uma saída curta, em vez de sumir de uma vez.
 function fecharDialogo(id) {
-  $(id).classList.add("hidden");
-  $(id).classList.remove("flex");
+  const dialogo = $(id);
+  if (dialogo.classList.contains("hidden") || dialogo.classList.contains("fechando")) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    dialogo.classList.add("hidden");
+    dialogo.classList.remove("flex");
+    return;
+  }
+  dialogo.classList.add("fechando");
+  setTimeout(() => {
+    dialogo.classList.add("hidden");
+    dialogo.classList.remove("flex", "fechando");
+  }, 170);
 }
 function fecharModaisDeTrafego() {
   // O diálogo de leads abre sobre os outros; fecha um nível por vez.

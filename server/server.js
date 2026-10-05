@@ -64,7 +64,7 @@ app.use("/api", (req, res, next) => {
 // --- Dados do Kommo, com cache curto em memória ----------------------------
 
 const CACHE_FUNIS_MS = 15 * 60 * 1000;
-const CACHE_DADOS_MS = 60 * 1000;
+const CACHE_DADOS_MS = 30 * 1000;
 let cacheMapeamento = null; // { em, valor, funis }
 const cacheDados = new Map(); // "de:ate" -> { em, promessa }
 
@@ -347,6 +347,11 @@ app.get("/api/metrics", async (req, res) => {
       periodo: { inicio: periodo.inicio, fim: periodo.fim },
       periodoAnterior: { inicio: anterior.inicio, fim: anterior.fim },
       geradoEm: new Date().toISOString(),
+      // Instante em que os dados usados nesta resposta foram lidos do Kommo.
+      // Pode ser alguns segundos anterior à resposta, por causa do cache.
+      dadosDe: new Date(
+        Math.min(cacheLeads?.em ?? Date.now(), cacheDados.get(`${periodo.deTs}:${periodo.ateTs}`)?.em ?? Date.now()),
+      ).toISOString(),
       campanhas: CAMPANHAS.map((c) => ({ codigo: c.codigo, nome: c.nome })),
       etapas: etapasParaInterface(chavesEncontradas),
       papeis: PAPEIS,

@@ -52,3 +52,60 @@ details.recolhivel > summary::-webkit-details-marker { display: none; }
 details.recolhivel > summary .indicador-recolhivel::after { content: "Mostrar"; font-size: 10px; color: #9a9ca8; border: 1px solid rgba(255, 255, 255, 0.12); padding: 1px 8px; }
 details.recolhivel[open] > summary .indicador-recolhivel::after { content: "Ocultar"; }
 details.recolhivel[open] > summary { margin-bottom: 12px; }
+
+/* Transições ---------------------------------------------------------------
+   Entradas suaves para o que aparece ou é redesenhado. Tudo é desligado para
+   quem pede menos movimento no sistema. */
+@keyframes sobe { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
+@keyframes some { to { opacity: 0; } }
+@keyframes caixa-entra { from { opacity: 0; transform: translateY(16px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes caixa-sai { to { opacity: 0; transform: translateY(8px) scale(0.98); } }
+@keyframes cresce { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes varre { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes da-esquerda { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+@keyframes da-direita { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+
+/* Cartões entram em sequência sempre que a grade é redesenhada. */
+.grade > * { animation: sobe 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; transition: background-color 0.25s ease; }
+.grade > *:nth-child(2) { animation-delay: 45ms; }
+.grade > *:nth-child(3) { animation-delay: 90ms; }
+.grade > *:nth-child(4) { animation-delay: 135ms; }
+.grade > *:nth-child(5) { animation-delay: 180ms; }
+.grade > *:nth-child(6) { animation-delay: 225ms; }
+.grade > *:nth-child(7) { animation-delay: 270ms; }
+.grade > *:nth-child(n + 8) { animation-delay: 315ms; }
+.grade > div:hover { background: #12131b; }
+
+/* Barras crescem a partir da esquerda; gráficos são revelados da esquerda para a direita. */
+.barra { transform-origin: left center; animation: cresce 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+main svg[role="img"] { animation: varre 0.9s cubic-bezier(0.3, 0.7, 0.2, 1) both; }
+
+/* Troca de aba: o conteúdo entra do lado da aba escolhida. */
+#abaFunil:not(.hidden) { animation: da-esquerda 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+#abaTrafego:not(.hidden) { animation: da-direita 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+/* Diálogos: o fundo escurece e a caixa sobe; ao fechar, o caminho inverso. */
+[role="dialog"]:not(.hidden) { animation: aparece 0.2s ease both; }
+[role="dialog"]:not(.hidden) > div { animation: caixa-entra 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.05) both; }
+[role="dialog"].fechando { animation: some 0.17s ease both; }
+[role="dialog"].fechando > div { animation: caixa-sai 0.17s ease both; }
+
+/* Seções recolhidas, resultados da busca e listas que acabaram de carregar. */
+details[open] > *:not(summary) { animation: sobe 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+#resultadosDaBusca:not(.hidden) { animation: sobe 0.2s ease both; }
+#corpoFicha > section, #corpoLeadsDoGrupo > * { animation: sobe 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+#corpoFicha > section:nth-child(2) { animation-delay: 50ms; }
+#corpoFicha > section:nth-child(3) { animation-delay: 100ms; }
+#corpoFicha > section:nth-child(n + 4) { animation-delay: 150ms; }
+
+/* Seções aparecem ao entrar na tela (classe aplicada por transicoes.js). */
+.revelar { opacity: 0; transform: translateY(18px); transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.revelar.visivel { opacity: 1; transform: none; }
+
+a, button, summary, input, select { transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .revelar { opacity: 1; transform: none; }
+}

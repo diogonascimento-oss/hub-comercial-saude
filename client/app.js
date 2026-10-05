@@ -951,8 +951,7 @@ function abrirModal() {
 }
 
 function fecharModal() {
-  modal.classList.add("hidden");
-  modal.classList.remove("flex");
+  fecharDialogo(modal.id);
 }
 
 // Converte uma data ISO para o formato do campo datetime-local, no horário do navegador.

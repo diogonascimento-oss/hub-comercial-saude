@@ -83,7 +83,7 @@
 
   /* Cor e movimento ------------------------------------------------------- */
   body::before { content:""; position:fixed; inset:-20%; z-index:-1; pointer-events:none;
-    background:radial-gradient(40% 35% at 18% 20%, rgba(216,181,101,.10), transparent 70%), radial-gradient(38% 34% at 85% 80%, rgba(110,168,216,.09), transparent 70%), radial-gradient(30% 30% at 70% 15%, rgba(79,179,138,.06), transparent 70%);
+    background:radial-gradient(40% 35% at 18% 20%, rgba(216,181,101,.07), transparent 70%), radial-gradient(38% 34% at 85% 80%, rgba(110,168,216,.045), transparent 70%);
     animation:deriva 48s ease-in-out infinite alternate; }
   @keyframes deriva { from { transform:translate3d(-3%, -2%, 0) scale(1); } to { transform:translate3d(3%, 2%, 0) scale(1.08); } }
 
@@ -96,8 +96,9 @@
 
   .cartao { position:relative; overflow:hidden; --cor:var(--ouroclaro); }
   .cartao.ind::before, .cartao.meta::before { content:""; position:absolute; left:0; right:0; top:0; height:.45vh; background:var(--cor); opacity:.9; }
-  .cartao.ind::after, .cartao.meta::after { content:""; position:absolute; right:-18%; top:-60%; width:60%; height:140%; background:radial-gradient(closest-side, var(--cor), transparent); opacity:.10; pointer-events:none; }
-  .ind .valor { color:var(--cor); }
+  /* A cor fica na faixa do topo e em um tom leve no número; o restante é neutro. */
+  .cartao.ind::before, .cartao.meta::before { opacity:.75; }
+  .ind .valor { color:color-mix(in srgb, var(--cor) 38%, var(--tinta)); }
   .ind .rotulo { color:var(--tinta); opacity:.85; letter-spacing:.08em; font-size:1.38vh; }
   .ind.destaque { border-color:rgba(216,181,101,.45); }
   .tela.ativa .cartao.mudou { animation:entra .7s cubic-bezier(.2,.7,.2,1) both, pulso 1.8s ease .4s; }
@@ -105,7 +106,8 @@
   .ponto { display:inline-block; width:1.1vh; height:1.1vh; border-radius:50%; margin-right:.6vw; vertical-align:middle; }
   #andamento { position:absolute; left:0; bottom:-1vh; height:.3vh; width:100%; background:var(--sup2); overflow:hidden; }
   #andamento i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--ouro), var(--ouroclaro)); }
-  #andamento.correndo i { animation:enche linear forwards; animation-duration:var(--duracao, 30s); }
+  #andamento.correndo i { animation:enche linear forwards; animation-duration:var(--duracao, 60s); }
+  #proxima { font-variant-numeric:tabular-nums; }
   @keyframes enche { to { width:100%; } }
 
   /* Comemorações ---------------------------------------------------------- */
@@ -219,7 +221,7 @@
   </main>
 
   <footer>
-    <span id="aviso" role="status"></span>
+    <span><span id="proxima"></span> <span id="aviso" role="status"></span></span>
     <span>
       <span id="pontos" aria-hidden="true"></span>
       <button id="btnAjustar" type="button">Ajustar</button>

@@ -3,7 +3,7 @@
 // pessoal de lead é carregado. Depende de mapa-brasil.js para o desenho do mapa.
 
 const API = "/api";
-const ATUALIZAR_A_CADA_MS = 2 * 60 * 1000; // curto, para a comemoração sair perto do fato
+const ATUALIZAR_A_CADA_MS = 60 * 1000; // curto, para a comemoração sair perto do fato
 const RECARREGAR_A_PAGINA_A_CADA_MS = 6 * 60 * 60 * 1000; // para receber versões novas do painel
 const CHAVE_DOS_AJUSTES = "mural:ajustes";
 const CHAVE_DA_CONTAGEM = "mural:contagem";
@@ -76,15 +76,6 @@ function mostrarTela(indice) {
     // Ordem de entrada dos cartões da tela que aparece.
     if (ativa) [...tela.querySelectorAll(".cartao")].filter((c) => !c.hidden).forEach((c, i) => c.style.setProperty("--ordem", i));
   }
-  // Barra fina que mostra quanto falta para a próxima tela.
-  const andamento = $("andamento");
-  andamento.classList.remove("correndo");
-  andamento.hidden = telasAtivas.length < 2;
-  if (telasAtivas.length > 1) {
-    andamento.style.setProperty("--duracao", `${ajustes.segundos}s`);
-    void andamento.offsetWidth; // reinicia a animação
-    andamento.classList.add("correndo");
-  }
   $("pontos").innerHTML = telasAtivas.length > 1 ? telasAtivas.map((_, i) => `<i class="${i === indice ? "ativo" : ""}"></i>`).join("") : "";
 }
 
@@ -151,7 +142,7 @@ function renderizarMetas(metas, hoje, deHoje) {
 
 function renderizarIndicadores(doMes, deHoje, reunioes) {
   const v = doMes.volume, t = doMes.taxas;
-  const CORES = { "Reuniões de hoje": "#d8b565", "Leads no mês": "#6ea8d8", Qualificados: "#a78bfa", Comparecimento: "#5fc4d6", "Reunião p/ fechamento": "#e0965a", "Conversão final": "#4fb38a", "Reuniões marcadas": "#5fc4d6", "Reuniões realizadas": "#e0965a", "Contratos fechados": "#4fb38a" };
+  const CORES = { "Reuniões de hoje": "#d8b565", "Leads no mês": "#6ea8d8", Qualificados: "#a78bfa", Comparecimento: "#5fc4d6", Fechamento: "#e0965a", "Conversão final": "#4fb38a", "Reuniões marcadas": "#5fc4d6", "Reuniões realizadas": "#e0965a", "Contratos fechados": "#4fb38a" };
   const cartao = (rotulo, valor, detalhe, bloco = "indicadores") => `
     <div class="cartao ind${bloco === "reunioesHoje" ? " destaque" : ""}" data-bloco="${bloco}" data-chave="${rotulo}" data-valor="${valor ?? ""}" style="--cor:${CORES[rotulo] || "#d8b565"}">
       <p class="rotulo">${rotulo}</p>
@@ -174,7 +165,7 @@ function renderizarIndicadores(doMes, deHoje, reunioes) {
   const complemento = ajustes.blocos.metas
     ? [
         taxa("Comparecimento", t.comparecimento, `<strong>${numero(v.realizadasDaCoorte)}</strong> de ${numero(v.reunioesMarcadas)} marcadas`),
-        taxa("Reunião p/ fechamento", t.reuniaoParaFechamento, `<strong>${numero(v.fechados)}</strong> de ${numero(v.reunioesRealizadas)} realizadas`),
+        taxa("Fechamento", t.reuniaoParaFechamento, `<strong>${numero(v.fechados)}</strong> de ${numero(v.reunioesRealizadas)} realizadas`),
         taxa("Conversão final", t.conversaoFinal, `<strong>${numero(v.fechados)}</strong> de ${numero(v.leadsRecebidos)} leads`),
       ]
     : [
@@ -358,7 +349,8 @@ async function atualizar() {
     destacarMudancas();
     comemorarNovidades(mes, hoje);
     $("mes").textContent = new Date(`${hoje}T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }).replace(/^./, (c) => c.toUpperCase());
-    $("atualizado").textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+    // Horário em que os dados foram lidos do Kommo, e não o da tela.
+    $("atualizado").textContent = `Dados do Kommo de ${new Date(mes.dadosDe || Date.now()).toLocaleTimeString("pt-BR")}`;
     $("aviso").textContent = "";
   } catch (erro) {
     $("aviso").textContent =
@@ -509,8 +501,27 @@ function tocar(tipo) {
   }
 }
 
+// Barra e contagem regressiva até a próxima conferência dos números. É nesse
+// momento que uma comemoração pode aparecer.
+let proximaConferencia = 0;
+function agendarProximaConferencia() {
+  proximaConferencia = Date.now() + ATUALIZAR_A_CADA_MS;
+  const andamento = $("andamento");
+  andamento.classList.remove("correndo");
+  andamento.style.setProperty("--duracao", `${ATUALIZAR_A_CADA_MS / 1000}s`);
+  void andamento.offsetWidth; // reinicia a animação
+  andamento.classList.add("correndo");
+}
+async function conferir() {
+  $("proxima").textContent = "Conferindo o Kommo.";
+  await atualizar();
+  agendarProximaConferencia();
+}
+
 function marcarHora() {
   $("relogio").textContent = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const falta = Math.max(0, Math.round((proximaConferencia - Date.now()) / 1000));
+  if (proximaConferencia) $("proxima").textContent = `Próxima conferência em ${Math.floor(falta / 60)}:${String(falta % 60).padStart(2, "0")}.`;
 }
 
 // Tela cheia e tela sempre ligada, quando o navegador permitir.
@@ -553,8 +564,8 @@ document.addEventListener("visibilitychange", () => document.visibilityState ===
 lerAjustes();
 aplicarAjustes();
 marcarHora();
-setInterval(marcarHora, 15000);
-atualizar();
-setInterval(atualizar, ATUALIZAR_A_CADA_MS);
+setInterval(marcarHora, 1000);
+conferir();
+setInterval(conferir, ATUALIZAR_A_CADA_MS);
 setTimeout(() => location.reload(), RECARREGAR_A_PAGINA_A_CADA_MS);
 manterTelaLigada();
