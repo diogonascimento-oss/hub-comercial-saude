@@ -84,6 +84,7 @@ function fecharAjustes() {
   gravarAjustes();
   $("ajustes").hidden = true;
   aplicarAjustes();
+  atualizar();
 }
 
 // --- Dados ---------------------------------------------------------------------
@@ -104,7 +105,7 @@ async function chamarApi(caminho) {
 
 // --- Tela 1: resumo ------------------------------------------------------------
 
-function renderizarMetas(metas, hoje) {
+function renderizarMetas(metas, hoje, deHoje) {
   const [ano, mes, dia] = hoje.split("-").map(Number);
   const fracaoDoMes = dia / new Date(ano, mes, 0).getDate();
   $("metas").innerHTML = (metas?.itens || [])
@@ -122,7 +123,7 @@ function renderizarMetas(metas, hoje) {
             <div class="barra" style="width:${pct}%;background:${cor}"></div>
             <div class="ritmo" style="left:${Math.min(fracaoDoMes * 100, 100)}%"></div>
           </div>
-          <p class="rodape"><span>${faltam ? `Faltam ${numero(faltam)}` : "Meta atingida"}</span><span>Ritmo esperado até hoje: ${numero(esperado)}</span></p>
+          <p class="rodape"><span>Hoje: ${numero(deHoje?.volume?.[m.chave])} · ${faltam ? `faltam ${numero(faltam)}` : "meta atingida"}</span><span>Ritmo esperado até hoje: ${numero(esperado)}</span></p>
         </div>
       </div>`;
     })
@@ -147,13 +148,25 @@ function renderizarIndicadores(doMes, deHoje, reunioes) {
         : r.horarios.length
           ? "Todas já passaram do horário"
           : "Sem horário informado";
+  const taxa = (rotulo, valor, detalhe) => cartao(rotulo, valor, detalhe).replace(/(<p class="valor serifa num">)[^<]*/, `$1${percentual(valor)}`);
+  // Reuniões marcadas, realizadas e contratos já aparecem nas metas. Com as
+  // metas à mostra, esta fileira traz as taxas; sem elas, traz as contagens.
+  const complemento = ajustes.blocos.metas
+    ? [
+        taxa("Comparecimento", t.comparecimento, `<strong>${numero(v.realizadasDaCoorte)}</strong> de ${numero(v.reunioesMarcadas)} marcadas`),
+        taxa("Fechamento", t.reuniaoParaFechamento, `<strong>${numero(v.fechados)}</strong> de ${numero(v.reunioesRealizadas)} realizadas`),
+        taxa("Conversão final", t.conversaoFinal, `<strong>${numero(v.fechados)}</strong> de ${numero(v.leadsRecebidos)} leads`),
+      ]
+    : [
+        cartao("Reuniões marcadas", v.reunioesMarcadas, `Hoje: <strong>${numero(deHoje?.volume.reunioesMarcadas)}</strong>`),
+        cartao("Reuniões realizadas", v.reunioesRealizadas, `Comparecimento: <strong>${percentual(t.comparecimento)}</strong>`),
+        cartao("Contratos fechados", v.fechados, `Conversão final: <strong>${percentual(t.conversaoFinal)}</strong>`),
+      ];
   $("indicadores").innerHTML = [
     cartao("Reuniões de hoje", r.total, detalheDeHoje, "reunioesHoje"),
     cartao("Leads no mês", v.leadsRecebidos, `Hoje: <strong>${numero(deHoje?.volume.leadsRecebidos)}</strong>`),
     cartao("Qualificados", v.qualificados, `Qualificação: <strong>${percentual(t.qualificacao)}</strong>`),
-    cartao("Reuniões marcadas", v.reunioesMarcadas, `Hoje: <strong>${numero(deHoje?.volume.reunioesMarcadas)}</strong>`),
-    cartao("Reuniões realizadas", v.reunioesRealizadas, `Comparecimento: <strong>${percentual(t.comparecimento)}</strong>`),
-    cartao("Contratos fechados", v.fechados, `Conversão final: <strong>${percentual(t.conversaoFinal)}</strong>`),
+    ...complemento,
   ].join("");
 }
 
@@ -224,20 +237,21 @@ function renderizarEvolucao(campanhas, etapas, escopos) {
       return linhas.map((l, li) => `<text x="${x(i)}" y="${base + 36 + li * 26}" text-anchor="${ancora}" font-family="Inter, sans-serif" font-size="22" fill="#9a9ca8">${esc(l)}</text>`).join("");
     })
     .join("");
-  // Cada número fica junto ao ponto da sua linha, na cor da série. Quando os
-  // pontos de uma etapa estão próximos, os números são afastados na vertical
-  // para não se sobreporem; quando todas as campanhas têm o mesmo valor, aparece
-  // um único número, em cor neutra.
+  // Cada número fica junto ao ponto da sua linha. Quando os pontos de uma etapa
+  // estão próximos, os números são afastados na vertical para não se sobreporem.
   const ALTURA_DO_NUMERO = 34;
   const numeros = caminho
     .map((_, i) => {
       const ancora = i === 0 ? "start" : i === caminho.length - 1 ? "end" : "middle";
       const texto = (valor, yTexto, cor) =>
         `<text x="${x(i)}" y="${yTexto.toFixed(1)}" text-anchor="${ancora}" font-family="Fraunces, Georgia, serif" font-size="30" font-weight="600" fill="${cor}" stroke="#12131b" stroke-width="7" paint-order="stroke" stroke-linejoin="round">${numero(valor)}</text>`;
-      const valores = series.map((s) => s.valores[i]);
-      if (valores.every((v) => v === valores[0])) return texto(valores[0], y(valores[0]) - 18, "#e9e7de");
-
-      const rotulosDaEtapa = series.map((s) => ({ valor: s.valores[i], cor: s.cor, y: y(s.valores[i]) - 18 })).sort((a, b) => a.y - b.y);
+      // Um rótulo por valor distinto: na cor da campanha quando o valor é só
+      // dela, em cor neutra quando duas ou mais campanhas coincidem.
+      const porValor = new Map();
+      for (const s of series) porValor.set(s.valores[i], [...(porValor.get(s.valores[i]) || []), s]);
+      const rotulosDaEtapa = [...porValor]
+        .map(([valor, donas]) => ({ valor, cor: donas.length > 1 ? "#e9e7de" : donas[0].cor, y: y(valor) - 18 }))
+        .sort((a, b) => a.y - b.y);
       // De cima para baixo, garante a distância mínima; se passar da base, sobe o conjunto.
       for (let k = 1; k < rotulosDaEtapa.length; k++) rotulosDaEtapa[k].y = Math.max(rotulosDaEtapa[k].y, rotulosDaEtapa[k - 1].y + ALTURA_DO_NUMERO);
       const excesso = rotulosDaEtapa.at(-1).y - (base - 10);
@@ -257,7 +271,7 @@ function renderizarEvolucao(campanhas, etapas, escopos) {
   $("legendaEvolucao").innerHTML =
     series
       .map((s) => `<span><i style="background:${s.traco ? `repeating-linear-gradient(90deg, ${s.cor} 0 10px, transparent 10px 16px)` : s.cor}"></i>${esc(s.nome)}</span>`)
-      .join("") + '<span style="margin-left:auto">Cada número tem a cor da sua campanha.</span>';
+      .join("") + '<span style="margin-left:auto">Número colorido: valor de uma campanha. Número branco: valor igual em mais de uma.</span>';
 }
 
 // --- Tela 3: mapa --------------------------------------------------------------
@@ -313,7 +327,7 @@ async function atualizar() {
       chamarApi(`/metrics?inicio=${hoje}&fim=${hoje}&resumo=1`),
       chamarApi(`/analise-trafego?inicio=${inicioDoMes}&fim=${hoje}&apenasNovos=true&resumo=1`),
     ]);
-    renderizarMetas(mes.metas, hoje);
+    renderizarMetas(mes.metas, hoje, dia.escopos.TODAS);
     renderizarIndicadores(mes.escopos.TODAS, dia.escopos.TODAS, mes.reunioesDeHoje);
     renderizarCampanhas(mes.campanhas, mes.escopos);
     renderizarEtapas(mes.etapas, mes.escopos.TODAS.volumeAtual);
