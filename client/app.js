@@ -504,14 +504,16 @@ function renderizarTempos() {
   ].join("");
 }
 
-function linhaDeConversao(origem, destino, taxa, rodape) {
+// neutra: usada quando o percentual é só uma divisão dos leads entre destinos,
+// e não uma medida de desempenho. Nesse caso não há verde ou vermelho.
+function linhaDeConversao(origem, destino, taxa, rodape, neutra = false) {
   const largura = taxa === null ? 0 : Math.min(taxa, 100);
-  const cor = taxa === null ? "#5d6070" : taxa >= 50 ? "#4fb38a" : taxa >= 25 ? "#b6923f" : "#d0685a";
+  const cor = taxa === null ? "#5d6070" : neutra ? "#b6923f" : taxa >= 50 ? "#4fb38a" : taxa >= 25 ? "#b6923f" : "#d0685a";
   return `
     <div class="py-2 border-b border-line last:border-0">
       <div class="flex items-center justify-between gap-2">
         <span class="text-[11px] text-ink truncate">${origem ? `${esc(origem)} <span class="text-inkfaint">para</span> ` : ""}${esc(destino)}</span>
-        <span class="${classeDaTaxa(taxa)} font-semibold tabular shrink-0">${percentual(taxa)}</span>
+        <span class="${neutra ? "text-ink" : classeDaTaxa(taxa)} font-semibold tabular shrink-0">${percentual(taxa)}</span>
       </div>
       <div class="h-px bg-line mt-1.5"><div class="barra h-px" style="width:${largura}%;background:${cor}"></div></div>
       <p class="text-[10px] text-inkfaint mt-1 tabular">${rodape}</p>
@@ -524,7 +526,7 @@ function renderizarDestinos() {
   const lista = e.destinosPorEtapa[origem] || [];
   $("destinos").innerHTML = lista.length
     ? `<p class="text-[10px] text-inkfaint mb-1">${numero(e.saidasPorEtapa[origem] || 0)} lead(s) saíram desta etapa no período.</p>` +
-      lista.map((d) => linhaDeConversao("", nomeEtapa(d.destino), d.taxa, `${numero(d.total)} lead(s)`)).join("")
+      lista.map((d) => linhaDeConversao("", nomeEtapa(d.destino), d.taxa, `${numero(d.total)} lead(s)`, true)).join("")
     : '<p class="text-xs text-inkdim">Nenhum lead saiu desta etapa no período selecionado.</p>';
 }
 
@@ -536,7 +538,7 @@ function renderizarConversao() {
   $("conversaoEntreEtapas").innerHTML = e.conversaoEntreEtapas.length
     ? e.conversaoEntreEtapas
         .slice(0, 8)
-        .map((c) => linhaDeConversao(nomeEtapa(c.origem), nomeEtapa(c.destino), c.taxa, `${numero(c.total)} lead(s) · percentual sobre as saídas da origem`))
+        .map((c) => linhaDeConversao(nomeEtapa(c.origem), nomeEtapa(c.destino), c.taxa, `${numero(c.total)} lead(s) · percentual sobre as saídas da origem`, true))
         .join("")
     : '<p class="text-xs text-inkdim">Sem movimentações no período.</p>';
 
