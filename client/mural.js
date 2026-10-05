@@ -3,9 +3,10 @@
 // pessoal de lead é carregado. Depende de mapa-brasil.js para o desenho do mapa.
 
 const API = "/api";
-const ATUALIZAR_A_CADA_MS = 5 * 60 * 1000;
+const ATUALIZAR_A_CADA_MS = 2 * 60 * 1000; // curto, para a comemoração sair perto do fato
 const RECARREGAR_A_PAGINA_A_CADA_MS = 6 * 60 * 60 * 1000; // para receber versões novas do painel
 const CHAVE_DOS_AJUSTES = "mural:ajustes";
+const CHAVE_DA_CONTAGEM = "mural:contagem";
 
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -25,12 +26,12 @@ const BLOCOS = [
 ];
 const NOME_DA_TELA = { telaResumo: "tela 1", telaEvolucao: "tela 2", telaMapa: "tela 3" };
 
-let ajustes = { blocos: Object.fromEntries(BLOCOS.map((b) => [b.chave, true])), segundos: 30 };
+let ajustes = { blocos: Object.fromEntries(BLOCOS.map((b) => [b.chave, true])), segundos: 30, som: true };
 
 function lerAjustes() {
   try {
     const salvo = JSON.parse(localStorage.getItem(CHAVE_DOS_AJUSTES) || "null");
-    if (salvo?.blocos) ajustes = { blocos: { ...ajustes.blocos, ...salvo.blocos }, segundos: Number(salvo.segundos) || 30 };
+    if (salvo?.blocos) ajustes = { blocos: { ...ajustes.blocos, ...salvo.blocos }, segundos: Number(salvo.segundos) || 30, som: salvo.som !== false };
   } catch {
     // Sem armazenamento disponível: vale o padrão.
   }
@@ -66,8 +67,24 @@ function aplicarVisibilidade() {
 }
 
 function mostrarTela(indice) {
+  const anterior = telasAtivas[telaAtual];
   telaAtual = indice;
-  for (const tela of document.querySelectorAll(".tela")) tela.classList.toggle("ativa", tela.id === telasAtivas[indice]);
+  for (const tela of document.querySelectorAll(".tela")) {
+    const ativa = tela.id === telasAtivas[indice];
+    tela.classList.toggle("saindo", !ativa && tela.id === anterior && anterior !== telasAtivas[indice]);
+    tela.classList.toggle("ativa", ativa);
+    // Ordem de entrada dos cartões da tela que aparece.
+    if (ativa) [...tela.querySelectorAll(".cartao")].filter((c) => !c.hidden).forEach((c, i) => c.style.setProperty("--ordem", i));
+  }
+  // Barra fina que mostra quanto falta para a próxima tela.
+  const andamento = $("andamento");
+  andamento.classList.remove("correndo");
+  andamento.hidden = telasAtivas.length < 2;
+  if (telasAtivas.length > 1) {
+    andamento.style.setProperty("--duracao", `${ajustes.segundos}s`);
+    void andamento.offsetWidth; // reinicia a animação
+    andamento.classList.add("correndo");
+  }
   $("pontos").innerHTML = telasAtivas.length > 1 ? telasAtivas.map((_, i) => `<i class="${i === indice ? "ativo" : ""}"></i>`).join("") : "";
 }
 
@@ -76,11 +93,13 @@ function abrirAjustes() {
     (b) => `<label><input type="checkbox" data-chave="${b.chave}" ${ajustes.blocos[b.chave] ? "checked" : ""}> ${esc(b.nome)} <small>${NOME_DA_TELA[b.tela]}</small></label>`,
   ).join("");
   $("segundosPorTela").value = String(ajustes.segundos);
+  $("somLigado").checked = ajustes.som;
   $("ajustes").hidden = false;
 }
 function fecharAjustes() {
   for (const caixa of $("opcoesDeBlocos").querySelectorAll("input")) ajustes.blocos[caixa.dataset.chave] = caixa.checked;
   ajustes.segundos = Number($("segundosPorTela").value) || 30;
+  ajustes.som = $("somLigado").checked;
   gravarAjustes();
   $("ajustes").hidden = true;
   aplicarAjustes();
@@ -115,7 +134,7 @@ function renderizarMetas(metas, hoje, deHoje) {
       const cor = m.atual >= m.meta ? "var(--bom)" : m.atual >= esperado ? "var(--ouro)" : "var(--ruim)";
       const faltam = Math.max(m.meta - m.atual, 0);
       return `
-      <div class="cartao meta">
+      <div class="cartao meta" data-chave="meta:${esc(m.chave)}" data-valor="${m.atual}" style="--cor:${cor}">
         <p class="rotulo">${esc(m.rotulo)} · meta do mês</p>
         <div>
           <p class="valor serifa num">${numero(m.atual)} <small>/ ${numero(m.meta)}</small></p>
@@ -132,8 +151,9 @@ function renderizarMetas(metas, hoje, deHoje) {
 
 function renderizarIndicadores(doMes, deHoje, reunioes) {
   const v = doMes.volume, t = doMes.taxas;
+  const CORES = { "Reuniões de hoje": "#d8b565", "Leads no mês": "#6ea8d8", Qualificados: "#a78bfa", Comparecimento: "#5fc4d6", "Reunião p/ fechamento": "#e0965a", "Conversão final": "#4fb38a", "Reuniões marcadas": "#5fc4d6", "Reuniões realizadas": "#e0965a", "Contratos fechados": "#4fb38a" };
   const cartao = (rotulo, valor, detalhe, bloco = "indicadores") => `
-    <div class="cartao ind${bloco === "reunioesHoje" ? " destaque" : ""}" data-bloco="${bloco}">
+    <div class="cartao ind${bloco === "reunioesHoje" ? " destaque" : ""}" data-bloco="${bloco}" data-chave="${rotulo}" data-valor="${valor ?? ""}" style="--cor:${CORES[rotulo] || "#d8b565"}">
       <p class="rotulo">${rotulo}</p>
       <div><p class="valor serifa num">${numero(valor)}</p><p class="detalhe">${detalhe}</p></div>
     </div>`;
@@ -171,9 +191,10 @@ function renderizarIndicadores(doMes, deHoje, reunioes) {
 }
 
 function renderizarCampanhas(campanhas, escopos) {
+  const corDaCampanha = (codigo) => SERIES[campanhas.findIndex((c) => c.codigo === codigo) % SERIES.length]?.cor;
   const linha = (nome, descricao, e, classe = "") => `
     <tr class="${classe}">
-      <td>${esc(nome)}${descricao ? `<small>${esc(descricao)}</small>` : ""}</td>
+      <td>${classe ? "" : `<i class="ponto" style="background:${corDaCampanha(nome)}"></i>`}${esc(nome)}${descricao ? `<small>${esc(descricao)}</small>` : ""}</td>
       <td class="num">${numero(e.volume.leadsRecebidos)}</td>
       <td class="num">${numero(e.volume.qualificados)}</td>
       <td class="num">${numero(e.volume.reunioesMarcadas)}</td>
@@ -334,6 +355,8 @@ async function atualizar() {
     renderizarEvolucao(mes.campanhas, mes.etapas, mes.escopos);
     renderizarMapa(trafego);
     aplicarVisibilidade();
+    destacarMudancas();
+    comemorarNovidades(mes, hoje);
     $("mes").textContent = new Date(`${hoje}T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }).replace(/^./, (c) => c.toUpperCase());
     $("atualizado").textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
     $("aviso").textContent = "";
@@ -342,6 +365,147 @@ async function atualizar() {
       erro.message === "SESSAO"
         ? "Sessão expirada. Recarregue a página e entre novamente para continuar atualizando."
         : "Sem resposta do servidor. Os números exibidos são os da última atualização; nova tentativa em instantes.";
+  }
+}
+
+// --- Destaque do que mudou desde a última atualização --------------------------
+
+const valoresAnteriores = new Map();
+
+function destacarMudancas() {
+  for (const cartao of document.querySelectorAll("[data-chave]")) {
+    const chave = cartao.dataset.chave;
+    const valor = cartao.dataset.valor;
+    if (valoresAnteriores.has(chave) && valoresAnteriores.get(chave) !== valor) cartao.classList.add("mudou");
+    valoresAnteriores.set(chave, valor);
+  }
+}
+
+// --- Comemorações ----------------------------------------------------------------
+
+// Compara os totais do mês com os da última leitura, gravados neste aparelho.
+// Na primeira leitura do mês só registra a base, sem comemorar.
+function comemorarNovidades(mes, hoje) {
+  const atual = { mes: hoje.slice(0, 7), fechados: {}, marcadas: mes.escopos.TODAS.volume.reunioesMarcadas };
+  for (const c of mes.campanhas) atual.fechados[c.codigo] = mes.escopos[c.codigo]?.volume.fechados || 0;
+  let anterior = null;
+  try {
+    anterior = JSON.parse(localStorage.getItem(CHAVE_DA_CONTAGEM) || "null");
+    localStorage.setItem(CHAVE_DA_CONTAGEM, JSON.stringify(atual));
+  } catch {
+    anterior = comemorarNovidades.memoria || null;
+  }
+  comemorarNovidades.memoria = atual;
+  if (!anterior || anterior.mes !== atual.mes) return;
+
+  const campanhasComContrato = mes.campanhas.filter((c) => atual.fechados[c.codigo] > (anterior.fechados?.[c.codigo] || 0)).map((c) => c.codigo);
+  const novasReunioes = atual.marcadas - (anterior.marcadas || 0);
+  const meta = mes.metas?.itens?.find((m) => m.chave === "fechados");
+  if (campanhasComContrato.length) {
+    comemorarContrato({ campanhas: campanhasComContrato, total: mes.escopos.TODAS.volume.fechados, meta: meta?.meta });
+    if (novasReunioes > 0) setTimeout(() => avisarReuniao(novasReunioes, atual.marcadas), 10500);
+  } else if (novasReunioes > 0) {
+    avisarReuniao(novasReunioes, atual.marcadas);
+  }
+}
+
+// Contrato fechado: tela cheia, confete e som, por cerca de dez segundos.
+function comemorarContrato({ campanhas, total, meta }) {
+  const festa = $("festa");
+  $("festaSobre").textContent = campanhas.length ? campanhas.join(" · ") : "Núcleo de Saúde";
+  const faltam = meta ? Math.max(meta - total, 0) : null;
+  $("festaSob").innerHTML = `<strong>${numero(total)}º</strong> contrato do mês${faltam === null ? "" : faltam ? ` · faltam <strong>${numero(faltam)}</strong> para a meta` : " · <strong>meta atingida</strong>"}`;
+  festa.hidden = false;
+  requestAnimationFrame(() => festa.classList.add("aberta"));
+  soltarConfete(festa.querySelector("canvas"), 9000);
+  tocar("contrato");
+  clearTimeout(comemorarContrato.fim);
+  comemorarContrato.fim = setTimeout(() => {
+    festa.classList.remove("aberta");
+    setTimeout(() => (festa.hidden = true), 600);
+  }, 9500);
+}
+
+// Reunião marcada: aviso pequeno no alto da tela, por alguns segundos.
+function avisarReuniao(novas, totalDoMes) {
+  $("recadoTexto").innerHTML = `${novas > 1 ? `<strong>${numero(novas)}</strong> novas reuniões marcadas` : "Nova <strong>reunião marcada</strong>"} · ${numero(totalDoMes)} no mês`;
+  $("recado").classList.add("aberto");
+  tocar("reuniao");
+  clearTimeout(avisarReuniao.fim);
+  avisarReuniao.fim = setTimeout(() => $("recado").classList.remove("aberto"), 7000);
+}
+
+function soltarConfete(tela, duracaoMs) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const ctx = tela.getContext("2d");
+  const L = (tela.width = innerWidth), A = (tela.height = innerHeight);
+  const cores = ["#e6c983", "#d8b565", "#fff3cf", "#4fb38a", "#6ea8d8", "#e9e7de"];
+  const pecas = Array.from({ length: 220 }, (_, i) => ({
+    x: Math.random() * L,
+    y: -Math.random() * A * 0.6 - 20,
+    vx: (Math.random() - 0.5) * 2.4,
+    vy: 2.2 + Math.random() * 4.2,
+    lado: 6 + Math.random() * 10,
+    giro: Math.random() * Math.PI,
+    vGiro: (Math.random() - 0.5) * 0.25,
+    cor: cores[i % cores.length],
+  }));
+  const inicio = performance.now();
+  (function quadro(agora) {
+    const decorrido = agora - inicio;
+    ctx.clearRect(0, 0, L, A);
+    ctx.globalAlpha = Math.max(0, Math.min(1, (duracaoMs - decorrido) / 1500));
+    for (const p of pecas) {
+      p.x += p.vx + Math.sin((decorrido + p.lado * 90) / 600) * 0.8;
+      p.y += p.vy;
+      p.giro += p.vGiro;
+      if (p.y > A + 20 && decorrido < duracaoMs - 2500) p.y = -20;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.giro);
+      ctx.fillStyle = p.cor;
+      ctx.fillRect(-p.lado / 2, -p.lado / 4, p.lado, p.lado / 2);
+      ctx.restore();
+    }
+    if (decorrido < duracaoMs) requestAnimationFrame(quadro);
+    else ctx.clearRect(0, 0, L, A);
+  })(inicio);
+}
+
+// --- Som -------------------------------------------------------------------------
+// Os sons são gerados pelo próprio navegador, sem arquivo de áudio. O navegador
+// só libera o som depois de um clique ou tecla na página.
+
+let audio = null;
+function liberarSom() {
+  try {
+    audio ||= new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === "suspended") audio.resume();
+  } catch {
+    audio = null;
+  }
+}
+
+function tocar(tipo) {
+  if (!ajustes.som || !audio || audio.state !== "running") return;
+  // Cada nota: [frequência em Hz, início em segundos, duração em segundos].
+  const notas =
+    tipo === "contrato"
+      ? [[523.25, 0, 0.5], [659.25, 0.14, 0.5], [783.99, 0.28, 0.5], [1046.5, 0.42, 1.1], [783.99, 0.42, 1.1], [1318.5, 0.75, 1.3]]
+      : [[880, 0, 0.45], [1174.66, 0.16, 0.7]];
+  const volume = tipo === "contrato" ? 0.16 : 0.07;
+  const agora = audio.currentTime + 0.05;
+  for (const [frequencia, inicio, duracao] of notas) {
+    const osc = audio.createOscillator();
+    const ganho = audio.createGain();
+    osc.type = tipo === "contrato" ? "triangle" : "sine";
+    osc.frequency.value = frequencia;
+    ganho.gain.setValueAtTime(0, agora + inicio);
+    ganho.gain.linearRampToValueAtTime(volume, agora + inicio + 0.02);
+    ganho.gain.exponentialRampToValueAtTime(0.0001, agora + inicio + duracao);
+    osc.connect(ganho).connect(audio.destination);
+    osc.start(agora + inicio);
+    osc.stop(agora + inicio + duracao + 0.05);
   }
 }
 
@@ -365,6 +529,19 @@ async function manterTelaLigada() {
 $("btnTelaCheia").addEventListener("click", telaCheia);
 $("btnAjustar").addEventListener("click", abrirAjustes);
 $("btnFecharAjustes").addEventListener("click", fecharAjustes);
+$("btnTestarContrato").addEventListener("click", () => {
+  ajustes.som = $("somLigado").checked;
+  $("ajustes").hidden = true;
+  comemorarContrato({ campanhas: ["Demonstração"], total: 1, meta: 30 });
+  setTimeout(abrirAjustes, 10200);
+});
+$("btnTestarReuniao").addEventListener("click", () => {
+  ajustes.som = $("somLigado").checked;
+  avisarReuniao(1, 1);
+});
+// Qualquer clique ou tecla libera o som para as próximas comemorações.
+document.addEventListener("pointerdown", liberarSom);
+document.addEventListener("keydown", liberarSom);
 document.addEventListener("keydown", (e) => {
   if (!$("ajustes").hidden) return e.key === "Escape" && fecharAjustes();
   if (e.key.toLowerCase() === "f") telaCheia();
