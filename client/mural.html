@@ -95,10 +95,12 @@
   @keyframes entra { from { opacity:0; transform:translateY(1.6vh); } to { opacity:1; transform:none; } }
 
   .cartao { position:relative; overflow:hidden; --cor:var(--ouroclaro); }
-  .cartao.ind::before, .cartao.meta::before { content:""; position:absolute; left:0; right:0; top:0; height:.45vh; background:var(--cor); opacity:.9; }
-  /* A cor fica na faixa do topo e em um tom leve no número; o restante é neutro. */
-  .cartao.ind::before, .cartao.meta::before { opacity:.75; }
-  .ind .valor { color:color-mix(in srgb, var(--cor) 38%, var(--tinta)); }
+  /* A cor aparece em três lugares discretos: um ponto ao lado do rótulo, um
+     tom leve no número e, nas taxas, a régua que mostra o percentual. */
+  .pinta { display:inline-block; width:.9vh; height:.9vh; border-radius:50%; background:var(--cor); margin-right:.55vw; vertical-align:.05em; }
+  .ind .valor { color:color-mix(in srgb, var(--cor) 30%, var(--tinta)); }
+  .medidor { height:.5vh; background:var(--sup2); margin-top:1.1vh; }
+  .medidor i { display:block; height:100%; background:var(--cor); opacity:.85; transition:width .8s ease; }
   .ind .rotulo { color:var(--tinta); opacity:.85; letter-spacing:.08em; font-size:1.38vh; }
   .ind.destaque { border-color:rgba(216,181,101,.45); }
   .tela.ativa .cartao.mudou { animation:entra .7s cubic-bezier(.2,.7,.2,1) both, pulso 1.8s ease .4s; }

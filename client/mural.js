@@ -143,23 +143,26 @@ function renderizarMetas(metas, hoje, deHoje) {
 function renderizarIndicadores(doMes, deHoje, reunioes) {
   const v = doMes.volume, t = doMes.taxas;
   const CORES = { "Reuniões de hoje": "#d8b565", "Leads no mês": "#6ea8d8", Qualificados: "#a78bfa", Comparecimento: "#5fc4d6", Fechamento: "#e0965a", "Conversão final": "#4fb38a", "Reuniões marcadas": "#5fc4d6", "Reuniões realizadas": "#e0965a", "Contratos fechados": "#4fb38a" };
-  const cartao = (rotulo, valor, detalhe, bloco = "indicadores") => `
+  // medidor: percentual de 0 a 100 exibido como uma régua fina na cor do cartão.
+  const cartao = (rotulo, valor, detalhe, bloco = "indicadores", medidor = null) => `
     <div class="cartao ind${bloco === "reunioesHoje" ? " destaque" : ""}" data-bloco="${bloco}" data-chave="${rotulo}" data-valor="${valor ?? ""}" style="--cor:${CORES[rotulo] || "#d8b565"}">
-      <p class="rotulo">${rotulo}</p>
-      <div><p class="valor serifa num">${numero(valor)}</p><p class="detalhe">${detalhe}</p></div>
+      <p class="rotulo"><i class="pinta"></i>${rotulo}</p>
+      <div>
+        <p class="valor serifa num">${numero(valor)}</p>
+        <p class="detalhe">${detalhe}</p>
+        ${medidor === null ? "" : `<div class="medidor"><i style="width:${Math.max(0, Math.min(Number(medidor) || 0, 100))}%"></i></div>`}
+      </div>
     </div>`;
   // Reuniões com data para hoje, pelo campo "Data da Reunião" do lead.
-  const r = reunioes || { emUso: false, total: 0, horarios: [] };
-  const detalheDeHoje = !r.emUso
-    ? "Campo ainda sem uso"
-    : !r.total
-      ? "Nenhuma com data para hoje"
-      : r.proxima
-        ? `Próxima às <strong>${esc(r.proxima)}</strong> · faltam ${numero(r.aindaPorAcontecer)}`
-        : r.horarios.length
-          ? "Todas já passaram do horário"
-          : "Sem horário informado";
-  const taxa = (rotulo, valor, detalhe) => cartao(rotulo, valor, detalhe).replace(/(<p class="valor serifa num">)[^<]*/, `$1${percentual(valor)}`);
+  const r = reunioes || { emUso: false, total: 0 };
+  const partes = [];
+  if (r.proxima) partes.push(`Próxima às <strong>${esc(r.proxima)}</strong>`);
+  else if (r.aindaPorAcontecer) partes.push(`<strong>${numero(r.aindaPorAcontecer)}</strong> por acontecer`);
+  if (r.realizadas) partes.push(`<strong>${numero(r.realizadas)}</strong> realizada${r.realizadas > 1 ? "s" : ""}`);
+  if (r.naoRealizadas) partes.push(`<strong>${numero(r.naoRealizadas)}</strong> não realizada${r.naoRealizadas > 1 ? "s" : ""}`);
+  if (r.semDesfecho) partes.push(`<strong>${numero(r.semDesfecho)}</strong> sem desfecho`);
+  const detalheDeHoje = !r.emUso ? "Campo ainda sem uso" : !r.total ? "Nenhuma com data para hoje" : partes.join(" · ") || "Fora da etapa Agendado";
+  const taxa = (rotulo, valor, detalhe) => cartao(rotulo, valor, detalhe, "indicadores", valor ?? 0).replace(/(<p class="valor serifa num">)[^<]*/, `$1${percentual(valor)}`);
   // Reuniões marcadas, realizadas e contratos já aparecem nas metas. Com as
   // metas à mostra, esta fileira traz as taxas; sem elas, traz as contagens.
   const complemento = ajustes.blocos.metas
@@ -176,7 +179,7 @@ function renderizarIndicadores(doMes, deHoje, reunioes) {
   $("indicadores").innerHTML = [
     cartao("Reuniões de hoje", r.total, detalheDeHoje, "reunioesHoje"),
     cartao("Leads no mês", v.leadsRecebidos, `Hoje: <strong>${numero(deHoje?.volume.leadsRecebidos)}</strong>`),
-    cartao("Qualificados", v.qualificados, `Qualificação: <strong>${percentual(t.qualificacao)}</strong>`),
+    cartao("Qualificados", v.qualificados, `Qualificação: <strong>${percentual(t.qualificacao)}</strong>`, "indicadores", t.qualificacao ?? 0),
     ...complemento,
   ].join("");
 }

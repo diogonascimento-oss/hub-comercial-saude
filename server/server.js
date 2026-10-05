@@ -17,6 +17,7 @@ import {
   ETAPA_POR_CHAVE,
   FUSO_HORARIO,
   METAS_MENSAIS,
+  ETAPAS_REUNIAO_REALIZADA,
   CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO,
   ROTULO_SEM_RASTREIO_DE_ANUNCIO,
 } from "./config.js";
@@ -225,22 +226,31 @@ const DESLOCAMENTO_DO_FUSO_S = -3 * 3600;
 const dataLocal = (ts) => new Date((ts + DESLOCAMENTO_DO_FUSO_S) * 1000).toISOString().slice(0, 10);
 
 // Reuniões com data marcada para hoje, pelo campo "Data da Reunião" do lead.
-// Só totais e horários; nenhum dado pessoal.
+// Só totais e horários; nenhum dado pessoal. A etapa atual do lead diz em que
+// pé está a reunião: em Agendado, ainda vai acontecer (ou está sem desfecho
+// lançado); em Protocolo Farmer, Reaquecimento ou Fechado, já aconteceu; em
+// Remarcação, não aconteceu.
 function reunioesDeHoje(leads, agora) {
   const hoje = dataLocal(agora);
   const doDia = leads.filter((l) => l.dataDaReuniao && dataLocal(l.dataDaReuniao) === hoje && l.etapa !== "DESQUALIFICADO");
   const hora = (ts) => new Date((ts + DESLOCAMENTO_DO_FUSO_S) * 1000).toISOString().slice(11, 16);
   // Campo só com a data, sem horário, chega como meia-noite.
-  const comHorario = doDia.filter((l) => hora(l.dataDaReuniao) !== "00:00").sort((a, b) => a.dataDaReuniao - b.dataDaReuniao);
+  const temHorario = (l) => hora(l.dataDaReuniao) !== "00:00";
+  const emAgendado = doDia.filter((l) => l.etapa === "AGENDADO").sort((a, b) => a.dataDaReuniao - b.dataDaReuniao);
+  const futuras = emAgendado.filter((l) => !temHorario(l) || l.dataDaReuniao > agora);
+  const proxima = futuras.find(temHorario);
   const porCampanha = {};
   for (const l of doDia) porCampanha[l.campanha] = (porCampanha[l.campanha] || 0) + 1;
   return {
     emUso: leads.some((l) => l.dataDaReuniao),
     total: doDia.length,
     porCampanha,
-    horarios: comHorario.map((l) => hora(l.dataDaReuniao)),
-    aindaPorAcontecer: comHorario.filter((l) => l.dataDaReuniao > agora).length,
-    proxima: comHorario.find((l) => l.dataDaReuniao > agora) ? hora(comHorario.find((l) => l.dataDaReuniao > agora).dataDaReuniao) : null,
+    aindaPorAcontecer: futuras.length,
+    proxima: proxima ? hora(proxima.dataDaReuniao) : null,
+    // Passou do horário e o lead continua em Agendado: falta lançar o desfecho.
+    semDesfecho: emAgendado.length - futuras.length,
+    realizadas: doDia.filter((l) => ETAPAS_REUNIAO_REALIZADA.includes(l.etapa)).length,
+    naoRealizadas: doDia.filter((l) => l.etapa === "REMARCACAO").length,
   };
 }
 
