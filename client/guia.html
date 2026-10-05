@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Guia dos indicadores — Hub Comercial, Núcleo de Saúde</title>
+<link rel="icon" href="icones/favicon-48.png" sizes="48x48" type="image/png">
+<link rel="icon" href="icones/favicon-96.png" sizes="96x96" type="image/png">
+<link rel="icon" href="icones/icone.svg" sizes="any" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+<!-- O painel fica atrás do Cloudflare Access: sem "use-credentials" o navegador
+     busca o manifesto sem a sessão e recebe a tela de login no lugar dele. -->
+<link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
+<meta name="theme-color" content="#12131b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hub Saúde">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body class="bg-bg text-ink font-sans antialiased">
+<main class="max-w-3xl mx-auto px-5 md:px-8 py-10 text-[13px] leading-relaxed">
+
+  <p class="rotulo">Robson Menezes Advogados · Núcleo de Saúde</p>
+  <h1 class="font-serif text-2xl font-semibold text-ink mt-2">Guia dos indicadores</h1>
+  <p class="text-inkdim mt-2">Explicação de cada número do Hub Comercial, com exemplos. Este guia é para consulta do dia a dia; a <a href="/documentacao" class="underline decoration-dotted hover:text-goldbright">metodologia de cálculo</a> traz as regras completas, em linguagem mais técnica.</p>
+  <p class="mt-3"><a href="/" class="underline decoration-dotted text-inkdim hover:text-goldbright">Voltar ao painel</a></p>
+
+  <nav class="mt-6 border border-line p-4 text-inkdim" aria-label="Sumário">
+    <p class="rotulo mb-2">Neste guia</p>
+    <ol class="list-decimal pl-5 space-y-0.5">
+      <li><a class="hover:text-goldbright" href="#ideias">Três ideias para entender todos os números</a></li>
+      <li><a class="hover:text-goldbright" href="#exemplo">O mês de exemplo</a></li>
+      <li><a class="hover:text-goldbright" href="#volume">Indicadores de quantidade</a></li>
+      <li><a class="hover:text-goldbright" href="#taxas">Taxas (percentuais)</a></li>
+      <li><a class="hover:text-goldbright" href="#tempos">Tempos de atendimento</a></li>
+      <li><a class="hover:text-goldbright" href="#metas">Metas e ritmo esperado</a></li>
+      <li><a class="hover:text-goldbright" href="#comparacao">Comparação com o período anterior</a></li>
+      <li><a class="hover:text-goldbright" href="#mural">O que aparece no mural</a></li>
+      <li><a class="hover:text-goldbright" href="#duvidas">Dúvidas frequentes</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="ideias" class="titulo-secao mt-10 mb-3">1. Três ideias para entender todos os números</h2>
+  <ol class="list-decimal pl-5 space-y-3 text-inkdim">
+    <li><span class="text-ink">O painel conta movimentações entre colunas do Kommo.</span> Cada coluna do funil é uma etapa. Quando alguém arrasta um lead de uma coluna para outra, o Kommo registra a data e a hora. O painel lê esses registros. Por isso, mover o lead para a coluna certa, na hora certa, é o que faz o número aparecer.</li>
+    <li><span class="text-ink">Tudo depende do período escolhido.</span> O filtro de datas no topo do painel define o que entra na conta. "Qualificados", por exemplo, quer dizer "leads que entraram na coluna Lead Qualificado dentro dessas datas". Um lead que chegou em setembro e foi qualificado em outubro conta como qualificado de outubro.</li>
+    <li><span class="text-ink">A mesma pessoa conta uma vez por campanha.</span> Dois leads com o mesmo telefone na mesma campanha são tratados como um só. A mesma pessoa pode existir em campanhas diferentes (IR-Q, IR-W e REA-Q).</li>
+  </ol>
+
+  <h2 id="exemplo" class="titulo-secao mt-10 mb-3">2. O mês de exemplo</h2>
+  <p class="text-inkdim">Todos os exemplos deste guia usam o mesmo mês inventado, com números redondos. Não são dados reais do escritório.</p>
+  <div class="border border-line overflow-x-auto mt-3">
+    <table class="w-full text-xs">
+      <tbody class="divide-y divide-line text-inkdim">
+        <tr><td class="px-3 py-2 text-ink">Leads que chegaram no mês</td><td class="px-3 py-2 text-right tabular text-ink">100</td></tr>
+        <tr><td class="px-3 py-2">Foram contatados (entraram em Contato Iniciado)</td><td class="px-3 py-2 text-right tabular">90</td></tr>
+        <tr><td class="px-3 py-2">Responderam (entraram em Em Qualificação)</td><td class="px-3 py-2 text-right tabular">60</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Foram qualificados</td><td class="px-3 py-2 text-right tabular text-ink">40</td></tr>
+        <tr><td class="px-3 py-2">Dos qualificados, chegaram a marcar reunião</td><td class="px-3 py-2 text-right tabular">25</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Reuniões marcadas (25 novas e 5 remarcações)</td><td class="px-3 py-2 text-right tabular text-ink">30</td></tr>
+        <tr><td class="px-3 py-2">Reuniões que aconteceram</td><td class="px-3 py-2 text-right tabular">14</td></tr>
+        <tr><td class="px-3 py-2">Reuniões em que o cliente faltou (foram para Remarcação)</td><td class="px-3 py-2 text-right tabular">9</td></tr>
+        <tr><td class="px-3 py-2">Leads perdidos antes da reunião (foram para Desqualificado)</td><td class="px-3 py-2 text-right tabular">2</td></tr>
+        <tr><td class="px-3 py-2">Reuniões ainda por acontecer (lead continua em Agendado)</td><td class="px-3 py-2 text-right tabular">5</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Contratos fechados</td><td class="px-3 py-2 text-right tabular text-ink">5</td></tr>
+        <tr><td class="px-3 py-2">Desqualificados no mês</td><td class="px-3 py-2 text-right tabular">20</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="text-inkdim mt-2">Repare que as 30 reuniões marcadas se dividem em 14 + 9 + 2 + 5. Toda reunião marcada termina em um desses quatro destinos.</p>
+
+  <h2 id="volume" class="titulo-secao mt-10 mb-1">3. Indicadores de quantidade</h2>
+  <p class="text-inkdim">São os oito cartões da seção "Indicadores do período". Clicar em qualquer número abre a lista dos leads que foram contados nele.</p>
+
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Leads recebidos</h3>
+    
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">Quantas pessoas novas chegaram ao escritório no período.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1">Leads <span class="text-ink">criados</span> no Kommo dentro do período, nos três funis. Vale a data de criação do lead, não a de qualquer movimentação.</dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">100 leads foram criados no mês. O cartão mostra <strong>100</strong>.</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">É a base de várias taxas. Se um lead for criado duas vezes com o mesmo telefone na mesma campanha, conta uma vez só.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Contatados e com primeira resposta</h3>
+    
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">Dois números menores, embaixo de "Leads recebidos". Contatado é o lead para quem a equipe (ou a cadência automática) já mandou a primeira mensagem. Com primeira resposta é o lead que respondeu.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1">Contatado: lead que <span class="text-ink">entrou na coluna Contato Iniciado</span> no período. Com primeira resposta: lead que <span class="text-ink">entrou na coluna Em Qualificação</span> no período.</dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">90 leads entraram em Contato Iniciado e 60 entraram em Em Qualificação. O cartão mostra <strong>90 contatados · 60 com primeira resposta</strong>.</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">Os dois números são contados separadamente. No IR-W o lead já chega conversando pelo WhatsApp e costuma ir direto para Em Qualificação, sem passar por Contato Iniciado. Por isso, nessa campanha, pode haver mais respostas do que contatos.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Qualificados</h3>
+    
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">Quantos leads a equipe considerou aptos a seguir para o agendamento.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1">Leads que <span class="text-ink">entraram na coluna Lead Qualificado</span> no período. Também conta quem foi movido direto de uma etapa anterior (Contato Inicial, Contato Iniciado ou Em Qualificação) para Em Agendamento ou Agendado, porque pular a coluna não significa que o lead não foi qualificado. Cada lead conta uma vez.</dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">40 leads entraram em Lead Qualificado. O cartão mostra <strong>40</strong>. Embaixo aparecem a taxa de qualificação (40%) e "15 sem agendamento", que são os qualificados que ainda não marcaram reunião (40 − 25).</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">Só conta quando o lead é movido. Um lead qualificado na conversa, mas deixado em Em Qualificação, não aparece aqui.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Reuniões marcadas</h3>
+    
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">Quantos agendamentos de reunião foram feitos no período.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1">Cada <span class="text-ink">entrada de um lead na coluna Agendado</span> conta um agendamento. Se o mesmo lead é agendado, falta, e é agendado de novo, são dois agendamentos. O cartão separa em <span class="text-ink">novas</span> (primeiro agendamento do lead) e <span class="text-ink">remarcações</span> (segundo agendamento em diante, ou agendamento vindo da coluna Remarcação).</dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">25 leads foram agendados pela primeira vez e 5 foram reagendados depois de faltar. O cartão mostra <strong>30</strong>, com "25 novas · 5 remarcações".</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">A reunião conta pela coluna, não pelo campo "Data da Reunião". Preencher a data serve para o mural mostrar as reuniões de hoje; não muda este número.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Reuniões realizadas</h3>
+    
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">Quantas reuniões de fato aconteceram.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1">O painel olha para onde o lead foi ao sair de Agendado. Saiu para <span class="text-ink">Protocolo Farmer, Reaquecimento ou Fechado</span>: reunião realizada. Se o campo "Situação da reunião" estiver preenchido com "Realizada", "No-show", "Cancelada pelo cliente" ou "Falha interna do escritório", vale o que o campo diz, mesmo que a coluna indique outra coisa.</dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">14 leads saíram de Agendado para o Protocolo Farmer ou para Fechado. O cartão mostra <strong>14</strong>.</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">Se o lead ficar parado em Agendado depois da reunião, ela não conta como realizada até ser movido.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Não realizadas</h3>
+    
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">Quantas reuniões marcadas não aconteceram porque o cliente faltou ou desmarcou.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1">Leads que saíram de <span class="text-ink">Agendado para Remarcação</span>, ou cujo campo "Situação da reunião" indica que a reunião não ocorreu. Só entram reuniões que foram marcadas dentro do próprio período.</dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">9 leads foram de Agendado para Remarcação. O cartão mostra <strong>9</strong>, com "30% das marcadas" (9 ÷ 30).</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">A linha "com a etiqueta NO_SHOW" mostra quantas dessas faltas a equipe marcou com a etiqueta do protocolo.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Remarcações recuperadas</h3>
+    
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">Quantos clientes que faltaram voltaram a marcar reunião.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1">Leads movidos de <span class="text-ink">Remarcação de volta para Agendado</span> no período.</dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">Dos 9 que faltaram, 5 foram reagendados. O cartão mostra <strong>5</strong>, com "De 9 entradas em Remarcação: 55,6%".</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Contratos fechados</h3>
+    
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">Quantos clientes fecharam contrato.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1">Leads que <span class="text-ink">entraram na coluna Fechado</span> no período. Cada lead conta uma vez.</dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">5 leads entraram em Fechado. O cartão mostra <strong>5</strong>.</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">O painel não distingue contrato assinado de contrato fechado: vale a entrada na coluna.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Desqualificados</h3>
+    
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">Quantos leads foram descartados.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1">Leads que <span class="text-ink">entraram na coluna Desqualificado / Não Fechado</span> no período. A linha de baixo mostra quantos deles foram perdidos entre o agendamento e a reunião (saíram de Agendado direto para Desqualificado).</dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">20 leads foram desqualificados, 2 deles depois de já terem reunião marcada. O cartão mostra <strong>20</strong>, com "2 perdidos entre o agendamento e a reunião".</dd></div>
+    </dl>
+  </article>
+
+  <h2 id="taxas" class="titulo-secao mt-10 mb-1">4. Taxas (percentuais)</h2>
+  <p class="text-inkdim">Toda taxa é uma divisão entre dois dos números acima. Ela responde a uma pergunta do tipo "de cada 100, quantos?". Quando não há base para dividir (por exemplo, nenhuma reunião marcada), o painel mostra um traço no lugar do percentual.</p>
+
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Taxa de qualificação</h3>
+    <p class="text-[11px] text-inkfaint mt-1">Onde aparece: embaixo do cartão Qualificados, no comparativo por campanha e no mural</p>
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">De cada 100 leads que chegaram, quantos foram qualificados.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1"><span class="text-ink">Qualificados ÷ Leads recebidos.</span></dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">40 qualificados ÷ 100 leads recebidos = <strong>40%</strong>.</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">Os dois números são contados de forma independente dentro do período: os qualificados do mês podem incluir leads que chegaram no mês anterior. Em períodos curtos isso pode distorcer a taxa, e ela pode até passar de 100%.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Qualificado para agendado</h3>
+    <p class="text-[11px] text-inkfaint mt-1">Onde aparece: embaixo do cartão Reuniões marcadas</p>
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">De cada 100 leads qualificados, quantos chegaram a marcar reunião.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1"><span class="text-ink">Qualificados no período que entraram em Agendado depois da qualificação ÷ Qualificados no período.</span></dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">25 dos 40 qualificados marcaram reunião: 25 ÷ 40 = <strong>62,5%</strong>.</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">Um valor baixo indica leads parados entre a qualificação e o agendamento.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Taxa de comparecimento</h3>
+    <p class="text-[11px] text-inkfaint mt-1">Onde aparece: embaixo do cartão Reuniões realizadas e no mural</p>
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">De cada 100 reuniões marcadas, quantas aconteceram.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1"><span class="text-ink">Reuniões realizadas ÷ Reuniões marcadas</span>, considerando apenas reuniões marcadas dentro do próprio período.</dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">14 realizadas ÷ 30 marcadas = <strong>46,7%</strong>.</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">As reuniões ainda por acontecer entram no total de marcadas. No exemplo há 5 em aberto; se as 5 acontecerem, a taxa sobe para 19 ÷ 30 = 63,3%. Por isso o comparecimento começa baixo e cresce ao longo do mês. O painel avisa quantas reuniões estão sem desfecho.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Reunião para fechamento</h3>
+    <p class="text-[11px] text-inkfaint mt-1">Onde aparece: embaixo do cartão Contratos fechados e no mural</p>
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">De cada 100 reuniões realizadas, quantas viraram contrato.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1"><span class="text-ink">Contratos fechados ÷ Reuniões realizadas.</span></dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">5 contratos ÷ 14 reuniões realizadas = <strong>35,7%</strong>.</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">Mede o aproveitamento das reuniões. Um valor baixo com comparecimento alto indica que o cliente aparece, mas não fecha.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Conversão final</h3>
+    <p class="text-[11px] text-inkfaint mt-1">Onde aparece: embaixo do cartão Contratos fechados e no mural</p>
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">De cada 100 leads que chegaram, quantos viraram contrato. É o resumo do funil inteiro.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1"><span class="text-ink">Contratos fechados ÷ Leads recebidos.</span></dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">5 contratos ÷ 100 leads = <strong>5%</strong>.</dd></div>
+      <div><dt class="rotulo">Atenção</dt><dd class="text-inkdim mt-1">Um lead costuma levar dias ou semanas para fechar. Os contratos de um mês vêm, em parte, de leads do mês anterior; a taxa faz mais sentido em períodos longos.</dd></div>
+    </dl>
+  </article>
+  <article class="border border-line bg-surface p-5 mt-4">
+    <h3 class="font-serif text-base font-semibold text-ink">Taxa de remarcação recuperada</h3>
+    <p class="text-[11px] text-inkfaint mt-1">Onde aparece: no cartão Remarcações recuperadas</p>
+    <dl class="mt-3 space-y-3">
+      <div><dt class="rotulo">O que é</dt><dd class="text-inkdim mt-1">De cada 100 clientes que faltaram, quantos foram reagendados.</dd></div>
+      <div><dt class="rotulo">Como é contado</dt><dd class="text-inkdim mt-1"><span class="text-ink">Remarcações recuperadas ÷ Entradas em Remarcação.</span></dd></div>
+      <div><dt class="rotulo">No mês de exemplo</dt><dd class="text-ink mt-1 border-l-2 border-gold/50 pl-3">5 reagendados ÷ 9 que foram para Remarcação = <strong>55,6%</strong>.</dd></div>
+    </dl>
+  </article>
+
+  <h2 id="tempos" class="titulo-secao mt-10 mb-3">5. Tempos de atendimento</h2>
+  <p class="text-inkdim">Os três tempos medem quanto a equipe demora em cada passo. Todos contam apenas <span class="text-ink">horas úteis</span>: segunda a sexta, das 8h às 18h. O que acontece fora desse horário não conta.</p>
+  <div class="border border-line overflow-x-auto mt-3">
+    <table class="w-full text-xs">
+      <thead class="bg-surface text-left"><tr class="rotulo"><th class="px-3 py-2 font-semibold">Tempo</th><th class="px-3 py-2 font-semibold">Começa em</th><th class="px-3 py-2 font-semibold">Termina em</th></tr></thead>
+      <tbody class="divide-y divide-line text-inkdim">
+        <tr><td class="px-3 py-2 text-ink">Da entrada à primeira mensagem</td><td class="px-3 py-2">Criação do lead</td><td class="px-3 py-2">Entrada em Contato Iniciado</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Até a primeira resposta</td><td class="px-3 py-2">Entrada em Contato Iniciado</td><td class="px-3 py-2">Entrada em Em Qualificação</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Da qualificação ao agendamento</td><td class="px-3 py-2">Qualificação</td><td class="px-3 py-2">Primeira entrada em Agendado</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-3 border-l-2 border-gold/50 pl-3 text-ink">Exemplo: um lead chega na sexta às 19h e recebe a primeira mensagem na segunda às 9h. Em tempo corrido são 62 horas. Em horas úteis é 1 hora, porque só conta das 8h às 9h de segunda.</p>
+  <p class="text-inkdim mt-3">O número grande é a <span class="text-ink">mediana</span>: metade dos leads foi atendida em menos tempo que isso, e metade em mais. Ela é usada porque um único lead esquecido por dias puxaria a média para cima sem representar o atendimento típico. A média e o tempo corrido aparecem em letra menor, para referência.</p>
+
+  <h2 id="metas" class="titulo-secao mt-10 mb-3">6. Metas e ritmo esperado</h2>
+  <p class="text-inkdim">As três barras do cabeçalho do painel, e os três cartões grandes do mural, mostram as metas do mês: contratos fechados, reuniões realizadas e reuniões marcadas. Elas olham sempre para o <span class="text-ink">mês corrente, do dia 1 até hoje</span>, somando as três campanhas, mesmo que o filtro de datas esteja em outro período.</p>
+  <p class="text-inkdim mt-3">No mural, cada barra tem um traço vertical: é o <span class="text-ink">ritmo esperado</span>, ou seja, onde a barra deveria estar hoje para o mês terminar batendo a meta. A conta é a meta multiplicada pela parte do mês que já passou.</p>
+  <p class="mt-3 border-l-2 border-gold/50 pl-3 text-ink">Exemplo: a meta de contratos é 30 e hoje é dia 10 de um mês de 30 dias. Já passou um terço do mês, então o ritmo esperado é 10 contratos. Com 5 contratos fechados, a barra fica antes do traço e aparece em vermelho: a equipe está atrás do ritmo. Com 10 ou mais, fica dourada. Com 30, fica verde.</p>
+  <p class="text-inkdim mt-3">O ritmo conta dias corridos, inclusive fins de semana. Por isso, numa segunda-feira, a equipe pode parecer mais atrasada do que está.</p>
+
+  <h2 id="comparacao" class="titulo-secao mt-10 mb-3">7. Comparação com o período anterior</h2>
+  <p class="text-inkdim">Embaixo de cada cartão aparece "Período anterior: N" e a variação em percentual. O período anterior é sempre o das <span class="text-ink">mesmas datas, um mês antes</span>.</p>
+  <p class="mt-3 border-l-2 border-gold/50 pl-3 text-ink">Exemplo: com o filtro em 01/10 a 15/10, a comparação é com 01/09 a 15/09. Se foram 100 leads agora e 80 no período anterior, o cartão mostra "Período anterior: 80 +25%".</p>
+  <p class="text-inkdim mt-3">Em períodos de poucos dias a variação oscila muito e deve ser lida com cautela, porque as mesmas datas caem em dias da semana diferentes.</p>
+
+  <h2 id="mural" class="titulo-secao mt-10 mb-3">8. O que aparece no mural</h2>
+  <p class="text-inkdim">O mural é a tela para a televisão da sala. Mostra sempre o mês corrente e não exibe nome nem telefone de lead.</p>
+  <ul class="list-disc pl-5 space-y-1 text-inkdim mt-3">
+    <li><span class="text-ink">Metas do mês:</span> as três metas, com o ritmo esperado (seção 6) e quanto entrou hoje.</li>
+    <li><span class="text-ink">Reuniões de hoje:</span> leads com o campo "Data da Reunião" no dia de hoje, com o horário da próxima. Depende de o campo ser preenchido no Kommo.</li>
+    <li><span class="text-ink">Leads no mês e Qualificados:</span> como nas seções 3 e 4.</li>
+    <li><span class="text-ink">Comparecimento, Reunião p/ fechamento e Conversão final:</span> as taxas da seção 4, com a conta por extenso embaixo.</li>
+    <li><span class="text-ink">Mês por campanha:</span> os mesmos números separados em IR-Q, IR-W e REA-Q.</li>
+    <li><span class="text-ink">Leads em cada etapa agora:</span> quantos leads estão em cada coluna neste momento, independentemente do mês.</li>
+    <li><span class="text-ink">Evolução ao longo das etapas:</span> quantos leads entraram em cada etapa no mês, uma linha por campanha.</li>
+    <li><span class="text-ink">Mapa:</span> leads criados no mês, por estado, estimado pelo DDD do telefone.</li>
+  </ul>
+
+  <h2 id="duvidas" class="titulo-secao mt-10 mb-3">9. Dúvidas frequentes</h2>
+  <dl class="space-y-4">
+    <div><dt class="text-ink font-semibold">Movi o lead e o número não mudou. Por quê?</dt><dd class="text-inkdim mt-1">O painel se atualiza a cada cinco minutos. Confira também se a movimentação caiu dentro do período do filtro e se o lead está em um dos três funis acompanhados.</dd></div>
+    <div><dt class="text-ink font-semibold">Movi um lead para a coluna errada e voltei. Isso conta?</dt><dd class="text-inkdim mt-1">Conta, porque a movimentação ficou registrada no Kommo. Para tirar do cálculo, use "Corrigir movimentação indevida" no topo do painel, informe o ID do lead e exclua a movimentação errada. Isso não altera nada no Kommo e pode ser desfeito.</dd></div>
+    <div><dt class="text-ink font-semibold">Por que a soma das campanhas às vezes não bate com o total?</dt><dd class="text-inkdim mt-1">Nas contagens ela bate. Nas taxas e nas medianas não: o percentual do total é calculado sobre os números somados, e não é a média dos percentuais das campanhas.</dd></div>
+    <div><dt class="text-ink font-semibold">Marquei a reunião, mas não preenchi a data. E agora?</dt><dd class="text-inkdim mt-1">A reunião conta normalmente em "Reuniões marcadas", na meta e nas taxas. Só não aparece no cartão "Reuniões de hoje" do mural, que depende da data.</dd></div>
+    <div><dt class="text-ink font-semibold">O que significa "(não informado)" na aba de tráfego?</dt><dd class="text-inkdim mt-1">Que o lead está sem campanha, conjunto e anúncio preenchidos no Kommo. Nos leads do IR-W aparece "WhatsApp (anúncio não rastreado)", porque nesse canal o anúncio de origem não fica registrado.</dd></div>
+    <div><dt class="text-ink font-semibold">Como vejo quais leads formam um número?</dt><dd class="text-inkdim mt-1">Clique no número. Abre a lista dos leads contados e a regra usada. Clicar em um lead da lista abre a ficha completa dele.</dd></div>
+  </dl>
+
+  <footer class="mt-10 pt-4 border-t border-line text-[10px] text-inkfaint text-right">
+    Desenvolvido por <a href="https://github.com/diogocoding" target="_blank" rel="noopener" class="hover:text-inkdim">diogocoding</a>
+  </footer>
+
+</main>
+</body>
+</html>
