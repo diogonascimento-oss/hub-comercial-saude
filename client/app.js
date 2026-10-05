@@ -525,7 +525,7 @@ function renderizarDestinos() {
   $("destinos").innerHTML = lista.length
     ? `<p class="text-[10px] text-inkfaint mb-1">${numero(e.saidasPorEtapa[origem] || 0)} lead(s) saíram desta etapa no período.</p>` +
       lista.map((d) => linhaDeConversao("", nomeEtapa(d.destino), d.taxa, `${numero(d.total)} lead(s)`)).join("")
-    : '<p class="text-xs text-inkdim">Nenhuma saída registrada no período.</p>';
+    : '<p class="text-xs text-inkdim">Nenhum lead saiu desta etapa no período selecionado.</p>';
 }
 
 function renderizarConversao() {
@@ -541,12 +541,17 @@ function renderizarConversao() {
     : '<p class="text-xs text-inkdim">Sem movimentações no período.</p>';
 
   const seletor = $("seletorOrigem");
-  const origens = dados.etapas.map((x) => x.chave).filter((chave) => e.destinosPorEtapa[chave]);
+  // Todas as etapas do funil aparecem na lista; as que não tiveram saída no
+  // período ficam marcadas. Colunas de fora do funil só entram se tiveram saída.
+  const comSaida = (chave) => Boolean(e.destinosPorEtapa[chave]);
+  const origens = dados.etapas.map((x) => x.chave).filter((chave) => !chave.startsWith("OUTRA:") || comSaida(chave));
   const anterior = seletor.value;
   seletor.innerHTML = origens.length
-    ? origens.map((chave) => `<option value="${esc(chave)}">${esc(nomeEtapa(chave))}</option>`).join("")
+    ? origens.map((chave) => `<option value="${esc(chave)}">${esc(nomeEtapa(chave))}${comSaida(chave) ? "" : " (sem saídas no período)"}</option>`).join("")
     : '<option value="">Sem dados</option>';
+  // Mantém a escolha anterior; na primeira vez, abre na primeira etapa com saídas.
   if (origens.includes(anterior)) seletor.value = anterior;
+  else seletor.value = origens.find(comSaida) || origens[0] || "";
   renderizarDestinos();
 }
 
