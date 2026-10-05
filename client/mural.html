@@ -202,7 +202,7 @@
       <div class="cartao inteira">
         <div>
           <h2 class="serifa">Evolução dos leads ao longo das etapas</h2>
-          <p class="explica">Leads que entraram em cada etapa neste mês, por campanha.</p>
+          <p class="explica" id="explicaEvolucao">Leads que entraram em cada etapa neste mês, por campanha.</p>
         </div>
         <div id="graficoEvolucao"></div>
         <div id="legendaEvolucao" class="legenda"></div>
@@ -240,6 +240,7 @@
       <h2 id="tituloAjustes" class="serifa">O que aparece no mural</h2>
       <p>A escolha fica gravada neste aparelho. Os blocos marcados se distribuem em até três telas, que se alternam sozinhas.</p>
       <div id="opcoesDeBlocos"></div>
+      <label><input type="checkbox" id="comDesvios"> Evolução com os desvios <small>Remarcação, Reaquecimento e Desqualificado</small></label>
       <label>Tempo de cada tela
         <select id="segundosPorTela">
           <option value="15">15 segundos</option>

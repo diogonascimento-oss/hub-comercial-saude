@@ -26,12 +26,12 @@ const BLOCOS = [
 ];
 const NOME_DA_TELA = { telaResumo: "tela 1", telaEvolucao: "tela 2", telaMapa: "tela 3" };
 
-let ajustes = { blocos: Object.fromEntries(BLOCOS.map((b) => [b.chave, true])), segundos: 30, som: true };
+let ajustes = { blocos: Object.fromEntries(BLOCOS.map((b) => [b.chave, true])), segundos: 30, som: true, desvios: false };
 
 function lerAjustes() {
   try {
     const salvo = JSON.parse(localStorage.getItem(CHAVE_DOS_AJUSTES) || "null");
-    if (salvo?.blocos) ajustes = { blocos: { ...ajustes.blocos, ...salvo.blocos }, segundos: Number(salvo.segundos) || 30, som: salvo.som !== false };
+    if (salvo?.blocos) ajustes = { blocos: { ...ajustes.blocos, ...salvo.blocos }, segundos: Number(salvo.segundos) || 30, som: salvo.som !== false, desvios: salvo.desvios === true };
   } catch {
     // Sem armazenamento disponível: vale o padrão.
   }
@@ -95,12 +95,14 @@ function abrirAjustes() {
   ).join("");
   $("segundosPorTela").value = String(ajustes.segundos);
   $("somLigado").checked = ajustes.som;
+  $("comDesvios").checked = ajustes.desvios;
   $("ajustes").hidden = false;
 }
 function fecharAjustes() {
   for (const caixa of $("opcoesDeBlocos").querySelectorAll("input")) ajustes.blocos[caixa.dataset.chave] = caixa.checked;
   ajustes.segundos = Number($("segundosPorTela").value) || 30;
   ajustes.som = $("somLigado").checked;
+  ajustes.desvios = $("comDesvios").checked;
   gravarAjustes();
   $("ajustes").hidden = true;
   aplicarAjustes();
@@ -238,12 +240,20 @@ const SERIES = [
 const DESVIOS = ["REMARCACAO", "REAQUECIMENTO", "DESQUALIFICADO"];
 
 function renderizarEvolucao(campanhas, etapas, escopos) {
-  const caminho = etapas.filter((e) => e.categoria !== "outra" && !DESVIOS.includes(e.chave));
+  const conhecidas = etapas.filter((e) => e.categoria !== "outra");
+  const principais = conhecidas.filter((e) => !DESVIOS.includes(e.chave));
+  // Com a opção ligada, os desvios entram à direita, depois de uma divisória.
+  const desvios = ajustes.desvios ? conhecidas.filter((e) => DESVIOS.includes(e.chave)) : [];
+  const caminho = [...principais, ...desvios];
   const series = campanhas
     .filter((c) => escopos[c.codigo])
     .map((c, i) => ({ ...SERIES[i % SERIES.length], nome: c.codigo, valores: caminho.map((e) => escopos[c.codigo].entradasPorEtapa?.[e.chave] || 0) }));
 
-  const W = 1600, H = 640, ML = 70, MR = 40, MT = 46, MB = 86;
+  // Com os desvios há onze etapas no eixo: mais margem à direita e rótulos menores.
+  const comDesvios = desvios.length > 0;
+  const W = 1600, H = 640, ML = 70, MR = comDesvios ? 95 : 40, MT = 46, MB = 86;
+  const TAMANHO_DO_ROTULO = comDesvios ? 18 : 22;
+  const ultimoNoMeio = comDesvios; // o último rótulo fica centrado quando há margem para isso
   const areaW = W - ML - MR, areaH = H - MT - MB, base = MT + areaH;
   const passo = caminho.length > 1 ? areaW / (caminho.length - 1) : 0;
   const maximo = Math.max(...series.flatMap((s) => s.valores), 1);
@@ -256,10 +266,12 @@ function renderizarEvolucao(campanhas, etapas, escopos) {
   // Nomes das etapas em até duas linhas, para caberem sob cada ponto.
   const rotulos = caminho
     .map((e, i) => {
-      const palavras = e.nome.split(" ");
-      const linhas = palavras.length > 1 ? [palavras.slice(0, Math.ceil(palavras.length / 2)).join(" "), palavras.slice(Math.ceil(palavras.length / 2)).join(" ")] : [e.nome];
-      const ancora = i === 0 ? "start" : i === caminho.length - 1 ? "end" : "middle";
-      return linhas.map((l, li) => `<text x="${x(i)}" y="${base + 36 + li * 26}" text-anchor="${ancora}" font-family="Inter, sans-serif" font-size="22" fill="#9a9ca8">${esc(l)}</text>`).join("");
+      // "Desqualificado / Não Fechado" é abreviado para caber.
+      const nome = e.nome.split(" / ")[0];
+      const palavras = nome.split(" ");
+      const linhas = palavras.length > 1 ? [palavras.slice(0, Math.ceil(palavras.length / 2)).join(" "), palavras.slice(Math.ceil(palavras.length / 2)).join(" ")] : [nome];
+      const ancora = i === 0 ? "start" : i === caminho.length - 1 && !ultimoNoMeio ? "end" : "middle";
+      return linhas.map((l, li) => `<text x="${x(i)}" y="${base + 36 + li * 26}" text-anchor="${ancora}" font-family="Inter, sans-serif" font-size="${TAMANHO_DO_ROTULO}" fill="#9a9ca8">${esc(l)}</text>`).join("");
     })
     .join("");
   // Cada número fica junto ao ponto da sua linha. Quando os pontos de uma etapa
@@ -267,7 +279,7 @@ function renderizarEvolucao(campanhas, etapas, escopos) {
   const ALTURA_DO_NUMERO = 34;
   const numeros = caminho
     .map((_, i) => {
-      const ancora = i === 0 ? "start" : i === caminho.length - 1 ? "end" : "middle";
+      const ancora = i === 0 ? "start" : i === caminho.length - 1 && !ultimoNoMeio ? "end" : "middle";
       const texto = (valor, yTexto, cor) =>
         `<text x="${x(i)}" y="${yTexto.toFixed(1)}" text-anchor="${ancora}" font-family="Fraunces, Georgia, serif" font-size="30" font-weight="600" fill="${cor}" stroke="#12131b" stroke-width="7" paint-order="stroke" stroke-linejoin="round">${numero(valor)}</text>`;
       // Um rótulo por valor distinto: na cor da campanha quando o valor é só
@@ -287,12 +299,19 @@ function renderizarEvolucao(campanhas, etapas, escopos) {
     .join("");
   const linhas = series
     .map(
-      (s) => `<path d="${s.valores.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${s.cor}" stroke-width="5" stroke-linejoin="round"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/>
+      // A linha liga só o caminho principal; os desvios são pontos soltos.
+      (s) => `<path d="${s.valores.slice(0, principais.length).map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${s.cor}" stroke-width="5" stroke-linejoin="round"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/>
       ${s.valores.map((v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="8" fill="${s.cor}" stroke="#12131b" stroke-width="3"/>`).join("")}`,
     )
     .join("");
 
-  $("graficoEvolucao").innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Evolução dos leads ao longo das etapas, por campanha">${marcas}<line x1="${ML}" y1="${base}" x2="${W - MR}" y2="${base}" stroke="#33364a"/>${linhas}${numeros}${rotulos}</svg>`;
+  const xDaDivisoria = desvios.length ? x(principais.length - 1) + passo / 2 : null;
+  const divisoria = desvios.length
+    ? `<line x1="${xDaDivisoria}" y1="${MT - 30}" x2="${xDaDivisoria}" y2="${base}" stroke="#4a4d63" stroke-width="2" stroke-dasharray="6,8"/>
+       <text x="${xDaDivisoria + 14}" y="${MT - 22}" font-family="IBM Plex Mono, monospace" font-size="17" letter-spacing="2" fill="#9a9ca8">DESVIOS DO CAMINHO PRINCIPAL</text>`
+    : "";
+
+  $("graficoEvolucao").innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Evolução dos leads ao longo das etapas, por campanha">${marcas}${divisoria}<line x1="${ML}" y1="${base}" x2="${W - MR}" y2="${base}" stroke="#33364a"/>${linhas}${numeros}${rotulos}</svg>`;
   $("legendaEvolucao").innerHTML =
     series
       .map((s) => `<span><i style="background:${s.traco ? `repeating-linear-gradient(90deg, ${s.cor} 0 10px, transparent 10px 16px)` : s.cor}"></i>${esc(s.nome)}</span>`)
