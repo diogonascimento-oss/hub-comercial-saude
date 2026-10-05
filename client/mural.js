@@ -154,7 +154,7 @@ function renderizarIndicadores(doMes, deHoje, reunioes) {
   const complemento = ajustes.blocos.metas
     ? [
         taxa("Comparecimento", t.comparecimento, `<strong>${numero(v.realizadasDaCoorte)}</strong> de ${numero(v.reunioesMarcadas)} marcadas`),
-        taxa("Fechamento", t.reuniaoParaFechamento, `<strong>${numero(v.fechados)}</strong> de ${numero(v.reunioesRealizadas)} realizadas`),
+        taxa("Reunião p/ fechamento", t.reuniaoParaFechamento, `<strong>${numero(v.fechados)}</strong> de ${numero(v.reunioesRealizadas)} realizadas`),
         taxa("Conversão final", t.conversaoFinal, `<strong>${numero(v.fechados)}</strong> de ${numero(v.leadsRecebidos)} leads`),
       ]
     : [
