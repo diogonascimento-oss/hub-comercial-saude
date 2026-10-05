@@ -91,3 +91,21 @@ export async function removerSemana(inicio, fim) {
   const lista = (await lerListaDeSemanas()).filter((s) => !(s.inicio === inicio && s.fim === fim));
   await gravar(CHAVE_LISTA_DE_SEMANAS, lista);
 }
+
+// --- Registro de alterações ---------------------------------------------------
+//
+// Lista, em ordem cronológica, do que foi alterado pelo painel e por quem. Ao
+// contrário das exclusões e correções, nada é apagado daqui quando uma
+// alteração é revertida: a reversão vira mais uma linha. Guarda as últimas
+// 1.000 entradas.
+
+const CHAVE_REGISTRO = "hubsaude:registro";
+const LIMITE_DO_REGISTRO = 1000;
+
+export const lerRegistroDeAlteracoes = () => ler(CHAVE_REGISTRO);
+
+export async function acrescentarAoRegistro(entrada) {
+  const lista = await ler(CHAVE_REGISTRO);
+  lista.push(entrada);
+  await gravar(CHAVE_REGISTRO, lista.slice(-LIMITE_DO_REGISTRO));
+}

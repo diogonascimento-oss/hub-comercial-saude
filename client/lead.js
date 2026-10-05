@@ -193,8 +193,9 @@ function renderizarFicha(l) {
                 (h) => `<li class="${h.excluido ? "opacity-50" : ""}">
             <span class="text-inkdim tabular">${dataHoraBr(h.data)}</span>
             <span class="text-ink block">${esc(h.de)} <span class="text-inkfaint">para</span> ${esc(h.para)}</span>
-            ${h.corrigido ? '<span class="text-[10px] text-goldbright">Movimentação corrigida manualmente</span>' : ""}
-            ${h.excluido ? '<span class="text-[10px] text-inkfaint">Excluída do cálculo</span>' : ""}
+            ${h.corrigido ? '<span class="text-[10px] text-goldbright block">Movimentação corrigida manualmente</span>' : ""}
+            ${h.excluido ? '<span class="text-[10px] text-inkfaint block">Excluída do cálculo</span>' : ""}
+            ${h.marcacao ? `<span class="text-[10px] text-inkfaint block">${esc(autoria(h.marcacao))}</span>` : ""}
           </li>`,
               )
               .join("")}</ol>`

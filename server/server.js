@@ -478,8 +478,14 @@ app.get("/api/eventos-lead/:id", async (req, res) => {
   try {
     const { valor: mapeamento } = await obterMapeamento();
     const brutos = await kommo.listarMudancasDeEtapaDoLead(leadId);
-    const idsExcluidos = new Set((await armazenamento.lerExclusoes()).map((e) => String(e.eventId)));
+    const exclusoesPorId = new Map((await armazenamento.lerExclusoes()).map((e) => [String(e.eventId), e]));
+    const idsExcluidos = new Set(exclusoesPorId.keys());
     const correcoesPorId = new Map((await armazenamento.lerCorrecoes()).map((c) => [String(c.eventId), c]));
+    // Quem excluiu ou corrigiu a movimentação, quando e por quê.
+    const marcacaoDe = (id) => {
+      const m = exclusoesPorId.get(id) || correcoesPorId.get(id);
+      return m ? { usuario: m.usuario || null, quando: m.criadoEm || null, motivo: m.motivo || "" } : null;
+    };
 
     const eventos = aplicarCorrecoes(brutos, correcoesPorId)
       .map((ev) => normalizarEvento(ev, mapeamento))
@@ -496,6 +502,7 @@ app.get("/api/eventos-lead/:id", async (req, res) => {
         paraOriginalNome: nomeDaEtapa(ev.paraOriginal),
         jaExcluido: idsExcluidos.has(ev.id),
         jaCorrigido: correcoesPorId.has(ev.id),
+        marcacao: marcacaoDe(ev.id),
       }));
     res.json({ leadId, eventos });
   } catch (erro) {
@@ -599,7 +606,8 @@ app.get("/api/leads/:id", async (req, res) => {
         }))
         .filter((c) => c.valor);
 
-    const idsExcluidos = new Set(exclusoes.map((e) => String(e.eventId)));
+    const exclusoesPorId = new Map(exclusoes.map((e) => [String(e.eventId), e]));
+    const idsExcluidos = new Set(exclusoesPorId.keys());
     const correcoesPorId = new Map(correcoes.map((c) => [String(c.eventId), c]));
     const eventosDoLead = aplicarCorrecoes(eventosBrutos, correcoesPorId)
       .map((ev) => normalizarEvento(ev, mapeamento))
@@ -621,6 +629,10 @@ app.get("/api/leads/:id", async (req, res) => {
         para: nomeDaEtapa(ev.para),
         excluido: idsExcluidos.has(ev.id),
         corrigido: correcoesPorId.has(ev.id),
+        // Quem excluiu ou corrigiu pelo painel, quando e por quê.
+        marcacao: ((m) => (m ? { usuario: m.usuario || null, quando: m.criadoEm || null, motivo: m.motivo || "" } : null))(
+          exclusoesPorId.get(ev.id) || correcoesPorId.get(ev.id),
+        ),
       }));
 
     const agora = Math.floor(Date.now() / 1000);
@@ -658,6 +670,35 @@ app.get("/api/leads/:id", async (req, res) => {
   }
 });
 
+// --- Usuário e registro de alterações ---------------------------------------
+
+// E-mail de quem está logado, informado pelo Worker a partir do login no
+// Cloudflare Access. Não vem do navegador, que poderia falsificá-lo.
+const usuarioDa = (req) => String(req.get("x-usuario") || "").slice(0, 200) || null;
+
+app.get("/api/eu", (req, res) => res.json({ usuario: usuarioDa(req) }));
+
+// Anota uma alteração no registro. Uma falha aqui não desfaz a alteração, que
+// já foi gravada; fica apenas no log do servidor.
+async function registrarAlteracao(req, acao, detalhes = {}) {
+  try {
+    await armazenamento.acrescentarAoRegistro({ quando: new Date().toISOString(), usuario: usuarioDa(req), acao, ...detalhes });
+  } catch (erro) {
+    console.error("Falha ao anotar o registro de alterações:", erro.message);
+  }
+}
+
+const leadInformado = (req) => (/^\d{1,15}$/.test(String(req.body?.leadId ?? req.query?.leadId ?? "")) ? String(req.body?.leadId ?? req.query?.leadId) : null);
+
+app.get("/api/registro", async (req, res) => {
+  try {
+    const lista = await armazenamento.lerRegistroDeAlteracoes();
+    res.json({ total: lista.length, entradas: lista.slice(-300).reverse() });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao ler o registro de alterações");
+  }
+});
+
 app.get("/api/exclusoes", async (req, res) => {
   try {
     res.json(await armazenamento.lerExclusoes());
@@ -683,6 +724,7 @@ app.post("/api/excluir-evento", async (req, res) => {
       const correcoes = await armazenamento.lerCorrecoes();
       const semEste = correcoes.filter((c) => String(c.eventId) !== eventId);
       if (semEste.length !== correcoes.length) await armazenamento.gravarCorrecoes(semEste);
+      await registrarAlteracao(req, "Movimentação excluída do cálculo", { leadId: leadInformado(req), eventId, motivo: lista.at(-1).motivo });
     }
     res.json({ ok: true });
   } catch (erro) {
@@ -695,6 +737,7 @@ app.delete("/api/excluir-evento/:eventId", async (req, res) => {
     const eventId = String(req.params.eventId);
     const lista = (await armazenamento.lerExclusoes()).filter((e) => String(e.eventId) !== eventId);
     await armazenamento.gravarExclusoes(lista);
+    await registrarAlteracao(req, "Exclusão revertida", { leadId: leadInformado(req), eventId });
     res.json({ ok: true });
   } catch (erro) {
     responderErro(res, erro, "Falha ao reverter a exclusão");
@@ -738,6 +781,12 @@ app.post("/api/corrigir-evento", async (req, res) => {
       usuario: req.get("x-usuario") || null,
     });
     await armazenamento.gravarCorrecoes(lista);
+    await registrarAlteracao(req, "Movimentação corrigida", {
+      leadId: leadInformado(req),
+      eventId,
+      motivo: lista.at(-1).motivo,
+      detalhe: `${novaEtapaOrigem ? `${nomeDaEtapa(novaEtapaOrigem)} para ` : "Destino: "}${nomeDaEtapa(novaEtapaDestino)}`,
+    });
     res.json({ ok: true });
   } catch (erro) {
     responderErro(res, erro, "Falha ao gravar a correção");
@@ -749,6 +798,7 @@ app.delete("/api/corrigir-evento/:eventId", async (req, res) => {
     const eventId = String(req.params.eventId);
     const lista = (await armazenamento.lerCorrecoes()).filter((c) => String(c.eventId) !== eventId);
     await armazenamento.gravarCorrecoes(lista);
+    await registrarAlteracao(req, "Correção revertida", { leadId: leadInformado(req), eventId });
     res.json({ ok: true });
   } catch (erro) {
     responderErro(res, erro, "Falha ao reverter a correção");
@@ -853,6 +903,7 @@ app.delete("/api/trafego/semana", async (req, res) => {
     const registro = await semanaDaRequisicao(req, res);
     if (!registro) return;
     await armazenamento.removerSemana(registro.inicio, registro.fim);
+    await registrarAlteracao(req, "Semana de tráfego apagada", { detalhe: `${registro.inicio} a ${registro.fim}` });
     res.json({ ok: true });
   } catch (erro) {
     responderErro(res, erro, "Falha ao excluir a semana");
@@ -876,6 +927,7 @@ app.post("/api/trafego/custo", async (req, res) => {
       ),
       meta: registro.custo?.meta || null,
     };
+    await registrarAlteracao(req, "Orçamento da semana alterado", { detalhe: `${registro.inicio} a ${registro.fim}` });
     res.json(await armazenamento.gravarSemana(registro));
   } catch (erro) {
     responderErro(res, erro, "Falha ao salvar o custo");
@@ -919,6 +971,7 @@ app.post("/api/trafego/importar-gasto-meta", async (req, res) => {
         semLeads: associacao.semLeads.slice(0, 50),
       },
     };
+    await registrarAlteracao(req, "Valor investido importado do Meta", { detalhe: `${registro.inicio} a ${registro.fim}` });
     res.json(await armazenamento.gravarSemana(registro));
   } catch (erro) {
     responderErro(res, erro, "Falha ao importar o valor investido do Meta");

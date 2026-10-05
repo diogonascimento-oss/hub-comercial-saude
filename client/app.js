@@ -961,6 +961,50 @@ function fecharModal() {
   fecharDialogo(modal.id);
 }
 
+// "Por fulano@escritorio em 04/10/2026 22:15. Motivo: ..." A partir de quem
+// fez a exclusão ou a correção, como registrado pelo servidor.
+function autoria(m) {
+  const quem = m.usuario || "autor não registrado";
+  const quando = m.quando ? ` em ${new Date(m.quando).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}` : "";
+  return `Por ${quem}${quando}.${m.motivo ? ` Motivo: ${m.motivo}` : ""}`;
+}
+
+// --- Usuário logado e registro de alterações ------------------------------------
+
+async function mostrarUsuario() {
+  try {
+    const { usuario } = await chamarApi("/eu");
+    if (usuario) $("usuarioLogado").textContent = usuario;
+  } catch {
+    // Sem o e-mail o painel funciona igual; o campo fica vazio.
+  }
+}
+
+async function abrirRegistroDeAlteracoes() {
+  $("corpoRegistro").innerHTML = '<p class="text-inkdim">Carregando.</p>';
+  abrirDialogo("modalRegistro");
+  try {
+    const r = await chamarApi("/registro");
+    $("corpoRegistro").innerHTML = r.entradas.length
+      ? r.entradas
+          .map(
+            (e) => `
+        <div class="border-b border-line py-2">
+          <p class="flex items-baseline justify-between gap-3">
+            <span class="text-ink">${esc(e.acao)}${e.leadId ? ` · <button data-lead="${esc(e.leadId)}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">lead ${esc(e.leadId)}</button>` : ""}</span>
+            <span class="text-inkdim tabular shrink-0">${new Date(e.quando).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span>
+          </p>
+          <p class="text-[11px] text-inkdim mt-0.5">${esc(e.usuario || "autor não registrado")}${e.detalhe ? ` · ${esc(e.detalhe)}` : ""}</p>
+          ${e.motivo ? `<p class="text-[10px] text-inkfaint mt-0.5">Motivo: ${esc(e.motivo)}</p>` : ""}
+        </div>`,
+          )
+          .join("") + (r.total > r.entradas.length ? `<p class="text-[10px] text-inkfaint pt-2">Exibindo as ${numero(r.entradas.length)} alterações mais recentes, de ${numero(r.total)}.</p>` : "")
+      : '<p class="text-inkdim">Nenhuma alteração registrada até agora. O registro começou em 05/10/2026; o que foi feito antes não consta aqui.</p>';
+  } catch (erro) {
+    $("corpoRegistro").innerHTML = `<p class="text-negativo">Não foi possível carregar o registro. ${esc(erro.message)}</p>`;
+  }
+}
+
 // Converte uma data ISO para o formato do campo datetime-local, no horário do navegador.
 function paraCampoDeDataHora(iso) {
   const d = new Date(iso);
@@ -994,6 +1038,7 @@ async function buscarEventos() {
             <p class="text-ink truncate">${esc(ev.deNome || "(criação)")} <span class="text-inkfaint">para</span> ${esc(ev.paraNome)}
               ${ev.jaCorrigido ? '<span class="text-goldbright text-[10px] font-semibold ml-1">corrigido</span>' : ""}
               ${ev.jaExcluido ? '<span class="text-negativo text-[10px] font-semibold ml-1">excluído do cálculo</span>' : ""}</p>
+            ${ev.marcacao ? `<p class="text-inkfaint text-[10px]">${esc(autoria(ev.marcacao))}</p>` : ""}
             ${ev.jaCorrigido ? `<p class="text-inkfaint text-[10px]">Registro original: ${esc(ev.deOriginalNome)} para ${esc(ev.paraOriginalNome)}, em ${new Date(ev.dataOriginal).toLocaleString("pt-BR")}</p>` : ""}
             <p class="text-inkfaint text-[10px] tabular">${new Date(ev.dataEfetiva).toLocaleString("pt-BR")}</p>
           </div>
@@ -1033,22 +1078,25 @@ async function buscarEventos() {
 async function executarAcaoDeCorrecao(acao, eventId) {
   const formulario = document.querySelector(`[data-formulario="${CSS.escape(eventId)}"]`);
   const json = { "Content-Type": "application/json" };
+  // O ID do lead acompanha a alteração para constar do registro.
+  const leadId = $("leadIdCorrecao").value.trim();
   try {
     if (acao === "editar") return formulario.classList.remove("hidden");
     if (acao === "cancelar") return formulario.classList.add("hidden");
     if (acao === "excluir") {
       if (!confirm("Confirma que esta movimentação foi um engano e deve ser desconsiderada nos indicadores?")) return;
-      await chamarApi("/excluir-evento", { method: "POST", headers: json, body: JSON.stringify({ eventId }) });
+      await chamarApi("/excluir-evento", { method: "POST", headers: json, body: JSON.stringify({ eventId, leadId }) });
     } else if (acao === "reverter-exclusao") {
-      await chamarApi(`/excluir-evento/${encodeURIComponent(eventId)}`, { method: "DELETE" });
+      await chamarApi(`/excluir-evento/${encodeURIComponent(eventId)}?leadId=${encodeURIComponent(leadId)}`, { method: "DELETE" });
     } else if (acao === "reverter-correcao") {
       if (!confirm("Reverter esta correção? O evento volta a valer com a etapa e o horário originais do Kommo.")) return;
-      await chamarApi(`/corrigir-evento/${encodeURIComponent(eventId)}`, { method: "DELETE" });
+      await chamarApi(`/corrigir-evento/${encodeURIComponent(eventId)}?leadId=${encodeURIComponent(leadId)}`, { method: "DELETE" });
     } else if (acao === "salvar") {
       const dataHora = formulario.querySelector(".campo-data").value;
       if (!dataHora) return alert("Informe a data e a hora em que a mudança ocorreu.");
       const corpo = {
         eventId,
+        leadId,
         novaEtapaOrigem: formulario.querySelector(".campo-origem").value,
         novaEtapaDestino: formulario.querySelector(".campo-destino").value,
         novaDataHora: new Date(dataHora).toISOString(),
@@ -1111,12 +1159,21 @@ $("abaBotaoFunil").addEventListener("click", () => mostrarAba("funil"));
 $("abaBotaoTrafego").addEventListener("click", () => mostrarAba("trafego"));
 
 $("btnAbrirCorrecao").addEventListener("click", abrirModal);
+$("btnAbrirRegistro").addEventListener("click", abrirRegistroDeAlteracoes);
+$("btnFecharRegistro").addEventListener("click", () => fecharDialogo("modalRegistro"));
+$("modalRegistro").addEventListener("click", (e) => e.target === $("modalRegistro") && fecharDialogo("modalRegistro"));
+$("corpoRegistro").addEventListener("click", (e) => {
+  const botao = e.target.closest("button[data-lead]");
+  if (botao) abrirFichaDoLead(botao.dataset.lead);
+});
+mostrarUsuario();
 $("btnFecharCorrecao").addEventListener("click", fecharModal);
 modal.addEventListener("click", (e) => e.target === modal && fecharModal());
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   // A ficha do lead abre sobre os demais diálogos; fecha primeiro.
   if (fecharFichaDoLead()) return;
+  if (!$("modalRegistro").classList.contains("hidden")) return fecharDialogo("modalRegistro");
   fecharModal();
   fecharModaisDeTrafego();
 });
