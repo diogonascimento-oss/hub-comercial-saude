@@ -54,9 +54,19 @@ function aplicarAjustes() {
   aplicarVisibilidade();
   telasAtivas = [...new Set(BLOCOS.filter((b) => ajustes.blocos[b.chave]).map((b) => b.tela))];
   if (!telasAtivas.length) telasAtivas = ["telaResumo"];
+  $("pontos").style.setProperty("--tela", `${ajustes.segundos}s`);
   mostrarTela(Math.min(telaAtual, telasAtivas.length - 1));
+  reiniciarAlternancia();
+}
+
+// Recomeça a contagem da tela atual. Usada também na troca manual, pelas setas.
+function reiniciarAlternancia() {
   clearInterval(relogioDasTelas);
   if (telasAtivas.length > 1) relogioDasTelas = setInterval(() => mostrarTela((telaAtual + 1) % telasAtivas.length), ajustes.segundos * 1000);
+}
+function trocarDeTelaManualmente(passo) {
+  mostrarTela((telaAtual + passo + telasAtivas.length) % telasAtivas.length);
+  reiniciarAlternancia();
 }
 
 // Chamada também depois de cada atualização, porque os cartões são redesenhados.
@@ -583,8 +593,8 @@ document.addEventListener("keydown", liberarSom);
 document.addEventListener("keydown", (e) => {
   if (!$("ajustes").hidden) return e.key === "Escape" && fecharAjustes();
   if (e.key.toLowerCase() === "f") telaCheia();
-  if (e.key === "ArrowRight") mostrarTela((telaAtual + 1) % telasAtivas.length);
-  if (e.key === "ArrowLeft") mostrarTela((telaAtual - 1 + telasAtivas.length) % telasAtivas.length);
+  if (e.key === "ArrowRight") trocarDeTelaManualmente(1);
+  if (e.key === "ArrowLeft") trocarDeTelaManualmente(-1);
 });
 document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && manterTelaLigada());
 

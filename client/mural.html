@@ -135,7 +135,10 @@
   footer button, footer a { background:none; border:0; color:inherit; font:inherit; cursor:pointer; text-decoration:underline dotted; padding:0; margin-left:1.2vw; }
   #pontos { display:inline-flex; gap:.5vw; margin-left:1.2vw; vertical-align:middle; }
   #pontos i { width:.9vh; height:.9vh; border-radius:50%; background:var(--sup2); border:1px solid var(--linha); }
-  #pontos i.ativo { background:var(--ouroclaro); }
+  /* A tela atual é um traço que se enche até a hora de trocar. */
+  #pontos i.ativo { width:2.2vw; border-radius:.5vh; position:relative; overflow:hidden; }
+  #pontos i.ativo::after { content:""; position:absolute; inset:0; background:var(--ouroclaro); transform-origin:left center; transform:scaleX(0); animation:enche-traco var(--tela, 30s) linear forwards; }
+  @keyframes enche-traco { to { transform:scaleX(1); } }
 
   #ajustes { position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:10; }
   #ajustes .caixa { background:var(--sup); border:1px solid var(--linha); padding:28px; width:min(92vw,560px); font-size:14px; }
