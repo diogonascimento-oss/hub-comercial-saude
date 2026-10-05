@@ -104,6 +104,13 @@ export default {
     }
     if (!METODOS_ACEITOS.has(request.method)) return json(405, { error: "Método não permitido." });
 
+    // Chamadas que alteram dados só são aceitas quando partem do próprio painel.
+    // O navegador informa a origem; uma página de outro site é recusada aqui.
+    const origem = request.headers.get("Origin");
+    if (request.method !== "GET" && origem && origem !== url.origin) {
+      return json(403, { error: "Origem não permitida." });
+    }
+
     const faltando = ["API_ORIGEM", "API_TOKEN", "ACCESS_TEAM_DOMAIN", "ACCESS_AUD"].filter((nome) => !env[nome]);
     if (faltando.length) {
       return json(500, { error: `Configuração incompleta no Worker. Segredos ausentes: ${faltando.join(", ")}.` });
@@ -115,7 +122,9 @@ export default {
       const dominio = env.ACCESS_TEAM_DOMAIN.replace(/^https?:\/\//, "").replace(/\/+$/, "");
       usuario = await validarTokenDoAccess(token, dominio, env.ACCESS_AUD);
     } catch (erro) {
-      return json(401, { error: "Acesso não autorizado.", detalhe: erro.message });
+      // O motivo fica só no registro do Worker; a resposta não o revela.
+      console.warn("Token do Access recusado:", erro.message);
+      return json(401, { error: "Acesso não autorizado." });
     }
 
     const destino = new URL(url.pathname + url.search, env.API_ORIGEM.replace(/\/+$/, "") + "/");

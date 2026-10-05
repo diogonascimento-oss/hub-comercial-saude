@@ -105,3 +105,18 @@ test("caminhos fora de /api e configuração incompleta", async () => {
   const r = await worker.fetch(new Request("https://painel.exemplo.test/api/metrics"), { ...env, API_TOKEN: "" });
   assert.equal(r.status, 500);
 });
+
+test("alteração vinda de outro site é recusada; do próprio painel é aceita", async () => {
+  const token = await emitirToken();
+  const chamar = (origem) =>
+    worker.fetch(
+      new Request("https://painel.exemplo.test/api/exclusoes", {
+        method: "POST",
+        headers: { "Cf-Access-Jwt-Assertion": token, "Content-Type": "application/json", ...(origem ? { Origin: origem } : {}) },
+        body: "{}",
+      }),
+      env,
+    );
+  assert.equal((await chamar("https://outro-site.test")).status, 403);
+  assert.notEqual((await chamar("https://painel.exemplo.test")).status, 403);
+});
