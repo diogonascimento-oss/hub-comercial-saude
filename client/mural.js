@@ -381,7 +381,12 @@ function destacarMudancas() {
 // Compara os totais do mês com os da última leitura, gravados neste aparelho.
 // Na primeira leitura do mês só registra a base, sem comemorar.
 function comemorarNovidades(mes, hoje) {
-  const atual = { mes: hoje.slice(0, 7), fechados: {}, marcadas: mes.escopos.TODAS.volume.reunioesMarcadas };
+  const atual = {
+    mes: hoje.slice(0, 7),
+    fechados: {},
+    marcadas: mes.escopos.TODAS.volume.reunioesMarcadas,
+    realizadas: mes.escopos.TODAS.volume.reunioesRealizadas,
+  };
   for (const c of mes.campanhas) atual.fechados[c.codigo] = mes.escopos[c.codigo]?.volume.fechados || 0;
   let anterior = null;
   try {
@@ -394,14 +399,21 @@ function comemorarNovidades(mes, hoje) {
   if (!anterior || anterior.mes !== atual.mes) return;
 
   const campanhasComContrato = mes.campanhas.filter((c) => atual.fechados[c.codigo] > (anterior.fechados?.[c.codigo] || 0)).map((c) => c.codigo);
-  const novasReunioes = atual.marcadas - (anterior.marcadas || 0);
+  // Base gravada por uma versão anterior pode não ter todos os campos: nesse caso não comemora.
+  const novasMarcadas = atual.marcadas - (anterior.marcadas ?? atual.marcadas);
+  const novasRealizadas = atual.realizadas - (anterior.realizadas ?? atual.realizadas);
   const meta = mes.metas?.itens?.find((m) => m.chave === "fechados");
+  let espera = 0;
   if (campanhasComContrato.length) {
     comemorarContrato({ campanhas: campanhasComContrato, total: mes.escopos.TODAS.volume.fechados, meta: meta?.meta });
-    if (novasReunioes > 0) setTimeout(() => avisarReuniao(novasReunioes, atual.marcadas), 10500);
-  } else if (novasReunioes > 0) {
-    avisarReuniao(novasReunioes, atual.marcadas);
+    espera = 10500;
   }
+  // Os avisos pequenos saem um depois do outro, e depois da comemoração de contrato.
+  if (novasRealizadas > 0) {
+    setTimeout(() => avisar("realizada", novasRealizadas, atual.realizadas), espera);
+    espera += 7800;
+  }
+  if (novasMarcadas > 0) setTimeout(() => avisar("marcada", novasMarcadas, atual.marcadas), espera);
 }
 
 // Contrato fechado: tela cheia, confete e som, por cerca de dez segundos.
@@ -421,13 +433,19 @@ function comemorarContrato({ campanhas, total, meta }) {
   }, 9500);
 }
 
-// Reunião marcada: aviso pequeno no alto da tela, por alguns segundos.
-function avisarReuniao(novas, totalDoMes) {
-  $("recadoTexto").innerHTML = `${novas > 1 ? `<strong>${numero(novas)}</strong> novas reuniões marcadas` : "Nova <strong>reunião marcada</strong>"} · ${numero(totalDoMes)} no mês`;
+// Reunião marcada ou realizada: aviso pequeno no alto da tela, por alguns segundos.
+const AVISOS = {
+  marcada: { cor: "#6ea8d8", uma: "Nova <strong>reunião marcada</strong>", varias: "novas reuniões marcadas", som: "reuniao" },
+  realizada: { cor: "#4fb38a", uma: "<strong>Reunião realizada</strong>", varias: "reuniões realizadas", som: "realizada" },
+};
+function avisar(tipo, novas, totalDoMes) {
+  const aviso = AVISOS[tipo];
+  $("recado").style.setProperty("--cor", aviso.cor);
+  $("recadoTexto").innerHTML = `${novas > 1 ? `<strong>${numero(novas)}</strong> ${aviso.varias}` : aviso.uma} · ${numero(totalDoMes)} no mês`;
   $("recado").classList.add("aberto");
-  tocar("reuniao");
-  clearTimeout(avisarReuniao.fim);
-  avisarReuniao.fim = setTimeout(() => $("recado").classList.remove("aberto"), 7000);
+  tocar(aviso.som);
+  clearTimeout(avisar.fim);
+  avisar.fim = setTimeout(() => $("recado").classList.remove("aberto"), 7000);
 }
 
 function soltarConfete(tela, duracaoMs) {
@@ -487,8 +505,10 @@ function tocar(tipo) {
   const notas =
     tipo === "contrato"
       ? [[523.25, 0, 0.5], [659.25, 0.14, 0.5], [783.99, 0.28, 0.5], [1046.5, 0.42, 1.1], [783.99, 0.42, 1.1], [1318.5, 0.75, 1.3]]
-      : [[880, 0, 0.45], [1174.66, 0.16, 0.7]];
-  const volume = tipo === "contrato" ? 0.16 : 0.07;
+      : tipo === "realizada"
+        ? [[659.25, 0, 0.4], [880, 0.14, 0.4], [1318.5, 0.28, 0.8]]
+        : [[880, 0, 0.45], [1174.66, 0.16, 0.7]];
+  const volume = tipo === "contrato" ? 0.16 : 0.08;
   const agora = audio.currentTime + 0.05;
   for (const [frequencia, inicio, duracao] of notas) {
     const osc = audio.createOscillator();
@@ -551,7 +571,11 @@ $("btnTestarContrato").addEventListener("click", () => {
 });
 $("btnTestarReuniao").addEventListener("click", () => {
   ajustes.som = $("somLigado").checked;
-  avisarReuniao(1, 1);
+  avisar("marcada", 1, 1);
+});
+$("btnTestarRealizada").addEventListener("click", () => {
+  ajustes.som = $("somLigado").checked;
+  avisar("realizada", 1, 1);
 });
 // Qualquer clique ou tecla libera o som para as próximas comemorações.
 document.addEventListener("pointerdown", liberarSom);

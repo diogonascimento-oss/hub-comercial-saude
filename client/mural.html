@@ -123,11 +123,11 @@
   #festa .sob strong { color:var(--ouroclaro); }
   @keyframes surge { from { opacity:0; transform:scale(.8) translateY(3vh); } to { opacity:1; transform:none; } }
   #recado { position:fixed; left:50%; top:11.5vh; z-index:15; transform:translate(-50%, -4vh); opacity:0; transition:opacity .5s ease, transform .6s cubic-bezier(.2,1.2,.3,1);
-    background:var(--sup); border:1px solid rgba(110,168,216,.55); padding:1.6vh 2.2vw; display:flex; align-items:center; gap:1.2vw; font-size:2.4vh; box-shadow:0 1.5vh 5vh rgba(0,0,0,.5), 0 0 4vh rgba(110,168,216,.18); }
+    --cor:#6ea8d8; background:var(--sup); border:1px solid color-mix(in srgb, var(--cor) 55%, transparent); padding:1.6vh 2.2vw; display:flex; align-items:center; gap:1.2vw; font-size:2.4vh; box-shadow:0 1.5vh 5vh rgba(0,0,0,.5), 0 0 4vh color-mix(in srgb, var(--cor) 18%, transparent); }
   #recado.aberto { opacity:1; transform:translate(-50%, 0); }
-  #recado .sino { width:3.2vh; height:3.2vh; border-radius:50%; background:#6ea8d8; box-shadow:0 0 0 0 rgba(110,168,216,.6); animation:onda 1.6s ease-out infinite; }
-  #recado strong { color:#9cc6ea; }
-  @keyframes onda { to { box-shadow:0 0 0 2.2vh rgba(110,168,216,0); } }
+  #recado .sino { width:3.2vh; height:3.2vh; border-radius:50%; background:var(--cor); animation:onda 1.6s ease-out infinite; }
+  #recado strong { color:color-mix(in srgb, var(--cor) 60%, #fff); }
+  @keyframes onda { from { box-shadow:0 0 0 0 color-mix(in srgb, var(--cor) 60%, transparent); } to { box-shadow:0 0 0 2.2vh transparent; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation:none !important; transition:none !important; } }
 
   footer { display:flex; justify-content:space-between; align-items:center; font-size:1.3vh; color:var(--apagada); }
@@ -138,7 +138,7 @@
   #pontos i.ativo { background:var(--ouroclaro); }
 
   #ajustes { position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:10; }
-  #ajustes .caixa { background:var(--sup); border:1px solid var(--linha); padding:28px; width:min(92vw,460px); font-size:14px; }
+  #ajustes .caixa { background:var(--sup); border:1px solid var(--linha); padding:28px; width:min(92vw,560px); font-size:14px; }
   #ajustes h2 { font-size:18px; margin-bottom:6px; }
   #ajustes p { color:var(--fraca); font-size:12px; margin-bottom:16px; line-height:1.5; }
   #ajustes label { display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px solid var(--linha); cursor:pointer; }
@@ -245,8 +245,8 @@
           <option value="120">2 minutos</option>
         </select>
       </label>
-      <label><input type="checkbox" id="somLigado"> Som nas comemorações <small>contrato e reunião</small></label>
-      <div class="testes">Ver como fica: <button id="btnTestarContrato" type="button">Contrato fechado</button><button id="btnTestarReuniao" type="button">Reunião marcada</button></div>
+      <label><input type="checkbox" id="somLigado"> Som nas comemorações <small>contrato e reuniões</small></label>
+      <div class="testes">Ver como fica: <button id="btnTestarContrato" type="button">Contrato fechado</button><button id="btnTestarReuniao" type="button">Reunião marcada</button><button id="btnTestarRealizada" type="button">Reunião realizada</button></div>
       <div class="acoes"><button id="btnFecharAjustes" type="button">Concluir</button></div>
     </div>
   </div>
