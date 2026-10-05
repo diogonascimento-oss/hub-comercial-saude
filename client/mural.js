@@ -224,17 +224,26 @@ function renderizarEvolucao(campanhas, etapas, escopos) {
       return linhas.map((l, li) => `<text x="${x(i)}" y="${base + 36 + li * 26}" text-anchor="${ancora}" font-family="Inter, sans-serif" font-size="22" fill="#9a9ca8">${esc(l)}</text>`).join("");
     })
     .join("");
-  // Em cada etapa, os números das campanhas são empilhados acima do ponto mais
-  // alto, na cor de cada série, para não se sobreporem às linhas.
+  // Cada número fica junto ao ponto da sua linha, na cor da série. Quando os
+  // pontos de uma etapa estão próximos, os números são afastados na vertical
+  // para não se sobreporem; quando todas as campanhas têm o mesmo valor, aparece
+  // um único número, em cor neutra.
+  const ALTURA_DO_NUMERO = 34;
   const numeros = caminho
     .map((_, i) => {
-      const topo = Math.min(...series.map((s) => y(s.valores[i])));
       const ancora = i === 0 ? "start" : i === caminho.length - 1 ? "end" : "middle";
-      return series
-        .map((s, si) => `<tspan fill="${s.cor}">${numero(s.valores[i])}</tspan>${si < series.length - 1 ? '<tspan fill="#6b6d7a"> · </tspan>' : ""}`)
-        .join("")
-        .replace(/^/, `<text x="${x(i)}" y="${Math.max(topo - 16, 24)}" text-anchor="${ancora}" font-family="Fraunces, Georgia, serif" font-size="30" font-weight="600">`)
-        .concat("</text>");
+      const texto = (valor, yTexto, cor) =>
+        `<text x="${x(i)}" y="${yTexto.toFixed(1)}" text-anchor="${ancora}" font-family="Fraunces, Georgia, serif" font-size="30" font-weight="600" fill="${cor}" stroke="#12131b" stroke-width="7" paint-order="stroke" stroke-linejoin="round">${numero(valor)}</text>`;
+      const valores = series.map((s) => s.valores[i]);
+      if (valores.every((v) => v === valores[0])) return texto(valores[0], y(valores[0]) - 18, "#e9e7de");
+
+      const rotulosDaEtapa = series.map((s) => ({ valor: s.valores[i], cor: s.cor, y: y(s.valores[i]) - 18 })).sort((a, b) => a.y - b.y);
+      // De cima para baixo, garante a distância mínima; se passar da base, sobe o conjunto.
+      for (let k = 1; k < rotulosDaEtapa.length; k++) rotulosDaEtapa[k].y = Math.max(rotulosDaEtapa[k].y, rotulosDaEtapa[k - 1].y + ALTURA_DO_NUMERO);
+      const excesso = rotulosDaEtapa.at(-1).y - (base - 10);
+      if (excesso > 0) for (const r of rotulosDaEtapa) r.y -= excesso;
+      for (let k = rotulosDaEtapa.length - 2; k >= 0; k--) rotulosDaEtapa[k].y = Math.min(rotulosDaEtapa[k].y, rotulosDaEtapa[k + 1].y - ALTURA_DO_NUMERO);
+      return rotulosDaEtapa.map((r) => texto(r.valor, Math.max(r.y, 26), r.cor)).join("");
     })
     .join("");
   const linhas = series
@@ -248,7 +257,7 @@ function renderizarEvolucao(campanhas, etapas, escopos) {
   $("legendaEvolucao").innerHTML =
     series
       .map((s) => `<span><i style="background:${s.traco ? `repeating-linear-gradient(90deg, ${s.cor} 0 10px, transparent 10px 16px)` : s.cor}"></i>${esc(s.nome)}</span>`)
-      .join("") + `<span style="margin-left:auto">Acima de cada etapa: ${series.map((s) => esc(s.nome)).join(" · ")}</span>`;
+      .join("") + '<span style="margin-left:auto">Cada número tem a cor da sua campanha.</span>';
 }
 
 // --- Tela 3: mapa --------------------------------------------------------------
