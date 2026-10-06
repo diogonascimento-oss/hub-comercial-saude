@@ -120,3 +120,26 @@ test("alteração vinda de outro site é recusada; do próprio painel é aceita"
   assert.equal((await chamar("https://outro-site.test")).status, 403);
   assert.notEqual((await chamar("https://painel.exemplo.test")).status, 403);
 });
+
+test("endereço inexistente recebe a página 404 do painel, com código 404", async () => {
+  const pedidos = [];
+  const ASSETS = {
+    // Imita o Cloudflare: /404.html redireciona para /404, que entrega a página.
+    fetch: async (pedido) => {
+      const caminho = new URL(pedido.url).pathname;
+      pedidos.push(caminho);
+      if (caminho === "/404.html") return new Response(null, { status: 307, headers: { Location: "/404" } });
+      return new Response("<h1>pagina 404</h1>", { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+    },
+  };
+  const r = await worker.fetch(new Request("https://painel.exemplo.test/nao/existe"), { ...env, ASSETS });
+  assert.equal(r.status, 404);
+  assert.match(r.headers.get("Content-Type"), /text\/html/);
+  assert.equal(await r.text(), "<h1>pagina 404</h1>");
+  assert.deepEqual(pedidos, ["/404.html", "/404"]);
+
+  // Se a página não puder ser lida, a resposta continua sendo 404, em texto.
+  const falha = await worker.fetch(new Request("https://painel.exemplo.test/x"), { ...env, ASSETS: { fetch: async () => { throw new Error("indisponível"); } } });
+  assert.equal(falha.status, 404);
+  assert.equal(await falha.text(), "Página não encontrada.");
+});

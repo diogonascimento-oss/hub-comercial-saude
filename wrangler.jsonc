@@ -5,7 +5,9 @@
   "main": "worker/index.js",
   "compatibility_date": "2026-09-01",
   "assets": {
-    "directory": "./client"
+    "directory": "./client",
+    // Permite ao Worker buscar a página 404 entre os arquivos da interface.
+    "binding": "ASSETS"
   },
   // Preserva as variáveis cadastradas no painel do Cloudflare a cada deploy.
   // Os valores do Worker (API_ORIGEM, API_TOKEN, ACCESS_TEAM_DOMAIN e

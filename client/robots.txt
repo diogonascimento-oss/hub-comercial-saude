@@ -1,0 +1,3 @@
+# Painel interno, protegido por login. Nenhuma página deve ser indexada.
+User-agent: *
+Disallow: /

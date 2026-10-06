@@ -94,13 +94,35 @@ export async function validarTokenDoAccess(token, dominio, audiencia) {
   return conteudo;
 }
 
+// Endereço que não corresponde a nenhum arquivo da interface: devolve a página
+// 404 do painel, com o código 404. Sem a página, responde em texto simples.
+async function paginaNaoEncontrada(url, env) {
+  const simples = () =>
+    new Response("Página não encontrada.", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  if (!env.ASSETS) return simples();
+  try {
+    let resposta = await env.ASSETS.fetch(new Request(new URL("/404.html", url)));
+    // O Cloudflare pode redirecionar /404.html para /404; segue uma vez.
+    const destino = resposta.headers.get("Location");
+    if (resposta.status >= 300 && resposta.status < 400 && destino) {
+      resposta = await env.ASSETS.fetch(new Request(new URL(destino, url)));
+    }
+    if (!resposta.ok) return simples();
+    const cabecalhos = new Headers(resposta.headers);
+    cabecalhos.set("Cache-Control", "no-store");
+    return new Response(resposta.body, { status: 404, headers: cabecalhos });
+  } catch {
+    return simples();
+  }
+}
+
 const METODOS_ACEITOS = new Set(["GET", "POST", "PUT", "DELETE"]);
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) {
-      return new Response("Página não encontrada.", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      return paginaNaoEncontrada(url, env);
     }
     if (!METODOS_ACEITOS.has(request.method)) return json(405, { error: "Método não permitido." });
 

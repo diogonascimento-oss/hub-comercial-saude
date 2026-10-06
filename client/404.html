@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Página não encontrada — Hub Comercial, Núcleo de Saúde</title>
+<!-- Esta página responde a qualquer endereço inexistente, em qualquer nível de
+     pasta. Por isso todos os caminhos são absolutos e o estilo fica aqui mesmo. -->
+<link rel="icon" href="/icones/favicon-48.png" sizes="48x48" type="image/png">
+<link rel="icon" href="/icones/icone.svg" sizes="any" type="image/svg+xml">
+<meta name="theme-color" content="#12131b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0b0c11; --sup:#12131b; --sup2:#181a24; --linha:rgba(255,255,255,.09); --tinta:#e9e7de; --fraca:#9a9ca8; --apagada:#6b6d7a; --ouro:#b6923f; --ouroclaro:#d8b565; --bom:#4fb38a; }
+  * { box-sizing:border-box; margin:0; }
+  html, body { min-height:100%; }
+  body { background:var(--bg); color:var(--tinta); font-family:Inter, system-ui, sans-serif; font-size:15px; line-height:1.6; overflow-x:hidden; }
+  .serifa { font-family:Fraunces, Georgia, serif; }
+  .rotulo { font-family:"IBM Plex Mono", monospace; text-transform:uppercase; letter-spacing:.14em; color:var(--fraca); font-size:11px; }
+  [hidden] { display:none !important; }
+
+  /* O número fica ao fundo, só em contorno, como marca d'água. */
+  .fundo { position:fixed; inset:0; display:grid; place-items:center; pointer-events:none; overflow:hidden; }
+  .fundo span { font-family:Fraunces, Georgia, serif; font-weight:700; font-size:min(58vw, 78vh); line-height:1; letter-spacing:-.04em; color:transparent; -webkit-text-stroke:1px rgba(216,181,101,.13); user-select:none; }
+
+  .pagina { position:relative; min-height:100vh; display:flex; flex-direction:column; padding:28px clamp(20px, 5vw, 64px); }
+  header { display:flex; align-items:center; gap:14px; }
+  header svg { height:34px; width:auto; }
+  header p.nome { font-size:14px; letter-spacing:.22em; text-transform:uppercase; }
+
+  main { flex:1; display:flex; flex-direction:column; justify-content:center; max-width:620px; padding:48px 0; }
+  h1 { font-size:clamp(30px, 5vw, 46px); font-weight:600; line-height:1.12; margin-top:14px; text-wrap:balance; }
+  .explica { color:var(--fraca); margin-top:16px; }
+  code { font-family:"IBM Plex Mono", monospace; font-size:.92em; color:var(--tinta); background:var(--sup2); padding:1px 6px; overflow-wrap:anywhere; }
+
+  .despacho { margin-top:26px; border-left:2px solid var(--ouro); padding:4px 0 4px 16px; }
+  .despacho p.texto { font-family:Fraunces, Georgia, serif; font-style:italic; font-size:17px; margin-top:6px; }
+
+  .acoes { display:flex; flex-wrap:wrap; gap:12px; margin-top:30px; }
+  .botao { font:inherit; font-size:13px; font-weight:600; letter-spacing:.04em; padding:11px 20px; border:1px solid var(--ouro); color:var(--bg); background:var(--ouroclaro); text-decoration:none; cursor:pointer; transition:background .2s, color .2s; }
+  .botao:hover { background:#e6c983; }
+  .botao.linha { background:transparent; color:var(--ouroclaro); }
+  .botao.linha:hover { background:rgba(216,181,101,.1); }
+  :focus-visible { outline:2px solid var(--ouroclaro); outline-offset:3px; }
+
+  /* Quadro do jogo: o lead avança uma etapa do funil a cada captura. */
+  .jogo { margin-top:40px; border-top:1px solid var(--linha); padding-top:20px; }
+  .jogo .convite { color:var(--fraca); font-size:13px; margin-top:8px; }
+  .etapas { display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; margin-top:16px; list-style:none; padding:0; }
+  .etapas li { font-family:"IBM Plex Mono", monospace; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--apagada); border-top:3px solid var(--sup2); padding-top:8px; transition:color .4s, border-color .4s; }
+  .etapas li.feita { color:var(--tinta); border-color:var(--ouroclaro); }
+  .etapas li.feita:last-child { border-color:var(--bom); }
+  #situacao { margin-top:16px; min-height:1.6em; font-size:14px; }
+  #situacao strong { color:var(--ouroclaro); font-weight:600; }
+  #recomecar { margin-top:14px; }
+
+  /* O lead perdido: um ponto dourado que foge do cursor. */
+  #lead { position:fixed; left:0; top:0; z-index:5; width:44px; height:44px; margin:-22px 0 0 -22px; padding:0; border:0; border-radius:50%; background:transparent; cursor:pointer; touch-action:manipulation; }
+  #lead i { position:absolute; inset:14px; border-radius:50%; background:var(--ouroclaro); box-shadow:0 0 0 5px rgba(216,181,101,.16), 0 0 22px rgba(216,181,101,.5); transition:background .4s, box-shadow .4s; }
+  #lead span { position:absolute; left:50%; top:100%; transform:translateX(-50%); white-space:nowrap; font-family:"IBM Plex Mono", monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--fraca); pointer-events:none; }
+  #lead.pego i { animation:pulso .5s ease-out; }
+  /* Depois do contrato o ponto para; não deve cobrir o clique nos botões. */
+  #lead.fechado { pointer-events:none; }
+  #lead.fechado i { background:var(--bom); box-shadow:0 0 0 5px rgba(79,179,138,.18), 0 0 22px rgba(79,179,138,.5); }
+  @keyframes pulso { 0% { transform:scale(1); } 40% { transform:scale(2.1); } 100% { transform:scale(1); } }
+
+  .faisca { position:fixed; z-index:4; width:6px; height:6px; background:var(--ouroclaro); pointer-events:none; animation:faisca 1.1s ease-out forwards; }
+  @keyframes faisca { to { transform:translate(var(--dx), var(--dy)) rotate(200deg); opacity:0; } }
+
+  footer { color:var(--apagada); font-size:11px; }
+
+  @media (max-width:520px) {
+    .etapas { grid-template-columns:1fr; gap:0; }
+    .etapas li { border-top:0; border-left:3px solid var(--sup2); padding:5px 0 5px 10px; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    #lead.pego i, .faisca { animation:none; }
+  }
+</style>
+</head>
+<body>
+<div class="fundo" aria-hidden="true"><span>404</span></div>
+
+<div class="pagina">
+  <header>
+    <svg viewBox="60 50 1392 670" role="img" aria-label="Robson Menezes Advogados">
+      <defs><linearGradient id="ouro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6c983"/><stop offset=".55" stop-color="#d8b565"/><stop offset="1" stop-color="#a8853a"/></linearGradient></defs>
+      <g fill="url(#ouro)"><path d="M72 60H465A215 215 0 0 1 526 482L660 708H535L350 385H465A110 110 0 0 0 465 165H72Z"/><path d="M792 65L1128 392L1440 88V240L1128 548L905 330V708H792Z"/></g>
+      <g fill="#8f7233"><path d="M122 388H240L432 708H305Z"/><path d="M1440 420V572L1297 708H1135Z"/></g>
+    </svg>
+    <div>
+      <p class="nome serifa">Robson Menezes</p>
+      <p class="rotulo">Núcleo de Saúde · Hub Comercial</p>
+    </div>
+  </header>
+
+  <main>
+    <p class="rotulo">Erro 404 · página não encontrada</p>
+    <h1 class="serifa">Esta página se perdeu no funil.</h1>
+    <p class="explica">O endereço <code id="endereco">solicitado</code> não existe no Hub Comercial. Pode ter sido digitado errado, ou a página mudou de lugar.</p>
+
+    <div class="despacho">
+      <p class="rotulo" id="despachoTitulo">Despacho · autos n.º 404</p>
+      <p class="texto" id="despachoTexto">Indefiro o acesso, por inexistência do objeto. Intime-se o usuário a retornar ao painel.</p>
+    </div>
+
+    <div class="acoes">
+      <a class="botao" href="/">Voltar ao painel</a>
+      <a class="botao linha" href="/guia">Guia dos indicadores</a>
+    </div>
+
+    <section class="jogo" aria-labelledby="jogoTitulo">
+      <p class="rotulo" id="jogoTitulo">Já que está aqui</p>
+      <p class="convite">Há um lead perdido solto nesta página. Ele foge do cursor. Capture-o cinco vezes para levá-lo da entrada até o contrato.</p>
+      <ol class="etapas" id="etapas">
+        <li>Contato iniciado</li>
+        <li>Em qualificação</li>
+        <li>Reunião marcada</li>
+        <li>Reunião realizada</li>
+        <li>Contrato fechado</li>
+      </ol>
+      <p id="situacao" aria-live="polite">Nenhuma captura ainda. O lead continua sem atendimento.</p>
+      <button class="botao linha" id="recomecar" type="button" hidden>Perder outro lead</button>
+    </section>
+  </main>
+
+  <footer>Hub Comercial — Núcleo de Saúde</footer>
+</div>
+
+<button id="lead" type="button" aria-label="Capturar o lead perdido"><i></i><span>lead perdido</span></button>
+
+<script src="/404.js"></script>
+</body>
+</html>
