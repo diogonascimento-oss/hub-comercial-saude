@@ -12,7 +12,11 @@ const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const numero = (n) => (n ?? 0).toLocaleString("pt-BR");
 // Valor em reais de forma curta: 38500 vira "38,5 mil".
-const reaisCurto = (n) => ((n ?? 0) >= 1000 ? `${((n ?? 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil` : numero(n));
+const reaisCurto = (n) => {
+  const v = n ?? 0;
+  if (v >= 1e6) return `${(v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${v >= 2e6 ? "milhões" : "milhão"}`;
+  return v >= 1000 ? `${(v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil` : numero(v);
+};
 const percentual = (t) => (t === null || t === undefined ? "—" : `${t.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 
 // --- Ajustes: quais blocos aparecem e o tempo de cada tela ---------------------
@@ -144,7 +148,7 @@ function renderizarMetas(metas, hoje, deHoje) {
       const deHojeNaMeta = m.base ? (deHoje?.volume?.[m.base] || 0) * m.multiplicador : deHoje?.volume?.[m.chave];
       return `
       <div class="cartao meta${moeda ? " moeda" : ""}" data-chave="meta:${esc(m.chave)}" data-valor="${m.atual}" style="--cor:${cor}">
-        <p class="rotulo">${esc(m.rotulo)}${moeda ? " (R$)" : ""} · meta</p>
+        <p class="rotulo">${esc(m.rotulo)}${moeda ? " (R$)" : ""} · meta${m.faixa ? ` ${m.faixa} de ${m.faixas.length}` : ""}</p>
         <div>
           <p class="valor serifa num">${moeda ? reaisCurto(m.atual) : numero(m.atual)} <small>/ ${moeda ? reaisCurto(m.meta) : numero(m.meta)}</small></p>
           <div class="trilho">

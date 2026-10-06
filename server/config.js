@@ -124,38 +124,72 @@ export const CAMPOS = {
   substatusFarmer: 1127429,
 };
 
-// Metas do mês corrente, somadas as três campanhas, definidas pelo escritório
-// em outubro de 2026: R$ 170 mil líquidos, cerca de 35 contratos e 180 reuniões
-// realizadas. Cada ação rende em média R$ 5.500 brutos, com variação caso a caso.
+// Metas do mês corrente, somadas as três campanhas.
 //
-// O Kommo não registra o valor de cada contrato e o escritório não informou
-// quanto dos R$ 5.500 sobra líquido. O painel usa então o valor líquido que as
-// próprias metas implicam: R$ 170 mil / 35 contratos = cerca de R$ 4.857 por
-// contrato (88% do bruto). Assim as metas de contratos e de faturamento são
-// atingidas juntas. É uma estimativa, não o resultado financeiro.
+// Faturamento: o escritório trabalha com faixas de faturamento líquido. A
+// mínima é de R$ 70 mil e a seguinte, de R$ 100 mil. O painel mostra a primeira
+// faixa ainda não alcançada.
 //
-// A meta de reuniões marcadas não foi informada. Foi derivada das 180
-// realizadas com o comparecimento de agosto de 2026 registrado no protocolo
-// (45,6%): 180 / 0,456 = 395.
-const META_DE_CONTRATOS = 35;
-const META_DE_FATURAMENTO_LIQUIDO = 170000;
+// O Kommo não registra o valor de cada contrato. O faturamento exibido é uma
+// estimativa: contratos fechados no mês multiplicados por R$ 5.500, o valor
+// bruto médio de uma ação. O escritório ainda não informou quanto desse valor
+// sobra líquido; enquanto isso, a estimativa fica acima do líquido real.
+//
+// Contratos (35) e reuniões realizadas (180) foram informados em outubro de
+// 2026. A meta de reuniões marcadas foi derivada das 180 realizadas com o
+// comparecimento de agosto de 2026 registrado no protocolo (45,6%):
+// 180 / 0,456 = 395.
 export const VALOR_BRUTO_MEDIO_POR_CONTRATO = 5500;
-export const VALOR_LIQUIDO_ESTIMADO_POR_CONTRATO = META_DE_FATURAMENTO_LIQUIDO / META_DE_CONTRATOS;
 
 export const METAS_MENSAIS = [
-  { chave: "fechados", rotulo: "Contratos fechados", meta: META_DE_CONTRATOS },
+  { chave: "fechados", rotulo: "Contratos fechados", meta: 35 },
   { chave: "reunioesRealizadas", rotulo: "Reuniões realizadas", meta: 180 },
   { chave: "reunioesMarcadas", rotulo: "Reuniões marcadas", meta: 395 },
   {
     chave: "faturamentoEstimado",
+    rotulo: "Faturamento estimado",
+    formato: "moeda",
+    // Faixas em ordem crescente; a primeira é a meta mínima.
+    faixas: [
+      { nome: "mínima", meta: 70000 },
+      { nome: "2ª faixa", meta: 100000 },
+    ],
+    // Calculada a partir de outra contagem: fechados x valor médio.
+    base: "fechados",
+    multiplicador: VALOR_BRUTO_MEDIO_POR_CONTRATO,
+  },
+];
+const FAIXA_ASSOCIADA_AOS_CONTRATOS = 100000;
+export const VALOR_BRUTO_MEDIO_POR_CONTRATO = 5500;
+export const VALOR_LIQUIDO_ESTIMADO_POR_CONTRATO = FAIXA_ASSOCIADA_AOS_CONTRATOS / META_DE_CONTRATOS;
+
+export const METAS_MENSAIS = [
+  { chave: "fechados", rotulo: "Contratos fechados", meta: META_DE_CONTRATOS },
+  { chave: "reunioesRealizadas", rotulo: "Reuniões realizadas", meta: 130 },
+  { chave: "reunioesMarcadas", rotulo: "Reuniões marcadas", meta: 285 },
+  {
+    chave: "faturamentoEstimado",
     rotulo: "Líquido estimado",
-    meta: META_DE_FATURAMENTO_LIQUIDO,
+    // A meta exibida é a próxima faixa ainda não atingida.
+    faixas: FAIXAS_DE_FATURAMENTO_LIQUIDO,
     formato: "moeda",
     // Calculada a partir de outra contagem: fechados x valor líquido estimado.
     base: "fechados",
     multiplicador: VALOR_LIQUIDO_ESTIMADO_POR_CONTRATO,
   },
 ];
+
+// Preenche o valor atual de cada meta e, nas metas em faixas, escolhe a
+// próxima faixa ainda não atingida (ou a última, quando todas foram).
+export function metasComValores(volume) {
+  return METAS_MENSAIS.map((m) => {
+    const atual = m.base ? Math.round((volume[m.base] || 0) * m.multiplicador) : volume[m.chave];
+    if (!m.faixas) return { ...m, atual };
+    const indice = m.faixas.findIndex((f) => atual < f);
+    const faixa = indice === -1 ? m.faixas.length : indice + 1;
+    return { ...m, atual, meta: m.faixas[faixa - 1], faixa };
+  });
+}
 
 // Etiquetas definidas no protocolo de automações. Alguns indicadores dependem
 // delas, porque a informação não está na coluna em que o lead se encontra.
