@@ -40,10 +40,13 @@
   #metas { grid-auto-flow:column; grid-auto-columns:1fr; flex:24; }
   .meta .valor { font-size:9.5vh; font-weight:600; line-height:1; }
   .meta .valor small { font-size:4vh; color:var(--fraca); font-weight:400; }
+  .meta .valor { white-space:nowrap; }
+  .meta.moeda .valor { font-size:6.4vh; line-height:9.5vh; }
+  .meta.moeda .valor small { font-size:3.2vh; }
   .meta .trilho { height:1.6vh; background:var(--sup2); position:relative; margin-top:1.4vh; }
   .meta .barra { height:100%; transition:width .8s ease; }
   .meta .ritmo { position:absolute; top:-.7vh; bottom:-.7vh; width:2px; background:var(--tinta); opacity:.7; }
-  .meta .rodape { display:flex; justify-content:space-between; margin-top:1.1vh; font-size:1.8vh; color:var(--fraca); }
+  .meta .rodape { display:flex; justify-content:space-between; margin-top:1.1vh; font-size:1.7vh; color:var(--fraca); gap:1vw; white-space:nowrap; }
 
   #indicadores { grid-auto-flow:column; grid-auto-columns:1fr; flex:20; }
   .ind .valor { font-size:7.4vh; font-weight:600; line-height:1; }

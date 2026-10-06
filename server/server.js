@@ -367,7 +367,7 @@ app.get("/api/metrics", async (req, res) => {
       papeis: PAPEIS,
       mapeamento: { completo: mapeamento.completo, pendencias: mapeamento.pendencias },
       avisos,
-      metas: { mes: hoje.slice(0, 7), itens: METAS_MENSAIS.map((m) => ({ ...m, atual: doMes[m.chave] })) },
+      metas: { mes: hoje.slice(0, 7), itens: METAS_MENSAIS.map((m) => ({ ...m, atual: m.base ? (doMes[m.base] || 0) * m.multiplicador : doMes[m.chave] })) },
       reunioesDeHoje: reunioesDeHoje(leads, agora),
       escopos,
       escoposAnteriores,

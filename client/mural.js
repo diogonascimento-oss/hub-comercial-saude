@@ -11,6 +11,8 @@ const CHAVE_DA_CONTAGEM = "mural:contagem";
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const numero = (n) => (n ?? 0).toLocaleString("pt-BR");
+// Valor em reais de forma curta: 38500 vira "38,5 mil".
+const reaisCurto = (n) => ((n ?? 0) >= 1000 ? `${((n ?? 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil` : numero(n));
 const percentual = (t) => (t === null || t === undefined ? "—" : `${t.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 
 // --- Ajustes: quais blocos aparecem e o tempo de cada tela ---------------------
@@ -136,16 +138,20 @@ function renderizarMetas(metas, hoje, deHoje) {
       const esperado = Math.round(m.meta * fracaoDoMes);
       const cor = m.atual >= m.meta ? "var(--bom)" : m.atual >= esperado ? "var(--ouro)" : "var(--ruim)";
       const faltam = Math.max(m.meta - m.atual, 0);
+      // A meta em reais é uma estimativa: contratos fechados x valor médio por ação.
+      const moeda = m.formato === "moeda";
+      const fmt = moeda ? reaisCurto : numero;
+      const deHojeNaMeta = m.base ? (deHoje?.volume?.[m.base] || 0) * m.multiplicador : deHoje?.volume?.[m.chave];
       return `
-      <div class="cartao meta" data-chave="meta:${esc(m.chave)}" data-valor="${m.atual}" style="--cor:${cor}">
-        <p class="rotulo">${esc(m.rotulo)} · meta do mês</p>
+      <div class="cartao meta${moeda ? " moeda" : ""}" data-chave="meta:${esc(m.chave)}" data-valor="${m.atual}" style="--cor:${cor}">
+        <p class="rotulo">${esc(m.rotulo)}${moeda ? " (R$)" : ""} · meta</p>
         <div>
-          <p class="valor serifa num">${numero(m.atual)} <small>/ ${numero(m.meta)}</small></p>
+          <p class="valor serifa num">${moeda ? reaisCurto(m.atual) : numero(m.atual)} <small>/ ${moeda ? reaisCurto(m.meta) : numero(m.meta)}</small></p>
           <div class="trilho">
             <div class="barra" style="width:${pct}%;background:${cor}"></div>
             <div class="ritmo" style="left:${Math.min(fracaoDoMes * 100, 100)}%"></div>
           </div>
-          <p class="rodape"><span>Hoje: ${numero(deHoje?.volume?.[m.chave])} · ${faltam ? `faltam ${numero(faltam)}` : "meta atingida"}</span><span>Ritmo esperado até hoje: ${numero(esperado)}</span></p>
+          <p class="rodape"><span>Hoje: ${fmt(deHojeNaMeta)} · ${faltam ? `faltam ${fmt(faltam)}` : "meta atingida"}</span><span>${moeda ? "Ritmo" : "Ritmo até hoje"}: ${fmt(esperado)}</span></p>
         </div>
       </div>`;
     })

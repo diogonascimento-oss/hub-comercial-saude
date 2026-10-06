@@ -124,16 +124,31 @@ export const CAMPOS = {
   substatusFarmer: 1127429,
 };
 
-// Metas do mês corrente, somadas as três campanhas.
+// Metas do mês corrente, somadas as três campanhas, definidas pelo escritório
+// em outubro de 2026: R$ 170 mil líquidos, cerca de 35 contratos e 180 reuniões
+// realizadas, com valor médio de R$ 5.500 por ação.
 //
-// A meta de contratos foi definida pelo escritório. As de reuniões foram
-// derivadas dela com as taxas de agosto de 2026 registradas no protocolo
-// (26,9% de fechamento sobre reuniões realizadas e 45,6% de comparecimento) e
-// arredondadas. São provisórias, até o escritório definir os números finais.
+// O Kommo não registra o valor de cada contrato, então o faturamento exibido é
+// uma estimativa: contratos fechados no mês multiplicados pelo valor médio.
+//
+// A meta de reuniões marcadas não foi informada. Foi derivada das 180
+// realizadas com o comparecimento de agosto de 2026 registrado no protocolo
+// (45,6%): 180 / 0,456 = 395.
+export const VALOR_MEDIO_POR_CONTRATO = 5500;
+
 export const METAS_MENSAIS = [
-  { chave: "fechados", rotulo: "Contratos fechados", meta: 30 },
-  { chave: "reunioesRealizadas", rotulo: "Reuniões realizadas", meta: 110 },
-  { chave: "reunioesMarcadas", rotulo: "Reuniões marcadas", meta: 240 },
+  { chave: "fechados", rotulo: "Contratos fechados", meta: 35 },
+  { chave: "reunioesRealizadas", rotulo: "Reuniões realizadas", meta: 180 },
+  { chave: "reunioesMarcadas", rotulo: "Reuniões marcadas", meta: 395 },
+  {
+    chave: "faturamentoEstimado",
+    rotulo: "Faturamento estimado",
+    meta: 170000,
+    formato: "moeda",
+    // Calculada a partir de outra contagem: fechados x valor médio.
+    base: "fechados",
+    multiplicador: VALOR_MEDIO_POR_CONTRATO,
+  },
 ];
 
 // Etiquetas definidas no protocolo de automações. Alguns indicadores dependem
