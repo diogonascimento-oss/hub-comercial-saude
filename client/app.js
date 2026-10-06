@@ -669,7 +669,7 @@ function renderizarMetas() {
       const moeda = m.formato === "moeda";
       const valores = moeda ? `R$ ${reaisCurto(m.atual)} / ${reaisCurto(m.meta)}` : `${numero(m.atual)} / ${numero(m.meta)}`;
       const dica = moeda
-        ? `Estimativa: contratos fechados no mês ${mes}/${ano} multiplicados pelo valor médio de R$ ${numero(m.multiplicador)} por ação`
+        ? `Estimativa: contratos fechados no mês ${mes}/${ano} multiplicados por R$ ${numero(Math.round(m.multiplicador))}, o valor líquido por contrato que a meta implica (R$ 170 mil em 35 contratos)`
         : `Meta do mês ${mes}/${ano}, somadas as três campanhas`;
       return `
       <div class="min-w-[150px]" title="${dica}">

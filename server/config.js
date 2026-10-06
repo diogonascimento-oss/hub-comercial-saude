@@ -126,28 +126,34 @@ export const CAMPOS = {
 
 // Metas do mês corrente, somadas as três campanhas, definidas pelo escritório
 // em outubro de 2026: R$ 170 mil líquidos, cerca de 35 contratos e 180 reuniões
-// realizadas, com valor médio de R$ 5.500 por ação.
+// realizadas. Cada ação rende em média R$ 5.500 brutos, com variação caso a caso.
 //
-// O Kommo não registra o valor de cada contrato, então o faturamento exibido é
-// uma estimativa: contratos fechados no mês multiplicados pelo valor médio.
+// O Kommo não registra o valor de cada contrato e o escritório não informou
+// quanto dos R$ 5.500 sobra líquido. O painel usa então o valor líquido que as
+// próprias metas implicam: R$ 170 mil / 35 contratos = cerca de R$ 4.857 por
+// contrato (88% do bruto). Assim as metas de contratos e de faturamento são
+// atingidas juntas. É uma estimativa, não o resultado financeiro.
 //
 // A meta de reuniões marcadas não foi informada. Foi derivada das 180
 // realizadas com o comparecimento de agosto de 2026 registrado no protocolo
 // (45,6%): 180 / 0,456 = 395.
-export const VALOR_MEDIO_POR_CONTRATO = 5500;
+const META_DE_CONTRATOS = 35;
+const META_DE_FATURAMENTO_LIQUIDO = 170000;
+export const VALOR_BRUTO_MEDIO_POR_CONTRATO = 5500;
+export const VALOR_LIQUIDO_ESTIMADO_POR_CONTRATO = META_DE_FATURAMENTO_LIQUIDO / META_DE_CONTRATOS;
 
 export const METAS_MENSAIS = [
-  { chave: "fechados", rotulo: "Contratos fechados", meta: 35 },
+  { chave: "fechados", rotulo: "Contratos fechados", meta: META_DE_CONTRATOS },
   { chave: "reunioesRealizadas", rotulo: "Reuniões realizadas", meta: 180 },
   { chave: "reunioesMarcadas", rotulo: "Reuniões marcadas", meta: 395 },
   {
     chave: "faturamentoEstimado",
-    rotulo: "Faturamento estimado",
-    meta: 170000,
+    rotulo: "Líquido estimado",
+    meta: META_DE_FATURAMENTO_LIQUIDO,
     formato: "moeda",
-    // Calculada a partir de outra contagem: fechados x valor médio.
+    // Calculada a partir de outra contagem: fechados x valor líquido estimado.
     base: "fechados",
-    multiplicador: VALOR_MEDIO_POR_CONTRATO,
+    multiplicador: VALOR_LIQUIDO_ESTIMADO_POR_CONTRATO,
   },
 ];
 
