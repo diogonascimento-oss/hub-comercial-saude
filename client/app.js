@@ -25,12 +25,6 @@ function esc(valor) {
 }
 
 const numero = (n) => (n ?? 0).toLocaleString("pt-BR");
-// Valor em reais de forma curta: 38500 vira "38,5 mil".
-const reaisCurto = (n) => {
-  const v = n ?? 0;
-  if (v >= 1e6) return `${(v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${v >= 2e6 ? "milhões" : "milhão"}`;
-  return v >= 1000 ? `${(v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil` : numero(v);
-};
 const percentual = (t) => (t === null || t === undefined ? "—" : `${t.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 
 function duracao(segundos) {
@@ -670,16 +664,11 @@ function renderizarMetas() {
     .map((m) => {
       const pct = m.meta > 0 ? Math.min((m.atual / m.meta) * 100, 100) : 0;
       const cor = pct >= 100 ? "#4fb38a" : pct >= 60 ? "#b6923f" : "#d0685a";
-      const moeda = m.formato === "moeda";
-      const valores = moeda ? `R$ ${reaisCurto(m.atual)} / ${reaisCurto(m.meta)}` : `${numero(m.atual)} / ${numero(m.meta)}`;
-      const dica = moeda
-        ? `Estimativa: contratos fechados no mês ${mes}/${ano} multiplicados por R$ ${numero(m.multiplicador)}, o valor bruto médio de uma ação. Meta de faturamento líquido: faixa ${m.faixa}`
-        : `Meta do mês ${mes}/${ano}, somadas as três campanhas`;
       return `
-      <div class="min-w-[150px]" title="${dica}">
+      <div class="min-w-[150px]" title="Meta do mês ${mes}/${ano}, somadas as três campanhas">
         <div class="flex justify-between items-baseline gap-3">
           <span class="rotulo">${esc(m.rotulo)}</span>
-          <span class="font-serif text-sm font-semibold text-ink tabular">${valores}</span>
+          <span class="font-serif text-sm font-semibold text-ink tabular">${numero(m.atual)} / ${numero(m.meta)}</span>
         </div>
         <div class="h-1 bg-surface2 mt-1.5"><div class="barra h-full" style="width:${pct}%;background:${cor}"></div></div>
       </div>`;

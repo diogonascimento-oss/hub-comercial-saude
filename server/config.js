@@ -126,39 +126,18 @@ export const CAMPOS = {
 
 // Metas do mês corrente, somadas as três campanhas.
 //
-// Faturamento: o escritório trabalha com três faixas de faturamento líquido:
-// R$ 70 mil (mínima), R$ 100 mil e R$ 1 milhão. O painel mostra a primeira
-// faixa ainda não alcançada.
+// A meta de contratos (25) foi definida em outubro de 2026. As de reuniões
+// foram calculadas a partir dela com as taxas de agosto de 2026 registradas no
+// protocolo:
+//   realizadas = 25 / 26,9% de fechamento sobre reuniões realizadas = 93
+//   marcadas   = 93 / 45,6% de comparecimento = 204
 //
-// O Kommo não registra o valor de cada contrato. O faturamento exibido é uma
-// estimativa: contratos fechados no mês multiplicados por R$ 5.500, o valor
-// bruto médio de uma ação. O escritório ainda não informou quanto desse valor
-// sobra líquido; enquanto isso, a estimativa fica acima do líquido real.
-//
-// Contratos (35) e reuniões realizadas (180) foram informados em outubro de
-// 2026. A meta de reuniões marcadas foi derivada das 180 realizadas com o
-// comparecimento de agosto de 2026 registrado no protocolo (45,6%):
-// 180 / 0,456 = 395.
-export const VALOR_BRUTO_MEDIO_POR_CONTRATO = 5500;
-
+// O painel não acompanha faturamento: o valor recebido em cada mês depende da
+// forma de pagamento (parcelas de boleto, desconto do cartão) e não está no Kommo.
 export const METAS_MENSAIS = [
-  { chave: "fechados", rotulo: "Contratos fechados", meta: 35 },
-  { chave: "reunioesRealizadas", rotulo: "Reuniões realizadas", meta: 180 },
-  { chave: "reunioesMarcadas", rotulo: "Reuniões marcadas", meta: 395 },
-  {
-    chave: "faturamentoEstimado",
-    rotulo: "Faturamento estimado",
-    formato: "moeda",
-    // Faixas em ordem crescente; a primeira é a meta mínima.
-    faixas: [
-      { nome: "mínima", meta: 70000 },
-      { nome: "2ª faixa", meta: 100000 },
-      { nome: "3ª faixa", meta: 1000000 },
-    ],
-    // Calculada a partir de outra contagem: fechados x valor médio.
-    base: "fechados",
-    multiplicador: VALOR_BRUTO_MEDIO_POR_CONTRATO,
-  },
+  { chave: "fechados", rotulo: "Contratos fechados", meta: 25 },
+  { chave: "reunioesRealizadas", rotulo: "Reuniões realizadas", meta: 93 },
+  { chave: "reunioesMarcadas", rotulo: "Reuniões marcadas", meta: 204 },
 ];
 
 // Etiquetas definidas no protocolo de automações. Alguns indicadores dependem
