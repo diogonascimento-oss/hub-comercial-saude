@@ -148,7 +148,7 @@ function renderizarMetas(metas, hoje, deHoje) {
       const deHojeNaMeta = m.base ? (deHoje?.volume?.[m.base] || 0) * m.multiplicador : deHoje?.volume?.[m.chave];
       return `
       <div class="cartao meta${moeda ? " moeda" : ""}" data-chave="meta:${esc(m.chave)}" data-valor="${m.atual}" style="--cor:${cor}">
-        <p class="rotulo">${esc(m.rotulo)}${moeda ? " (R$)" : ""} · meta${m.faixa ? ` ${m.faixa} de ${m.faixas.length}` : ""}</p>
+        <p class="rotulo">${esc(m.rotulo)} · ${m.faixa ? esc(m.faixa) : "meta"}</p>
         <div>
           <p class="valor serifa num">${moeda ? reaisCurto(m.atual) : numero(m.atual)} <small>/ ${moeda ? reaisCurto(m.meta) : numero(m.meta)}</small></p>
           <div class="trilho">

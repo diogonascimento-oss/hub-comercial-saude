@@ -673,12 +673,12 @@ function renderizarMetas() {
       const moeda = m.formato === "moeda";
       const valores = moeda ? `R$ ${reaisCurto(m.atual)} / ${reaisCurto(m.meta)}` : `${numero(m.atual)} / ${numero(m.meta)}`;
       const dica = moeda
-        ? `Estimativa: contratos fechados no mês ${mes}/${ano} multiplicados por R$ ${numero(Math.round(m.multiplicador))}, o valor líquido estimado por contrato. Meta ${m.faixa} de ${m.faixas?.length}: ${(m.faixas || []).map((f) => `R$ ${reaisCurto(f)}`).join(", ")}`
+        ? `Estimativa: contratos fechados no mês ${mes}/${ano} multiplicados por R$ ${numero(m.multiplicador)}, o valor bruto médio de uma ação. Meta de faturamento líquido: faixa ${m.faixa}`
         : `Meta do mês ${mes}/${ano}, somadas as três campanhas`;
       return `
       <div class="min-w-[150px]" title="${dica}">
         <div class="flex justify-between items-baseline gap-3">
-          <span class="rotulo">${esc(m.rotulo)}${m.faixa ? ` · meta ${m.faixa}` : ""}</span>
+          <span class="rotulo">${esc(m.rotulo)}</span>
           <span class="font-serif text-sm font-semibold text-ink tabular">${valores}</span>
         </div>
         <div class="h-1 bg-surface2 mt-1.5"><div class="barra h-full" style="width:${pct}%;background:${cor}"></div></div>

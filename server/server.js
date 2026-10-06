@@ -16,7 +16,7 @@ import {
   ETAPAS,
   ETAPA_POR_CHAVE,
   FUSO_HORARIO,
-  metasComValores,
+  METAS_MENSAIS,
   ETAPAS_REUNIAO_REALIZADA,
   CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO,
   ROTULO_SEM_RASTREIO_DE_ANUNCIO,
@@ -367,7 +367,13 @@ app.get("/api/metrics", async (req, res) => {
       papeis: PAPEIS,
       mapeamento: { completo: mapeamento.completo, pendencias: mapeamento.pendencias },
       avisos,
-      metas: { mes: hoje.slice(0, 7), itens: metasComValores(doMes) },
+      metas: { mes: hoje.slice(0, 7), itens: METAS_MENSAIS.map((m) => {
+          const atual = m.base ? Math.round((doMes[m.base] || 0) * m.multiplicador) : doMes[m.chave];
+          if (!m.faixas) return { ...m, atual };
+          // Meta em faixas: vale a primeira ainda não alcançada (ou a última).
+          const faixa = m.faixas.find((f) => atual < f.meta) || m.faixas.at(-1);
+          return { ...m, atual, meta: faixa.meta, faixa: faixa.nome };
+        }) },
       reunioesDeHoje: reunioesDeHoje(leads, agora),
       escopos,
       escoposAnteriores,

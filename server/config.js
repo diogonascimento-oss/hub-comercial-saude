@@ -126,8 +126,8 @@ export const CAMPOS = {
 
 // Metas do mês corrente, somadas as três campanhas.
 //
-// Faturamento: o escritório trabalha com faixas de faturamento líquido. A
-// mínima é de R$ 70 mil e a seguinte, de R$ 100 mil. O painel mostra a primeira
+// Faturamento: o escritório trabalha com três faixas de faturamento líquido:
+// R$ 70 mil (mínima), R$ 100 mil e R$ 1 milhão. O painel mostra a primeira
 // faixa ainda não alcançada.
 //
 // O Kommo não registra o valor de cada contrato. O faturamento exibido é uma
@@ -153,43 +153,13 @@ export const METAS_MENSAIS = [
     faixas: [
       { nome: "mínima", meta: 70000 },
       { nome: "2ª faixa", meta: 100000 },
+      { nome: "3ª faixa", meta: 1000000 },
     ],
     // Calculada a partir de outra contagem: fechados x valor médio.
     base: "fechados",
     multiplicador: VALOR_BRUTO_MEDIO_POR_CONTRATO,
   },
 ];
-const FAIXA_ASSOCIADA_AOS_CONTRATOS = 100000;
-export const VALOR_BRUTO_MEDIO_POR_CONTRATO = 5500;
-export const VALOR_LIQUIDO_ESTIMADO_POR_CONTRATO = FAIXA_ASSOCIADA_AOS_CONTRATOS / META_DE_CONTRATOS;
-
-export const METAS_MENSAIS = [
-  { chave: "fechados", rotulo: "Contratos fechados", meta: META_DE_CONTRATOS },
-  { chave: "reunioesRealizadas", rotulo: "Reuniões realizadas", meta: 130 },
-  { chave: "reunioesMarcadas", rotulo: "Reuniões marcadas", meta: 285 },
-  {
-    chave: "faturamentoEstimado",
-    rotulo: "Líquido estimado",
-    // A meta exibida é a próxima faixa ainda não atingida.
-    faixas: FAIXAS_DE_FATURAMENTO_LIQUIDO,
-    formato: "moeda",
-    // Calculada a partir de outra contagem: fechados x valor líquido estimado.
-    base: "fechados",
-    multiplicador: VALOR_LIQUIDO_ESTIMADO_POR_CONTRATO,
-  },
-];
-
-// Preenche o valor atual de cada meta e, nas metas em faixas, escolhe a
-// próxima faixa ainda não atingida (ou a última, quando todas foram).
-export function metasComValores(volume) {
-  return METAS_MENSAIS.map((m) => {
-    const atual = m.base ? Math.round((volume[m.base] || 0) * m.multiplicador) : volume[m.chave];
-    if (!m.faixas) return { ...m, atual };
-    const indice = m.faixas.findIndex((f) => atual < f);
-    const faixa = indice === -1 ? m.faixas.length : indice + 1;
-    return { ...m, atual, meta: m.faixas[faixa - 1], faixa };
-  });
-}
 
 // Etiquetas definidas no protocolo de automações. Alguns indicadores dependem
 // delas, porque a informação não está na coluna em que o lead se encontra.
