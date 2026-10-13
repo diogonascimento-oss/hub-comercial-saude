@@ -65,6 +65,17 @@ export function valorDoCampo(campos, idDoCampo) {
     .join("; ");
 }
 
+// Valor de um campo de rastreamento do Kommo (UTM), localizado pelo código do
+// campo (UTM_CAMPAIGN, UTM_CONTENT...), que é o mesmo em todas as contas.
+export function valorDoRastreamento(campos, codigo) {
+  const campo = (campos || []).find((f) => String(f.field_code || "").toUpperCase() === codigo);
+  if (!campo) return "";
+  return (campo.values || [])
+    .map((v) => String(v?.value ?? "").trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
 // Data da reunião gravada no lead, em segundos. O campo é localizado pelo nome
 // ("Data da Reunião"), porque o ID dele não consta da configuração.
 function dataDaReuniao(lead) {
@@ -106,10 +117,15 @@ export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento) {
       etapaNome: etapa.nome,
       tags: lead._embedded?.tags?.map((t) => t.name) || [],
       motivoPerda: motivoDePerda(lead),
+      // Origem de marketing. Os campos do protocolo, preenchidos pelo Make nos
+      // leads de formulário, têm prioridade. Sem eles, valem as UTMs que o
+      // Kommo grava nos leads de anúncio de WhatsApp: utm_campaign para a
+      // campanha, utm_term para o conjunto e utm_content para o anúncio.
       origem: {
-        campanhaMeta: valorDoCampo(lead.custom_fields_values, CAMPOS.campanhaMeta),
-        conjunto: valorDoCampo(lead.custom_fields_values, CAMPOS.conjunto),
-        anuncio: valorDoCampo(lead.custom_fields_values, CAMPOS.anuncio),
+        campanhaMeta:
+          valorDoCampo(lead.custom_fields_values, CAMPOS.campanhaMeta) || valorDoRastreamento(lead.custom_fields_values, "UTM_CAMPAIGN"),
+        conjunto: valorDoCampo(lead.custom_fields_values, CAMPOS.conjunto) || valorDoRastreamento(lead.custom_fields_values, "UTM_TERM"),
+        anuncio: valorDoCampo(lead.custom_fields_values, CAMPOS.anuncio) || valorDoRastreamento(lead.custom_fields_values, "UTM_CONTENT"),
       },
       responsaveis: {
         sdr: valorDoCampo(lead.custom_fields_values, CAMPOS.sdrResponsavel),
