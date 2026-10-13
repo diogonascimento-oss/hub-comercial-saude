@@ -147,6 +147,8 @@
   #ajustes label { display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px solid var(--linha); cursor:pointer; }
   #ajustes label small { color:var(--apagada); margin-left:auto; font-size:11px; }
   #ajustes input[type=checkbox] { width:16px; height:16px; accent-color:var(--ouro); }
+  #ajustes input[type=date] { background:var(--sup2); color:var(--tinta); border:1px solid var(--linha); padding:4px 8px; margin-left:auto; font:inherit; color-scheme:dark; }
+  #ajustes p.explica { margin:-2px 0 4px; font-size:11px; color:var(--apagada); }
   #ajustes select { background:var(--sup2); color:var(--tinta); border:1px solid var(--linha); padding:5px 8px; margin-left:auto; font:inherit; }
   #ajustes .testes { display:flex; align-items:center; gap:8px; padding:9px 0; border-top:1px solid var(--linha); color:var(--fraca); font-size:12px; }
   #ajustes .testes button { margin-left:0; background:var(--sup2); color:var(--tinta); border:1px solid var(--linha); padding:5px 10px; font:inherit; cursor:pointer; }
@@ -184,7 +186,7 @@
       <section id="indicadores" class="grade" aria-label="Indicadores do mês"></section>
       <section id="base" class="grade">
         <div class="cartao" data-bloco="campanhas">
-          <p class="rotulo">Mês por campanha</p>
+          <p class="rotulo" id="tituloCampanhas">Mês por campanha</p>
           <table>
             <thead><tr><th>Campanha</th><th>Leads</th><th>Qualificados</th><th>Marcadas</th><th>Realizadas</th><th>Contratos</th></tr></thead>
             <tbody id="porCampanha"></tbody>
@@ -249,6 +251,10 @@
           <option value="120">2 minutos</option>
         </select>
       </label>
+      <label>Contar a partir de
+        <input type="date" id="contarDesde" aria-describedby="explicaContarDesde">
+      </label>
+      <p id="explicaContarDesde" class="explica">Em branco, o padrão, o mural conta o mês inteiro. Com uma data, conta só a partir dela, e as metas ficam proporcionais aos dias que faltam até o fim do mês. A data deixa de valer sozinha na virada do mês.</p>
       <label><input type="checkbox" id="somLigado"> Som nas comemorações <small>contrato e reuniões</small></label>
       <div class="testes">Ver como fica: <button id="btnTestarContrato" type="button">Contrato fechado</button><button id="btnTestarReuniao" type="button">Reunião marcada</button><button id="btnTestarRealizada" type="button">Reunião realizada</button></div>
       <div class="acoes"><button id="btnFecharAjustes" type="button">Concluir</button></div>

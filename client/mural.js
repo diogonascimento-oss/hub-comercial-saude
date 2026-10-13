@@ -26,12 +26,14 @@ const BLOCOS = [
 ];
 const NOME_DA_TELA = { telaResumo: "tela 1", telaEvolucao: "tela 2", telaMapa: "tela 3" };
 
-let ajustes = { blocos: Object.fromEntries(BLOCOS.map((b) => [b.chave, true])), segundos: 30, som: true, desvios: false };
+// contarDesde: data (AAAA-MM-DD) a partir da qual o mural conta, dentro do mês
+// corrente. Vazio, o padrão, conta o mês inteiro.
+let ajustes = { blocos: Object.fromEntries(BLOCOS.map((b) => [b.chave, true])), segundos: 30, som: true, desvios: false, contarDesde: "" };
 
 function lerAjustes() {
   try {
     const salvo = JSON.parse(localStorage.getItem(CHAVE_DOS_AJUSTES) || "null");
-    if (salvo?.blocos) ajustes = { blocos: { ...ajustes.blocos, ...salvo.blocos }, segundos: Number(salvo.segundos) || 30, som: salvo.som !== false, desvios: salvo.desvios === true };
+    if (salvo?.blocos) ajustes = { blocos: { ...ajustes.blocos, ...salvo.blocos }, segundos: Number(salvo.segundos) || 30, som: salvo.som !== false, desvios: salvo.desvios === true, contarDesde: /^\d{4}-\d{2}-\d{2}$/.test(salvo.contarDesde || "") ? salvo.contarDesde : "" };
   } catch {
     // Sem armazenamento disponível: vale o padrão.
   }
@@ -96,6 +98,8 @@ function abrirAjustes() {
   $("segundosPorTela").value = String(ajustes.segundos);
   $("somLigado").checked = ajustes.som;
   $("comDesvios").checked = ajustes.desvios;
+  $("contarDesde").max = hojeNoEscritorio();
+  $("contarDesde").value = ajustes.contarDesde;
   $("ajustes").hidden = false;
 }
 function fecharAjustes() {
@@ -103,6 +107,8 @@ function fecharAjustes() {
   ajustes.segundos = Number($("segundosPorTela").value) || 30;
   ajustes.som = $("somLigado").checked;
   ajustes.desvios = $("comDesvios").checked;
+  const desde = $("contarDesde").value;
+  ajustes.contarDesde = /^\d{4}-\d{2}-\d{2}$/.test(desde) && desde <= hojeNoEscritorio() ? desde : "";
   gravarAjustes();
   $("ajustes").hidden = true;
   aplicarAjustes();
@@ -116,6 +122,34 @@ function hojeNoEscritorio() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Recife" }).format(new Date());
 }
 
+// Início da contagem: o dia 1 do mês, ou a data escolhida em "Ajustar" quando
+// ela cai dentro do mês corrente. Uma data de mês anterior deixa de valer
+// sozinha na virada do mês.
+function inicioDaContagem(hoje) {
+  const inicioDoMes = `${hoje.slice(0, 8)}01`;
+  const desde = ajustes.contarDesde;
+  return desde && desde > inicioDoMes && desde <= hoje ? desde : inicioDoMes;
+}
+const diaEMes = (data) => `${data.slice(8, 10)}/${data.slice(5, 7)}`;
+
+// Metas da tela. Com o mês inteiro, valem as do servidor. Com início no meio do
+// mês, cada meta fica proporcional aos dias contados, e o valor atual é o do
+// período contado.
+function metasDaTela(mes, hoje, inicio) {
+  const itens = mes.metas?.itens || [];
+  const [ano, m] = hoje.split("-").map(Number);
+  const diasNoMes = new Date(ano, m, 0).getDate();
+  const diaInicial = Number(inicio.slice(8, 10));
+  if (diaInicial === 1) return itens.map((i) => ({ ...i, metaDoMes: i.meta }));
+  const diasContados = diasNoMes - diaInicial + 1;
+  return itens.map((i) => ({
+    ...i,
+    metaDoMes: i.meta,
+    meta: i.meta > 0 ? Math.max(1, Math.round((i.meta * diasContados) / diasNoMes)) : 0,
+    atual: mes.escopos.TODAS.volume[i.chave] ?? i.atual,
+  }));
+}
+
 async function chamarApi(caminho) {
   const resposta = await fetch(`${API}${caminho}`);
   const tipo = resposta.headers.get("Content-Type") || "";
@@ -127,18 +161,22 @@ async function chamarApi(caminho) {
 
 // --- Tela 1: resumo ------------------------------------------------------------
 
-function renderizarMetas(metas, hoje, deHoje) {
+function renderizarMetas(metas, hoje, inicio, deHoje) {
   const [ano, mes, dia] = hoje.split("-").map(Number);
-  const fracaoDoMes = dia / new Date(ano, mes, 0).getDate();
-  $("metas").innerHTML = (metas?.itens || [])
+  // Fração do período contado que já passou: do dia inicial até o fim do mês.
+  const diaInicial = Number(inicio.slice(8, 10));
+  const diasNoMes = new Date(ano, mes, 0).getDate();
+  const fracaoDoMes = (dia - diaInicial + 1) / (diasNoMes - diaInicial + 1);
+  const proporcional = diaInicial > 1;
+  $("metas").innerHTML = metas
     .map((m) => {
       const pct = m.meta > 0 ? Math.min((m.atual / m.meta) * 100, 100) : 0;
       const esperado = Math.round(m.meta * fracaoDoMes);
       const cor = m.atual >= m.meta ? "var(--bom)" : m.atual >= esperado ? "var(--ouro)" : "var(--ruim)";
       const faltam = Math.max(m.meta - m.atual, 0);
       return `
-      <div class="cartao meta" data-chave="meta:${esc(m.chave)}" data-valor="${m.atual}" style="--cor:${cor}">
-        <p class="rotulo">${esc(m.rotulo)} · meta do mês</p>
+      <div class="cartao meta" data-chave="meta:${esc(m.chave)}" data-valor="${m.atual}" style="--cor:${cor}" ${proporcional ? `title="Meta do mês: ${numero(m.metaDoMes)}. Proporcional aos dias desde ${diaEMes(inicio)}."` : ""}>
+        <p class="rotulo">${esc(m.rotulo)} · ${proporcional ? `meta desde ${diaEMes(inicio)}` : "meta do mês"}</p>
         <div>
           <p class="valor serifa num">${numero(m.atual)} <small>/ ${numero(m.meta)}</small></p>
           <div class="trilho">
@@ -152,12 +190,12 @@ function renderizarMetas(metas, hoje, deHoje) {
     .join("");
 }
 
-function renderizarIndicadores(doMes, deHoje, reunioes) {
+function renderizarIndicadores(doMes, deHoje, reunioes, rotuloDosLeads = "Leads no mês") {
   const v = doMes.volume, t = doMes.taxas;
   const CORES = { "Reuniões de hoje": "#d8b565", "Leads no mês": "#6ea8d8", Qualificados: "#a78bfa", Comparecimento: "#5fc4d6", Fechamento: "#e0965a", "Conversão final": "#4fb38a", "Reuniões marcadas": "#5fc4d6", "Reuniões realizadas": "#e0965a", "Contratos fechados": "#4fb38a" };
   // medidor: percentual de 0 a 100 exibido como uma régua fina na cor do cartão.
-  const cartao = (rotulo, valor, detalhe, bloco = "indicadores", medidor = null) => `
-    <div class="cartao ind${bloco === "reunioesHoje" ? " destaque" : ""}" data-bloco="${bloco}" data-chave="${rotulo}" data-valor="${valor ?? ""}" style="--cor:${CORES[rotulo] || "#d8b565"}">
+  const cartao = (rotulo, valor, detalhe, bloco = "indicadores", medidor = null, cor = CORES[rotulo]) => `
+    <div class="cartao ind${bloco === "reunioesHoje" ? " destaque" : ""}" data-bloco="${bloco}" data-chave="${rotulo}" data-valor="${valor ?? ""}" style="--cor:${cor || "#d8b565"}">
       <p class="rotulo"><i class="pinta"></i>${rotulo}</p>
       <div>
         <p class="valor serifa num">${numero(valor)}</p>
@@ -190,7 +228,7 @@ function renderizarIndicadores(doMes, deHoje, reunioes) {
       ];
   $("indicadores").innerHTML = [
     cartao("Reuniões de hoje", r.total, detalheDeHoje, "reunioesHoje"),
-    cartao("Leads no mês", v.leadsRecebidos, `Hoje: <strong>${numero(deHoje?.volume.leadsRecebidos)}</strong>`),
+    cartao(rotuloDosLeads, v.leadsRecebidos, `Hoje: <strong>${numero(deHoje?.volume.leadsRecebidos)}</strong>`, "indicadores", null, CORES["Leads no mês"]),
     cartao("Qualificados", v.qualificados, `Qualificação: <strong>${percentual(t.qualificacao)}</strong>`, "indicadores", t.qualificacao ?? 0),
     ...complemento,
   ].join("");
@@ -363,24 +401,28 @@ function renderizarMapa(analise) {
 
 async function atualizar() {
   const hoje = hojeNoEscritorio();
-  const inicioDoMes = `${hoje.slice(0, 8)}01`;
+  const inicio = inicioDaContagem(hoje);
+  const parcial = !inicio.endsWith("-01");
   try {
     // resumo=1: o servidor devolve apenas totais, sem as listas de leads.
     const [mes, dia, trafego] = await Promise.all([
-      chamarApi(`/metrics?inicio=${inicioDoMes}&fim=${hoje}&resumo=1`),
+      chamarApi(`/metrics?inicio=${inicio}&fim=${hoje}&resumo=1`),
       chamarApi(`/metrics?inicio=${hoje}&fim=${hoje}&resumo=1`),
-      chamarApi(`/analise-trafego?inicio=${inicioDoMes}&fim=${hoje}&apenasNovos=true&resumo=1`),
+      chamarApi(`/analise-trafego?inicio=${inicio}&fim=${hoje}&apenasNovos=true&resumo=1`),
     ]);
-    renderizarMetas(mes.metas, hoje, dia.escopos.TODAS);
-    renderizarIndicadores(mes.escopos.TODAS, dia.escopos.TODAS, mes.reunioesDeHoje);
+    const metas = metasDaTela(mes, hoje, inicio);
+    renderizarMetas(metas, hoje, inicio, dia.escopos.TODAS);
+    renderizarIndicadores(mes.escopos.TODAS, dia.escopos.TODAS, mes.reunioesDeHoje, parcial ? `Leads desde ${diaEMes(inicio)}` : "Leads no mês");
     renderizarCampanhas(mes.campanhas, mes.escopos);
     renderizarEtapas(mes.etapas, mes.escopos.TODAS.volumeAtual);
     renderizarEvolucao(mes.campanhas, mes.etapas, mes.escopos);
     renderizarMapa(trafego);
     aplicarVisibilidade();
     destacarMudancas();
-    comemorarNovidades(mes, hoje);
-    $("mes").textContent = new Date(`${hoje}T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }).replace(/^./, (c) => c.toUpperCase());
+    comemorarNovidades(mes, hoje, inicio, metas);
+    const nomeDoMes = new Date(`${hoje}T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }).replace(/^./, (c) => c.toUpperCase());
+    $("tituloCampanhas").textContent = parcial ? `Desde ${diaEMes(inicio)}, por campanha` : "Mês por campanha";
+    $("mes").textContent = parcial ? `${nomeDoMes} · desde ${diaEMes(inicio)}` : nomeDoMes;
     // Horário em que os dados foram lidos do Kommo, e não o da tela.
     $("atualizado").textContent = `Dados do Kommo de ${new Date(mes.dadosDe || Date.now()).toLocaleTimeString("pt-BR")}`;
     $("aviso").textContent = "";
@@ -409,9 +451,12 @@ function destacarMudancas() {
 
 // Compara os totais do mês com os da última leitura, gravados neste aparelho.
 // Na primeira leitura do mês só registra a base, sem comemorar.
-function comemorarNovidades(mes, hoje) {
+function comemorarNovidades(mes, hoje, inicio, metas) {
   const atual = {
     mes: hoje.slice(0, 7),
+    // Ao mudar o início da contagem os totais mudam sem que nada tenha
+    // acontecido; nesse caso só se registra a nova base.
+    desde: inicio,
     fechados: {},
     marcadas: mes.escopos.TODAS.volume.reunioesMarcadas,
     realizadas: mes.escopos.TODAS.volume.reunioesRealizadas,
@@ -425,16 +470,16 @@ function comemorarNovidades(mes, hoje) {
     anterior = comemorarNovidades.memoria || null;
   }
   comemorarNovidades.memoria = atual;
-  if (!anterior || anterior.mes !== atual.mes) return;
+  if (!anterior || anterior.mes !== atual.mes || (anterior.desde && anterior.desde !== atual.desde)) return;
 
   const campanhasComContrato = mes.campanhas.filter((c) => atual.fechados[c.codigo] > (anterior.fechados?.[c.codigo] || 0)).map((c) => c.codigo);
   // Base gravada por uma versão anterior pode não ter todos os campos: nesse caso não comemora.
   const novasMarcadas = atual.marcadas - (anterior.marcadas ?? atual.marcadas);
   const novasRealizadas = atual.realizadas - (anterior.realizadas ?? atual.realizadas);
-  const meta = mes.metas?.itens?.find((m) => m.chave === "fechados");
+  const meta = metas.find((m) => m.chave === "fechados");
   let espera = 0;
   if (campanhasComContrato.length) {
-    comemorarContrato({ campanhas: campanhasComContrato, total: mes.escopos.TODAS.volume.fechados, meta: meta?.meta });
+    comemorarContrato({ campanhas: campanhasComContrato, total: mes.escopos.TODAS.volume.fechados, meta: meta?.meta, desde: inicio.endsWith("-01") ? null : inicio });
     espera = 10500;
   }
   // Os avisos pequenos saem um depois do outro, e depois da comemoração de contrato.
@@ -446,11 +491,11 @@ function comemorarNovidades(mes, hoje) {
 }
 
 // Contrato fechado: tela cheia, confete e som, por cerca de dez segundos.
-function comemorarContrato({ campanhas, total, meta }) {
+function comemorarContrato({ campanhas, total, meta, desde = null }) {
   const festa = $("festa");
   $("festaSobre").textContent = campanhas.length ? campanhas.join(" · ") : "Núcleo de Saúde";
   const faltam = meta ? Math.max(meta - total, 0) : null;
-  $("festaSob").innerHTML = `<strong>${numero(total)}º</strong> contrato do mês${faltam === null ? "" : faltam ? ` · faltam <strong>${numero(faltam)}</strong> para a meta` : " · <strong>meta atingida</strong>"}`;
+  $("festaSob").innerHTML = `<strong>${numero(total)}º</strong> contrato ${desde ? `desde ${diaEMes(desde)}` : "do mês"}${faltam === null ? "" : faltam ? ` · faltam <strong>${numero(faltam)}</strong> para a meta` : " · <strong>meta atingida</strong>"}`;
   festa.hidden = false;
   requestAnimationFrame(() => festa.classList.add("aberta"));
   soltarConfete(festa.querySelector("canvas"), 9000);
