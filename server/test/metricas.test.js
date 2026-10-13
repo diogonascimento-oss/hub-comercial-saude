@@ -229,3 +229,30 @@ test("reuniões do lead: desfecho e critério de cada agendamento", () => {
   assert.equal(r[1].divergente, true);
   assert.equal(r[1].veioDeRemarcacao, true);
 });
+
+test("quem pula Contato Iniciado ou Em Qualificação conta como contatado e como respondido", () => {
+  const calcularCom = (leads, eventos) => {
+    const eventosPorLead = new Map();
+    for (const e of eventos) eventosPorLead.set(e.leadId, [...(eventosPorLead.get(e.leadId) || []), e]);
+    return calcularEscopo({ leads, eventosPorLead, deTs: DE, ateTs: ATE, agora: AGORA });
+  };
+  const fora = { criadoEm: DE - 10 * DIA }; // criado antes do período
+  const leads = [
+    lead(1, "LEAD_QUALIFICADO", fora), // Contato Iniciado -> Lead Qualificado: respondeu
+    lead(2, "AGENDADO", fora), // Contato Inicial -> Agendado: contatado e respondeu
+    lead(3, "DESQUALIFICADO", fora), // Contato Iniciado -> Desqualificado: não respondeu
+    lead(4, "EM_QUALIFICACAO", fora), // caminho normal
+    lead(5, "AGENDADO", fora), // Lead Qualificado -> Agendado: nada a contar aqui
+    lead(6, "EM_QUALIFICACAO"), // nasceu em Em Qualificação, no período, sem eventos
+  ];
+  const eventos = [
+    ev(1, HORA, "CONTATO_INICIADO", "LEAD_QUALIFICADO"),
+    ev(2, HORA, "CONTATO_INICIAL", "AGENDADO"),
+    ev(3, HORA, "CONTATO_INICIADO", "DESQUALIFICADO"),
+    ev(4, HORA, "CONTATO_INICIAL", "CONTATO_INICIADO"), ev(4, 2 * HORA, "CONTATO_INICIADO", "EM_QUALIFICACAO"),
+    ev(5, HORA, "LEAD_QUALIFICADO", "AGENDADO"),
+  ];
+  const v = calcularCom(leads, eventos).volume;
+  assert.equal(v.contatados, 3); // 2, 4 e 6
+  assert.equal(v.comPrimeiraResposta, 4); // 1, 2, 4 e 6
+});

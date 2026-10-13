@@ -54,8 +54,8 @@
       <thead class="bg-surface text-left"><tr class="rotulo"><th class="px-3 py-2 font-semibold">Indicador</th><th class="px-3 py-2 font-semibold">Regra</th></tr></thead>
       <tbody class="divide-y divide-line text-inkdim">
         <tr><td class="px-3 py-2 text-ink">Leads recebidos</td><td class="px-3 py-2">Leads criados dentro do período.</td></tr>
-        <tr><td class="px-3 py-2 text-ink">Leads contatados</td><td class="px-3 py-2">Leads que entraram em Contato Iniciado no período.</td></tr>
-        <tr><td class="px-3 py-2 text-ink">Com primeira resposta</td><td class="px-3 py-2">Leads que entraram em Em Qualificação no período.</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Leads contatados</td><td class="px-3 py-2">Leads que entraram em Contato Iniciado no período, ou que pularam essa coluna: foram de Contato Inicial, ou foram criados, direto numa etapa mais adiante (exceto Desqualificado).</td></tr>
+        <tr><td class="px-3 py-2 text-ink">Com primeira resposta</td><td class="px-3 py-2">Leads que entraram em Em Qualificação no período, ou que pularam essa coluna: foram de Contato Inicial ou Contato Iniciado, ou foram criados, direto numa etapa mais adiante, como Lead Qualificado ou Agendado (exceto Desqualificado).</td></tr>
         <tr><td class="px-3 py-2 text-ink">Qualificados</td><td class="px-3 py-2">Leads que entraram em Lead Qualificado no período. Como a coluna é de passagem, também conta quem foi movido diretamente de uma etapa anterior à qualificação para Em Agendamento ou Agendado.</td></tr>
         <tr><td class="px-3 py-2 text-ink">Qualificados sem agendamento</td><td class="px-3 py-2">Qualificados no período que não entraram em Agendado depois da qualificação, dentro do período.</td></tr>
         <tr><td class="px-3 py-2 text-ink">Reuniões marcadas</td><td class="px-3 py-2">Entradas em Agendado no período. É uma contagem de agendamentos: o mesmo lead conta mais de uma vez se foi reagendado. São remarcações as entradas vindas de Remarcação e a segunda entrada em diante do mesmo lead.</td></tr>
@@ -90,7 +90,7 @@
   <h2 class="titulo-secao mt-10 mb-3">5. Tempos de atendimento</h2>
   <ul class="list-disc pl-5 space-y-1 text-inkdim">
     <li><span class="text-ink">Da entrada à primeira mensagem:</span> da criação do lead até a mudança para Contato Iniciado, para leads criados no período.</li>
-    <li><span class="text-ink">Até a primeira resposta:</span> da entrada em Contato Iniciado até a entrada em Em Qualificação.</li>
+    <li><span class="text-ink">Até a primeira resposta:</span> da entrada em Contato Iniciado até a entrada em Em Qualificação. Leads que pularam uma dessas colunas não entram na medição de tempo, porque o Kommo não registra o instante do contato ou da resposta que não passou pela coluna.</li>
     <li><span class="text-ink">Da qualificação ao agendamento:</span> da qualificação até a primeira entrada em Agendado.</li>
   </ul>
   <p class="mt-3 text-inkdim">Os três tempos são medidos em horas úteis: segunda a sexta, das 8h às 18h, no horário do escritório. O que acontece fora do expediente não conta; um lead que chega na sexta às 19h e é atendido na segunda às 9h soma uma hora. O sábado não entra na conta, porque o atendimento nesse dia é eventual, e feriados não são descontados. O painel exibe a mediana, menos sensível a casos extremos, e a média, e informa também a mediana em tempo corrido, para referência.</p>

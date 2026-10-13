@@ -312,8 +312,8 @@ function comparacaoComAnterior(chave, menorEhMelhor = false) {
 // Regra de contagem de cada indicador, exibida junto com a lista de leads.
 const REGRAS_DOS_INDICADORES = {
   leadsRecebidos: ["Leads recebidos", "Leads criados no Kommo dentro do período selecionado, nos funis das três campanhas."],
-  contatados: ["Leads contatados", "Leads que entraram na coluna Contato Iniciado dentro do período. Inclui leads criados antes do período que só foram movidos agora."],
-  comPrimeiraResposta: ["Com primeira resposta", "Leads que entraram na coluna Em Qualificação dentro do período. Inclui leads contatados antes do período que responderam agora, por isso não é necessariamente uma parte dos contatados."],
+  contatados: ["Leads contatados", "Leads que entraram na coluna Contato Iniciado dentro do período, ou que a pularam: saíram de Contato Inicial, ou já foram criados, numa etapa mais adiante do funil (exceto Desqualificado). Inclui leads criados antes do período que só foram movidos agora."],
+  comPrimeiraResposta: ["Com primeira resposta", "Leads que entraram na coluna Em Qualificação dentro do período, ou que a pularam: saíram de Contato Inicial ou Contato Iniciado, ou já foram criados, numa etapa mais adiante do funil (exceto Desqualificado). Inclui leads contatados antes do período que responderam agora, por isso não é necessariamente uma parte dos contatados."],
   qualificados: ["Qualificados", "Leads que entraram na coluna Lead Qualificado dentro do período. Também conta quem foi movido direto de uma etapa anterior à qualificação para Em Agendamento ou Agendado."],
   qualificadosSemAgendamento: ["Qualificados sem agendamento", "Leads qualificados no período que não entraram em Agendado depois da qualificação, dentro do período."],
   reunioesMarcadas: ["Leads com reunião marcada", "Leads que entraram na coluna Agendado dentro do período. O número do cartão conta agendamentos: um lead reagendado conta mais de uma vez no cartão e uma vez nesta lista."],

@@ -19,6 +19,22 @@ import { nomeDaEtapa } from "./mapeamento.js";
 
 const DIA = 86400;
 
+// Posição de cada etapa no funil, pela ordem do protocolo.
+const POSICAO = new Map(ETAPAS.map((e, i) => [e.chave, i]));
+
+// Um lead pode pular uma coluna: sair de Contato Iniciado direto para Lead
+// Qualificado, por exemplo. Nesse caso ele passou pelo marco daquela coluna
+// mesmo sem entrar nela. Retorna true quando o lead foi de uma etapa anterior
+// ao marco (ou nasceu, sem etapa de origem) para uma etapa posterior a ele.
+// Ir para Desqualificado não conta: o lead pode ter sido descartado sem atingir
+// o marco (telefone inválido, sem resposta).
+function pulouOMarco(de, para, marco) {
+  if (para === "DESQUALIFICADO" || !POSICAO.has(para)) return false;
+  const posicaoDoMarco = POSICAO.get(marco);
+  if (POSICAO.get(para) <= posicaoDoMarco) return false;
+  return de == null || (POSICAO.has(de) && POSICAO.get(de) < posicaoDoMarco);
+}
+
 // Percentual com uma casa decimal; null quando não há base de cálculo.
 function taxa(numerador, denominador) {
   return denominador > 0 ? Math.round((numerador / denominador) * 1000) / 10 : null;
@@ -132,6 +148,10 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
   const leadsFechados = new Set();
   const leadsDesqualificados = new Set();
   const leadsQualificados = new Set();
+  // Contatados e com primeira resposta: quem entrou na coluna do marco no
+  // período ou a pulou (ver pulouOMarco).
+  const leadsContatados = new Set();
+  const leadsComPrimeiraResposta = new Set();
   const qualificadosQueAgendaram = new Set();
   // Conjuntos usados só para o detalhamento "quem são esses leads".
   const leadsRecebidosNoPeriodo = new Set();
@@ -159,7 +179,13 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
       // A criação do lead não gera evento de mudança de etapa. A etapa em que
       // ele nasceu é a de origem do primeiro evento; sem eventos, é a atual.
       const etapaDeNascimento = eventos[0]?.de || lead.etapa;
-      if (etapaDeNascimento) registrarEntrada(etapaDeNascimento, lead.id, lead.criadoEm);
+      if (etapaDeNascimento) {
+        registrarEntrada(etapaDeNascimento, lead.id, lead.criadoEm);
+        // Lead que já nasce adiante (o do WhatsApp, por exemplo, pode ser
+        // criado em Em Qualificação) passou pelos marcos anteriores.
+        if (etapaDeNascimento === "CONTATO_INICIADO" || pulouOMarco(null, etapaDeNascimento, "CONTATO_INICIADO")) leadsContatados.add(lead.id);
+        if (etapaDeNascimento === "EM_QUALIFICACAO" || pulouOMarco(null, etapaDeNascimento, "EM_QUALIFICACAO")) leadsComPrimeiraResposta.add(lead.id);
+      }
     }
 
     const ultimaSaidaDeAgendado = eventos.findLast((e) => e.para && e.de === "AGENDADO" && e.para !== "AGENDADO") || null;
@@ -261,6 +287,12 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
       if (ev.para === "FECHADO") leadsFechados.add(lead.id);
       if (ev.para === "DESQUALIFICADO") leadsDesqualificados.add(lead.id);
 
+      const contatou = ev.para === "CONTATO_INICIADO" || pulouOMarco(ev.de, ev.para, "CONTATO_INICIADO");
+      const respondeu = ev.para === "EM_QUALIFICACAO" || pulouOMarco(ev.de, ev.para, "EM_QUALIFICACAO");
+      if (contatou) leadsContatados.add(lead.id);
+      if (respondeu) leadsComPrimeiraResposta.add(lead.id);
+      // Os tempos só usam a entrada na própria coluna: num salto, o instante
+      // do contato ou da resposta não está registrado no Kommo.
       if (ev.para === "CONTATO_INICIADO" && instanteDoContatoIniciado === null) {
         instanteDoContatoIniciado = ev.ts;
         if (criadoNoPeriodo) temposAtePrimeiraMensagem.push([lead.criadoEm, ev.ts]);
@@ -358,8 +390,8 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
   const resultado = {
     volume: {
       leadsRecebidos,
-      contatados: totalQueEntrou("CONTATO_INICIADO"),
-      comPrimeiraResposta: totalQueEntrou("EM_QUALIFICACAO"),
+      contatados: leadsContatados.size,
+      comPrimeiraResposta: leadsComPrimeiraResposta.size,
       qualificados,
       qualificadosSemAgendamento: qualificados - qualificadosQueAgendaram.size,
       reunioesMarcadas,
@@ -465,8 +497,8 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
     // Indicadores em que cada lead foi contado, para o detalhamento dos cartões.
     const conjuntos = {
       leadsRecebidos: leadsRecebidosNoPeriodo,
-      contatados: new Set(entradas.get("CONTATO_INICIADO")?.keys() || []),
-      comPrimeiraResposta: new Set(entradas.get("EM_QUALIFICACAO")?.keys() || []),
+      contatados: leadsContatados,
+      comPrimeiraResposta: leadsComPrimeiraResposta,
       qualificados: leadsQualificados,
       qualificadosSemAgendamento: new Set([...leadsQualificados].filter((id) => !qualificadosQueAgendaram.has(id))),
       reunioesMarcadas: leadsComReuniaoMarcada,
