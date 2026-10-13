@@ -805,6 +805,46 @@ app.delete("/api/corrigir-evento/:eventId", async (req, res) => {
   }
 });
 
+// --- Acontecimentos do dia -----------------------------------------------------
+
+// Agendamentos, reuniões realizadas e não realizadas, remarcações e contratos
+// de um dia, em ordem de horário. As regras são as mesmas dos cartões.
+app.get("/api/acontecimentos", async (req, res) => {
+  const dia = String(req.query.dia || "");
+  const periodo = lerPeriodo({ query: { inicio: dia, fim: dia } });
+  if (!periodo) return res.status(400).json({ error: "Informe o dia no formato AAAA-MM-DD." });
+  try {
+    const { leads, eventosPorLead } = await prepararPeriodo(periodo);
+    const agora = Math.floor(Date.now() / 1000);
+    const { acontecimentos } = calcularEscopo({
+      leads,
+      eventosPorLead,
+      deTs: periodo.deTs,
+      ateTs: periodo.ateTs,
+      agora,
+      incluirAcontecimentos: true,
+    });
+    const porId = new Map(leads.map((l) => [l.id, l]));
+    const lista = acontecimentos.map((a) => {
+      const lead = porId.get(a.leadId);
+      return {
+        em: iso(a.ts),
+        tipo: a.tipo,
+        detalhe: a.detalhe,
+        de: a.de ? nomeDaEtapa(a.de) : null,
+        para: nomeDaEtapa(a.para),
+        lead: { id: lead.id, nome: lead.nome, campanha: lead.campanha },
+        responsaveis: lead.responsaveis,
+      };
+    });
+    const totais = {};
+    for (const a of lista) totais[a.tipo] = (totais[a.tipo] || 0) + 1;
+    res.json({ dia, totais, acontecimentos: lista });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao listar os acontecimentos do dia");
+  }
+});
+
 // --- Tráfego e campanhas -------------------------------------------------------
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;

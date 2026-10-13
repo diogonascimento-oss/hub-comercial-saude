@@ -256,3 +256,23 @@ test("quem pula Contato Iniciado ou Em Qualificação conta como contatado e com
   assert.equal(v.contatados, 3); // 2, 4 e 6
   assert.equal(v.comPrimeiraResposta, 4); // 1, 2, 4 e 6
 });
+
+test("acontecimentos do dia seguem as mesmas regras dos cartões", () => {
+  const leads = [lead(1, "FECHADO"), lead(2, "REMARCACAO"), lead(3, "AGENDADO"), lead(4, "AGENDADO")];
+  const eventos = [
+    ev(1, HORA, "LEAD_QUALIFICADO", "AGENDADO"), ev(1, 3 * HORA, "AGENDADO", "FECHADO"),
+    ev(2, 2 * HORA, "AGENDADO", "REMARCACAO"),
+    ev(3, 4 * HORA, "REMARCACAO", "AGENDADO"),
+    ev(4, 5 * HORA, "EM_AGENDAMENTO", "AGENDADO"),
+  ];
+  const eventosPorLead = new Map();
+  for (const e of eventos) eventosPorLead.set(e.leadId, [...(eventosPorLead.get(e.leadId) || []), e]);
+  const r = calcularEscopo({ leads, eventosPorLead, deTs: DE, ateTs: ATE, agora: AGORA, incluirAcontecimentos: true });
+  assert.deepEqual(
+    r.acontecimentos.map((a) => `${a.leadId}:${a.tipo}`),
+    ["1:agendamento", "2:naoRealizada", "1:realizada", "1:contrato", "3:reagendamento", "4:agendamento"],
+  );
+  assert.equal(r.acontecimentos.filter((a) => a.tipo.endsWith("agendamento")).length, r.volume.reunioesMarcadas);
+  assert.equal(r.acontecimentos.filter((a) => a.tipo === "realizada").length, r.volume.reunioesRealizadas);
+  assert.equal(calcularEscopo({ leads, eventosPorLead, deTs: DE, ateTs: ATE, agora: AGORA }).acontecimentos, undefined);
+});

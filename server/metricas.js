@@ -116,7 +116,14 @@ export function reunioesDoLead(lead, eventos) {
 //   sem os excluídos e com as correções aplicadas.
 // deTs, ateTs: limites do período, em segundos.
 // agora: instante da consulta, em segundos.
-export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incluirListas = false }) {
+export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incluirListas = false, incluirAcontecimentos = false }) {
+  // Acontecimentos do período, um por movimentação relevante, registrados nos
+  // mesmos pontos em que os indicadores são contados. Assim a lista do dia
+  // usa exatamente as regras dos cartões.
+  const acontecimentos = [];
+  const registrarAcontecimento = (lead, ev, tipo, detalhe = "") => {
+    if (incluirAcontecimentos) acontecimentos.push({ ts: ev.ts, leadId: lead.id, tipo, de: ev.de, para: ev.para, detalhe });
+  };
   // etapa -> Map(leadId -> instante da primeira entrada no período)
   const entradas = new Map();
   const registrarEntrada = (chave, leadId, ts) => {
@@ -235,6 +242,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
           leadsComRemarcacaoRecuperada.add(lead.id);
         }
         ultimoAgendamentoVeioDeRemarcacao = veioDeRemarcacao;
+        registrarAcontecimento(lead, ev, vezesAgendado > 1 || veioDeRemarcacao ? "reagendamento" : "agendamento");
 
         if (instanteDaQualificacao !== null) {
           qualificadosQueAgendaram.add(lead.id);
@@ -261,6 +269,14 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
         if (realizada) {
           reunioesRealizadas++;
           leadsComReuniaoRealizada.add(lead.id);
+          registrarAcontecimento(lead, ev, "realizada", peloCampo === true ? "pelo campo Situação da reunião" : "");
+        } else if (ev.para === "REMARCACAO" || peloCampo === false) {
+          // Na lista do dia entra toda reunião que não aconteceu, inclusive as
+          // marcadas antes do período (o cartão "Não realizadas" conta só as
+          // marcadas dentro dele).
+          registrarAcontecimento(lead, ev, "naoRealizada", peloCampo === false && lead.situacaoDaReuniao ? lead.situacaoDaReuniao : "");
+        } else if (ev.para === "DESQUALIFICADO") {
+          registrarAcontecimento(lead, ev, "perdidaAntesDaReuniao");
         }
 
         // Os desfechos abaixo só contam quando o agendamento correspondente
@@ -283,8 +299,15 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
         }
       }
 
-      if (ev.para === "REMARCACAO" && ev.de !== "REMARCACAO") entradasEmRemarcacao++;
-      if (ev.para === "FECHADO") leadsFechados.add(lead.id);
+      if (ev.para === "REMARCACAO" && ev.de !== "REMARCACAO") {
+        entradasEmRemarcacao++;
+        // Vindo de Agendado, o acontecimento já foi registrado como reunião não realizada.
+        if (ev.de !== "AGENDADO") registrarAcontecimento(lead, ev, "remarcacao");
+      }
+      if (ev.para === "FECHADO") {
+        leadsFechados.add(lead.id);
+        if (ev.de !== "FECHADO") registrarAcontecimento(lead, ev, "contrato");
+      }
       if (ev.para === "DESQUALIFICADO") leadsDesqualificados.add(lead.id);
 
       const contatou = ev.para === "CONTATO_INICIADO" || pulouOMarco(ev.de, ev.para, "CONTATO_INICIADO");
@@ -563,6 +586,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
     };
   }
 
+  if (incluirAcontecimentos) resultado.acontecimentos = acontecimentos.sort((a, b) => a.ts - b.ts);
   return resultado;
 }
 

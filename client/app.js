@@ -730,6 +730,7 @@ function renderizarEscopo() {
   renderizarPerdas();
   renderizarPendencias();
   renderizarLeads();
+  renderizarAcontecimentos();
 }
 
 function renderizarTudo() {
@@ -771,6 +772,7 @@ async function atualizar() {
     mostrarErro("");
     renderizarTudo();
     atualizarTrafego();
+    carregarAcontecimentos();
   } catch (erro) {
     mostrarErro(`${erro.message}${dados ? " Os números exibidos são da última consulta bem-sucedida." : ""}`);
   } finally {
