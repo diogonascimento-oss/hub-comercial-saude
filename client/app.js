@@ -354,7 +354,7 @@ function renderizarCartoes() {
   const c = comparacaoComAnterior;
 
   $("cartoes").innerHTML = [
-    cartao(numero(v.leadsRecebidos), "Leads recebidos", `${linkDoIndicador("contatados", `${numero(v.contatados)} contatados`)} · ${linkDoIndicador("comPrimeiraResposta", `${numero(v.comPrimeiraResposta)} com primeira resposta`)}`, "text-ink", c("leadsRecebidos"), "leadsRecebidos"),
+    cartao(numero(v.leadsRecebidos), "Leads recebidos", linkDoIndicador("contatados", `${numero(v.contatados)} contatados`), "text-ink", c("leadsRecebidos"), "leadsRecebidos"),
     cartao(numero(v.qualificados), "Qualificados", `Taxa de qualificação: <span class="${classeDaTaxa(t.qualificacao)}">${percentual(t.qualificacao)}</span><br>${linkDoIndicador("qualificadosSemAgendamento", `${numero(v.qualificadosSemAgendamento)} sem agendamento`)}`, "text-ink", c("qualificados"), "qualificados"),
     cartao(numero(v.reunioesMarcadas), "Reuniões marcadas", `${numero(v.reunioesMarcadasNovas)} novas · ${numero(v.remarcacoes)} remarcações<br>Qualificado para agendado: <span class="${classeDaTaxa(t.qualificadoParaAgendado)}">${percentual(t.qualificadoParaAgendado)}</span>`, "text-goldbright", c("reunioesMarcadas"), "reunioesMarcadas"),
     cartao(numero(v.reunioesRealizadas), "Reuniões realizadas", `Comparecimento: <span class="${classeDaTaxa(t.comparecimento)}">${percentual(t.comparecimento)}</span>`, "text-positivo", c("reunioesRealizadas"), "reunioesRealizadas"),
