@@ -295,7 +295,7 @@ function renderizarTabelaPorCampanha(a) {
   const grupos = a.porCampanhaMeta || [];
   const tabela = $("tabelaPorCampanha");
   $("notaPorCampanha").textContent = $("apenasNovos").checked
-    ? "Somente leads que chegaram no período, e até onde cada um foi."
+    ? "Leads que chegaram no período, acompanhados até hoje: tudo o que aconteceu com eles depois conta aqui."
     : "Todos os leads com movimentação no período, inclusive os que chegaram antes.";
   if (!grupos.length) {
     tabela.innerHTML = '<tbody><tr><td class="text-inkdim">Sem leads no período.</td></tr></tbody>';

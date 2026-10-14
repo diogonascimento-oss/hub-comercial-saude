@@ -915,7 +915,14 @@ function periodoDe(inicio, fim) {
 
 // Análise de tráfego de um período, opcionalmente restrita a uma campanha.
 async function calcularAnaliseDeTrafego(periodo, { apenasNovos, campanha }) {
-  const { leads, eventosPorLead } = await prepararPeriodo(periodo);
+  // Com apenasNovos, a análise acompanha os leads que chegaram no período até
+  // hoje: entram só os criados entre o início e o fim, mas as movimentações
+  // consideradas vão até a data atual. Assim, um lead que chegou na semana e
+  // fechou contrato na semana seguinte aparece como fechado na sua semana de
+  // chegada. Sem apenasNovos, valem só as movimentações do período.
+  const hoje = dataLocal(Math.floor(Date.now() / 1000));
+  const periodoDosEventos = apenasNovos && periodo.fim < hoje ? lerPeriodo({ query: { inicio: periodo.inicio, fim: hoje } }) : periodo;
+  const { leads, eventosPorLead } = await prepararPeriodo(periodoDosEventos);
   const doEscopo = campanha && campanha !== "TODAS" ? leads.filter((l) => l.campanha === campanha) : leads;
   return analisarTrafego({ leads: doEscopo, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
 }
