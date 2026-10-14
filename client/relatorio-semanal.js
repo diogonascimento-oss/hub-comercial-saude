@@ -18,6 +18,7 @@ const ESTILO_DO_RELATORIO = `
   tbody tr:nth-child(even) { background: #fafafa; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   td.destaque { font-weight: 700; color: #0f1b2d; }
+  tr.total td { font-weight: 700; background: #f6f1e4; }
   .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #e2e2e2; border: 1px solid #e2e2e2; margin: 12px 0 8px; }
   .kpi { background: #fff; padding: 14px 12px; }
   .kpi .valor { font-size: 23px; font-weight: 700; color: #0f1b2d; }
@@ -32,6 +33,18 @@ const reais = (valor) => (valor === null || valor === undefined ? "—" : valor.
 
 function kpi(valor, rotulo) {
   return `<div class="kpi"><div class="valor">${valor}</div><div class="rotulo">${esc(rotulo)}</div></div>`;
+}
+
+// Tabela por campanha do Meta, no formato usado pelo tráfego.
+function tabelaPorCampanhaMeta(lista) {
+  if (!lista?.length) return '<p class="vazio">Sem dados neste período.</p>';
+  const soma = (campo) => lista.reduce((t, g) => t + (g[campo] || 0), 0);
+  const linha = (rotulo, g, forte = false) =>
+    `<tr${forte ? ' class="total"' : ""}><td>${esc(rotulo)}</td><td class="num">${g.totalLeads}</td><td class="num">${g.qualificados}</td><td class="num">${g.reuniao}</td><td class="num">${g.realizadas ?? 0}</td><td class="num">${g.contratoFechado}</td></tr>`;
+  return `<table>
+    <thead><tr><th>Campanha</th><th class="num">Leads</th><th class="num">Qualificados</th><th class="num">Reuniões marcadas</th><th class="num">Reuniões realizadas</th><th class="num">Contratos</th></tr></thead>
+    <tbody>${lista.map((g) => linha(g.grupo, g)).join("")}${linha("Total", { totalLeads: soma("totalLeads"), qualificados: soma("qualificados"), reuniao: soma("reuniao"), realizadas: soma("realizadas"), contratoFechado: soma("contratoFechado") }, true)}</tbody>
+  </table>`;
 }
 
 function tabelaDeGrupos(titulo, lista, nota = "") {
@@ -164,7 +177,8 @@ function relatorioSemanalHTML(contexto) {
   const v = funil?.volume || {};
   const t = funil?.taxas || {};
   const corpo = `
-  <h2>1. Resumo do período</h2>
+  <h2>1. Atividade da equipe no período</h2>
+  <p class="nota">Tudo o que aconteceu entre as datas do relatório, com qualquer lead, inclusive os que chegaram antes.</p>
   <div class="kpis">
     ${kpi(numero(v.leadsRecebidos), "Leads recebidos")}
     ${kpi(numero(v.qualificados), "Qualificados")}
@@ -180,7 +194,10 @@ function relatorioSemanalHTML(contexto) {
   ${tabelaDeComparacao(comparacao)}
 
   <h2>3. Origem dos leads</h2>
-  ${tabelaDeGrupos("Por campanha", analise?.porCampanha)}
+  <p class="nota">Somente os leads que chegaram no período, acompanhados até a data em que este relatório foi gerado.</p>
+  <h3>Por campanha do Meta</h3>
+  ${tabelaPorCampanhaMeta(analise?.porCampanhaMeta)}
+  ${tabelaDeGrupos("Por campanha do núcleo (IR-Q, IR-W, REA-Q)", analise?.porCampanha)}
   ${tabelaDeGrupos("Por conjunto de anúncios", analise?.porConjunto)}
   ${tabelaDeGrupos("Por anúncio", analise?.porAnuncio)}
   ${tabelaDeGrupos("Por região (DDD do telefone)", analise?.porRegiao)}
@@ -218,12 +235,15 @@ function relatorioDaSomaHTML(d) {
     ${kpi(numero(d.totalReuniao), "Reuniões")}
     ${kpi(numero(d.totalContratoFechado), "Contratos fechados")}
   </div>
-  <h2>1. Por conjunto de anúncios</h2>
+  <p class="nota">Leads que chegaram em cada semana somada, acompanhados até a data em que este relatório foi gerado.</p>
+  <h2>1. Por campanha do Meta</h2>
+  ${tabelaPorCampanhaMeta(d.porCampanhaMeta)}
+  <h2>2. Por conjunto de anúncios</h2>
   ${tabela(d.porConjunto, false)}
-  <h2>2. Por anúncio e conjunto</h2>
+  <h2>3. Por anúncio e conjunto</h2>
   ${d.todasComCusto ? "" : '<p class="nota">Nem todas as semanas somadas têm orçamento registrado; os valores de custo foram omitidos.</p>'}
   ${tabela(d.porAnuncioEConjunto, true)}
-  <h2>3. Por região</h2>
+  <h2>4. Por região</h2>
   ${tabela(d.porRegiao, false)}`;
   return documentoHTML("Relatório de semanas somadas", `Período: ${d.periodo.inicio} a ${d.periodo.fim} · ${d.semanasIncluidas} semanas`, corpo);
 }

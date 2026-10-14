@@ -274,8 +274,8 @@ export function associarGastoDoMeta(grupos, linhas) {
 
 function somarGrupos(listas) {
   const soma = new Map();
-  const campos = ["totalLeads", "qualificados", "reuniao", "remarcacao", "farmer", "reaquecimento", "contratoFechado", "desqualificados"];
-  const listasDeLeads = ["leads", "leadsQualificados", "leadsReuniao", "leadsFarmer", "leadsFechados"];
+  const campos = ["totalLeads", "qualificados", "reuniao", "realizadas", "remarcacao", "farmer", "reaquecimento", "contratoFechado", "desqualificados"];
+  const listasDeLeads = ["leads", "leadsQualificados", "leadsReuniao", "leadsRealizadas", "leadsFarmer", "leadsFechados"];
   for (const lista of listas) {
     for (const g of lista || []) {
       if (!soma.has(g.grupo)) {
@@ -306,6 +306,7 @@ export function combinarSemanas(registros) {
     totalQualificados: total("totalQualificados"),
     totalReuniao: total("totalReuniao"),
     totalContratoFechado: total("totalContratoFechado"),
+    porCampanhaMeta: somarGrupos(analises.map((a) => a.porCampanhaMeta)),
     porConjunto: somarGrupos(analises.map((a) => a.porConjunto)),
     porAnuncio: somarGrupos(analises.map((a) => a.porAnuncio)),
     porAnuncioEConjunto: somarGrupos(analises.map((a) => a.porAnuncioEConjunto)),

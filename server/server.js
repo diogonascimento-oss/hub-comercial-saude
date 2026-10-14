@@ -927,6 +927,22 @@ async function calcularAnaliseDeTrafego(periodo, { apenasNovos, campanha }) {
   return analisarTrafego({ leads: doEscopo, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
 }
 
+// Semanas salvas guardam o orçamento, as decisões e as observações; os números
+// dos leads são sempre recalculados, com os leads que chegaram em cada semana
+// acompanhados até hoje. Uma única leitura do Kommo atende todas as semanas.
+async function comAnaliseAtual(registros) {
+  if (!registros.length) return registros;
+  const hoje = dataLocal(Math.floor(Date.now() / 1000));
+  const inicio = registros.map((r) => r.inicio).sort()[0];
+  const fim = [hoje, ...registros.map((r) => r.fim)].sort().at(-1);
+  const { leads, eventosPorLead } = await prepararPeriodo(lerPeriodo({ query: { inicio, fim } }));
+  return registros.map((r) => {
+    const semana = lerPeriodo({ query: { inicio: r.inicio, fim: r.fim } });
+    const apenasNovos = r.analise?.apenasNovos ?? true;
+    return { ...r, analise: analisarTrafego({ leads, eventosPorLead, deTs: semana.deTs, ateTs: semana.ateTs, apenasNovos }) };
+  });
+}
+
 app.get("/api/analise-trafego", async (req, res) => {
   const periodo = lerPeriodo(req);
   if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
@@ -1153,8 +1169,9 @@ app.get("/api/trafego/analise-com-custo", async (req, res) => {
       return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
     }
     // Período ainda não salvo como semana é uma situação normal, não um erro.
-    const registro = await armazenamento.lerSemana(inicio, fim);
-    if (!registro) return res.json({ semanaSalva: false, porAnuncioEConjunto: [] });
+    const salvo = await armazenamento.lerSemana(inicio, fim);
+    if (!salvo) return res.json({ semanaSalva: false, porAnuncioEConjunto: [] });
+    const [registro] = await comAnaliseAtual([salvo]);
     const grupos = registro.analise.porAnuncioEConjunto || [];
     res.json({
       ...registro.analise,
@@ -1175,9 +1192,10 @@ app.get("/api/trafego/comparar-semana-anterior", async (req, res) => {
     if (!atual) return;
     const anteriores = (await armazenamento.lerListaDeSemanas()).filter((s) => s.fim < atual.inicio);
     const referencia = anteriores[anteriores.length - 1];
-    const anterior = referencia ? await armazenamento.lerSemana(referencia.inicio, referencia.fim) : null;
-    if (!anterior) return res.json({ semAnterior: true, mensagem: "Não há semana salva anterior a esta para comparar." });
-    res.json({ semAnterior: false, ...compararSemanas(atual, anterior) });
+    const anteriorSalva = referencia ? await armazenamento.lerSemana(referencia.inicio, referencia.fim) : null;
+    if (!anteriorSalva) return res.json({ semAnterior: true, mensagem: "Não há semana salva anterior a esta para comparar." });
+    const [atualRecalculada, anterior] = await comAnaliseAtual([atual, anteriorSalva]);
+    res.json({ semAnterior: false, ...compararSemanas(atualRecalculada, anterior) });
   } catch (erro) {
     responderErro(res, erro, "Falha ao comparar as semanas");
   }
@@ -1198,7 +1216,7 @@ app.post("/api/trafego/rollup", async (req, res) => {
     res.json({
       periodo: { inicio: registros[0].inicio, fim: registros[registros.length - 1].fim },
       semanasIncluidas: registros.length,
-      ...combinarSemanas(registros),
+      ...combinarSemanas(await comAnaliseAtual(registros)),
     });
   } catch (erro) {
     responderErro(res, erro, "Falha ao somar as semanas");
