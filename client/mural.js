@@ -399,6 +399,8 @@ function renderizarMapa(analise) {
 
 // --- Atualização ---------------------------------------------------------------
 
+let ultimaLeitura = null;
+
 async function atualizar() {
   const hoje = hojeNoEscritorio();
   const inicio = inicioDaContagem(hoje);
@@ -411,6 +413,8 @@ async function atualizar() {
       chamarApi(`/analise-trafego?inicio=${inicio}&fim=${hoje}&apenasNovos=true&resumo=1`),
     ]);
     const metas = metasDaTela(mes, hoje, inicio);
+    // Guardado para o teste de comemoração usar a meta e a contagem reais.
+    ultimaLeitura = { fechados: mes.escopos.TODAS.volume.fechados, meta: metas.find((m) => m.chave === "fechados")?.meta, desde: parcial ? inicio : null };
     renderizarMetas(metas, hoje, inicio, dia.escopos.TODAS);
     renderizarIndicadores(mes.escopos.TODAS, dia.escopos.TODAS, mes.reunioesDeHoje, parcial ? `Leads desde ${diaEMes(inicio)}` : "Leads no mês");
     renderizarCampanhas(mes.campanhas, mes.escopos);
@@ -640,7 +644,8 @@ $("btnFecharAjustes").addEventListener("click", fecharAjustes);
 $("btnTestarContrato").addEventListener("click", () => {
   ajustes.som = $("somLigado").checked;
   $("ajustes").hidden = true;
-  comemorarContrato({ campanhas: ["Demonstração"], total: 1, meta: 30 });
+  // Simula o próximo contrato com a meta e a contagem atuais do mural.
+  comemorarContrato({ campanhas: ["Demonstração"], total: (ultimaLeitura?.fechados || 0) + 1, meta: ultimaLeitura?.meta, desde: ultimaLeitura?.desde });
   setTimeout(abrirAjustes, 10200);
 });
 $("btnTestarReuniao").addEventListener("click", () => {
