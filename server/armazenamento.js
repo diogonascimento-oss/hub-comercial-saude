@@ -109,3 +109,9 @@ export async function acrescentarAoRegistro(entrada) {
   lista.push(entrada);
   await gravar(CHAVE_REGISTRO, lista.slice(-LIMITE_DO_REGISTRO));
 }
+
+// Metas mensais definidas pelo painel: um único registro com um item por mês,
+// no formato { "2026-10": { fechados, reunioesRealizadas, reunioesMarcadas } }.
+const CHAVE_METAS = "hubsaude:metas";
+export const lerMetasDefinidas = async () => (await lerRegistro(CHAVE_METAS)) || {};
+export const gravarMetasDefinidas = (metas) => gravar(CHAVE_METAS, metas);

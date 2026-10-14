@@ -17,6 +17,7 @@ import {
   ETAPA_POR_CHAVE,
   FUSO_HORARIO,
   METAS_MENSAIS,
+  TAXAS_DE_REFERENCIA,
   ETAPAS_REUNIAO_REALIZADA,
   CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO,
   ROTULO_SEM_RASTREIO_DE_ANUNCIO,
@@ -367,7 +368,10 @@ app.get("/api/metrics", async (req, res) => {
       papeis: PAPEIS,
       mapeamento: { completo: mapeamento.completo, pendencias: mapeamento.pendencias },
       avisos,
-      metas: { mes: hoje.slice(0, 7), itens: METAS_MENSAIS.map((m) => ({ ...m, atual: doMes[m.chave] })) },
+      metas: await (async () => {
+        const { valores, origem } = await metasDoMes(hoje.slice(0, 7));
+        return { mes: hoje.slice(0, 7), origem, itens: METAS_MENSAIS.map((m) => ({ ...m, meta: valores[m.chave], atual: doMes[m.chave] })) };
+      })(),
       reunioesDeHoje: reunioesDeHoje(leads, agora),
       escopos,
       escoposAnteriores,
@@ -802,6 +806,62 @@ app.delete("/api/corrigir-evento/:eventId", async (req, res) => {
     res.json({ ok: true });
   } catch (erro) {
     responderErro(res, erro, "Falha ao reverter a correção");
+  }
+});
+
+// --- Metas mensais -------------------------------------------------------------
+
+const CHAVES_DE_META = METAS_MENSAIS.map((m) => m.chave);
+const metasPadrao = () => Object.fromEntries(METAS_MENSAIS.map((m) => [m.chave, m.meta]));
+const MES = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+// Metas de um mês: as definidas para ele ou, sem elas, as do mês definido mais
+// recente anterior a ele. Sem nenhuma definição, valem as metas padrão.
+async function metasDoMes(mes) {
+  const definidas = await armazenamento.lerMetasDefinidas();
+  if (definidas[mes]) return { valores: { ...metasPadrao(), ...definidas[mes] }, origem: "definida" };
+  const anterior = Object.keys(definidas).filter((m) => m < mes).sort().at(-1);
+  if (anterior) return { valores: { ...metasPadrao(), ...definidas[anterior] }, origem: `herdada de ${anterior}` };
+  return { valores: metasPadrao(), origem: "padrão" };
+}
+
+app.get("/api/metas", async (req, res) => {
+  const mes = String(req.query.mes || "");
+  if (!MES.test(mes)) return res.status(400).json({ error: "Informe o mês no formato AAAA-MM." });
+  try {
+    const { valores, origem } = await metasDoMes(mes);
+    res.json({
+      mes,
+      origem,
+      itens: METAS_MENSAIS.map((m) => ({ chave: m.chave, rotulo: m.rotulo, meta: valores[m.chave] })),
+      taxasDeReferencia: TAXAS_DE_REFERENCIA,
+    });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao ler as metas");
+  }
+});
+
+app.put("/api/metas", async (req, res) => {
+  const mes = String(req.body?.mes || "");
+  if (!MES.test(mes)) return res.status(400).json({ error: "Informe o mês no formato AAAA-MM." });
+  const novas = {};
+  for (const chave of CHAVES_DE_META) {
+    const valor = Number(req.body?.[chave]);
+    if (!Number.isInteger(valor) || valor < 0 || valor > 100000) {
+      return res.status(400).json({ error: "Cada meta deve ser um número inteiro entre 0 e 100.000." });
+    }
+    novas[chave] = valor;
+  }
+  try {
+    const { valores: antes } = await metasDoMes(mes);
+    const definidas = await armazenamento.lerMetasDefinidas();
+    definidas[mes] = novas;
+    await armazenamento.gravarMetasDefinidas(definidas);
+    const resumo = (v) => METAS_MENSAIS.map((m) => `${m.rotulo.toLowerCase()} ${v[m.chave]}`).join(", ");
+    await registrarAlteracao(req, "Metas do mês alteradas", { detalhe: `${mes}: ${resumo(antes)} → ${resumo(novas)}` });
+    res.json({ ok: true, mes, ...novas });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao gravar as metas");
   }
 });
 

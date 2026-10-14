@@ -134,6 +134,11 @@ export const CAMPOS = {
 //
 // O painel não acompanha faturamento: o valor recebido em cada mês depende da
 // forma de pagamento (parcelas de boleto, desconto do cartão) e não está no Kommo.
+// Taxas de referência usadas para sugerir as metas de reuniões a partir da meta
+// de contratos (agosto de 2026, registradas no protocolo).
+export const TAXAS_DE_REFERENCIA = { fechamentoSobreRealizadas: 26.9, comparecimento: 45.6 };
+
+// Metas padrão, usadas enquanto nenhuma meta for definida pelo painel.
 export const METAS_MENSAIS = [
   { chave: "fechados", rotulo: "Contratos fechados", meta: 25 },
   { chave: "reunioesRealizadas", rotulo: "Reuniões realizadas", meta: 93 },

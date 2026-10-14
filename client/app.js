@@ -1175,6 +1175,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   // A ficha do lead abre sobre os demais diálogos; fecha primeiro.
   if (fecharFichaDoLead()) return;
+  if (!$("modalMetas").classList.contains("hidden")) return fecharDialogo("modalMetas");
   if (!$("modalRegistro").classList.contains("hidden")) return fecharDialogo("modalRegistro");
   fecharModal();
   fecharModaisDeTrafego();
