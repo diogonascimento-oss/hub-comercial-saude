@@ -285,9 +285,9 @@ async function atualizarGraficoDeCusto() {
 const COLUNAS_POR_CAMPANHA = [
   { campo: "totalLeads", lista: "leads", rotulo: "Leads", titulo: "leads" },
   { campo: "qualificados", lista: "leadsQualificados", rotulo: "Qualificados", titulo: "qualificados" },
-  { campo: "reuniao", lista: "leadsReuniao", rotulo: "Reuniões marcadas", titulo: "com reunião marcada" },
-  { campo: "realizadas", lista: "leadsRealizadas", rotulo: "Reuniões realizadas", titulo: "com reunião realizada" },
-  { campo: "contratoFechado", lista: "leadsFechados", rotulo: "Contratos fechados", titulo: "com contrato fechado" },
+  { campo: "reuniao", lista: "leadsReuniao", rotulo: "Marcadas", titulo: "com reunião marcada" },
+  { campo: "realizadas", lista: "leadsRealizadas", rotulo: "Realizadas", titulo: "com reunião realizada" },
+  { campo: "contratoFechado", lista: "leadsFechados", rotulo: "Contratos", titulo: "com contrato fechado" },
 ];
 const moeda = (valor) => (valor === null || valor === undefined ? "—" : valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 
@@ -309,16 +309,25 @@ function renderizarTabelaPorCampanha(a) {
   const celula = (g, i, c, ci) =>
     `<td class="text-right tabular"><button data-campanha="${i}" data-coluna="${ci}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">${numero(g[c.campo])}</button></td>`;
   tabela.innerHTML = `
-    <thead><tr class="text-inkdim text-[10px] uppercase tracking-wide">
-      <th class="text-left font-normal">Campanha</th>
-      <th class="text-right font-normal">Investido</th>
-      ${COLUNAS_POR_CAMPANHA.map((c) => `<th class="text-right font-normal">${c.rotulo}</th>`).join("")}
-    </tr></thead>
+    <thead>
+      <tr class="text-inkdim text-[10px] uppercase tracking-wide">
+        <th rowspan="2" class="text-left font-normal align-bottom">Campanha</th>
+        <th rowspan="2" class="text-right font-normal align-bottom">Investido</th>
+        <th rowspan="2" class="text-right font-normal align-bottom">Leads</th>
+        <th rowspan="2" class="text-right font-normal align-bottom">Qualificados</th>
+        <th colspan="2" class="text-center font-normal">Reuniões</th>
+        <th rowspan="2" class="text-right font-normal align-bottom">Contratos</th>
+      </tr>
+      <tr class="text-inkdim text-[10px] uppercase tracking-wide">
+        <th class="text-right font-normal">Marcadas</th>
+        <th class="text-right font-normal">Realizadas</th>
+      </tr>
+    </thead>
     <tbody>
       ${grupos
         .map(
           (g, i) => `<tr>
-        <td class="text-ink max-w-[280px] truncate" title="${esc(g.grupo)}">${esc(g.grupo)}</td>
+        <td class="text-ink max-w-[220px] truncate" title="${esc(g.grupo)}">${esc(g.grupo)}</td>
         <td class="text-right tabular text-inkdim">${moeda(g.investido)}</td>
         ${COLUNAS_POR_CAMPANHA.map((c, ci) => celula(g, i, c, ci)).join("")}
       </tr>`,
@@ -417,7 +426,7 @@ async function carregarSemanas() {
       <div class="flex items-center gap-2 border border-line px-3 py-2 flex-wrap" data-semana="${esc(chave)}">
         <input type="checkbox" class="accent-gold" data-acao="selecionar" aria-label="Selecionar para somar" ${semanasSelecionadas.has(chave) ? "checked" : ""}>
         <span class="flex-1 text-ink tabular">${dataBR(s.inicio)} a ${dataBR(s.fim)}</span>
-        <button data-acao="ver" class="${botao}">Ver no painel</button>
+        <button data-acao="ver" class="${botao}" title="Coloca estas datas no filtro do topo e mostra os números da semana">Filtrar por esta semana</button>
         <button data-acao="gerenciar" class="${botao}">Gerenciar</button>
         <button data-acao="exportar" class="${botao}">Exportar relatório</button>
       </div>`;
@@ -723,9 +732,11 @@ $("listaSemanas").addEventListener("click", (e) => {
     else semanasSelecionadas.delete(`${inicio}|${fim}`);
     atualizarBotaoDeSoma();
   } else if (alvo.dataset.acao === "ver") {
+    // Põe a semana no filtro de datas do topo e leva a tela até os números.
     $("dataInicio").value = inicio;
     $("dataFim").value = fim;
     atualizar();
+    $("tTrafegoResumo").scrollIntoView({ behavior: "smooth", block: "start" });
   } else if (alvo.dataset.acao === "gerenciar") abrirSemana(inicio, fim);
   else if (alvo.dataset.acao === "exportar") exportarRelatorioDaSemana(inicio, fim);
 });

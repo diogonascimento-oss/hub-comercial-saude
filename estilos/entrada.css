@@ -109,3 +109,7 @@ a, button, summary, input, select { transition: color 0.2s ease, border-color 0.
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .revelar { opacity: 1; transform: none; }
 }
+
+/* Tabela por campanha: mais colunas, espaçamento menor. */
+table.comparativo.compacta th,
+table.comparativo.compacta td { padding: 8px 10px; }
