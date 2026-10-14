@@ -26,7 +26,7 @@ import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
 import { normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
 import { calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
-import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta } from "./trafego.js";
+import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
 import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
 import { getLocalizacao } from "./localizacao.js";
 
@@ -872,6 +872,17 @@ app.get("/api/analise-trafego", async (req, res) => {
     if (req.query.resumo === "1") {
       const contagens = (lista) => (lista || []).map((g) => ({ grupo: g.grupo, totalLeads: g.totalLeads }));
       return res.json({ totalLeads: analise.totalLeads, porEstado: contagens(analise.porEstado), porRegiao: contagens(analise.porRegiao) });
+    }
+    // Valor investido por campanha, lido do Meta quando o token está
+    // configurado. Uma falha do Meta não impede a resposta: o valor fica vazio.
+    analise.investimento = { configurado: metaConfigurado(), erro: null };
+    if (metaConfigurado()) {
+      try {
+        const linhas = await buscarGastoDoMeta(periodo.inicio, periodo.fim);
+        analise.porCampanhaMeta = associarInvestimentoPorCampanha(analise.porCampanhaMeta, linhas);
+      } catch (erro) {
+        analise.investimento.erro = erro.message || "Falha ao consultar o Meta.";
+      }
     }
     res.json(analise);
   } catch (erro) {

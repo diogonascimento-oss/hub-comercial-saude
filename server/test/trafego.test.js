@@ -1,7 +1,7 @@
 // Testes da análise de tráfego e do cálculo de custo.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta } from "../trafego.js";
+import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "../trafego.js";
 
 const DE = 1_000_000;
 const ATE = DE + 7 * 86400;
@@ -120,4 +120,18 @@ test("campanha sem rastreio de anúncio recebe rótulo próprio e não conta com
     a.porConjunto.map((g) => g.grupo).sort(),
     ["(não informado)", "Pernambuco", "WhatsApp (anúncio não rastreado)"],
   );
+});
+
+test("por campanha do Meta: reuniões realizadas e valor investido pelo nome da campanha", () => {
+  const a = analisarTrafego({ ...cenario(), apenasNovos: true });
+  const campanha = a.porCampanhaMeta.find((g) => g.grupo === "Campanha");
+  assert.deepEqual([campanha.totalLeads, campanha.qualificados, campanha.reuniao, campanha.realizadas, campanha.contratoFechado], [4, 2, 1, 1, 1]);
+  const comInvestimento = associarInvestimentoPorCampanha(a.porCampanhaMeta, [
+    { campanha: " campanha ", gasto: 100.5 },
+    { campanha: "CAMPANHA", gasto: 20 },
+    { campanha: "Outra área do escritório", gasto: 999 },
+  ]);
+  assert.equal(comInvestimento.find((g) => g.grupo === "Campanha").investido, 120.5);
+  assert.equal(associarInvestimentoPorCampanha([{ grupo: "Sem gasto" }], []).at(0).investido, null);
+  assert.equal(comInvestimento.length, a.porCampanhaMeta.length);
 });

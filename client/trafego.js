@@ -280,6 +280,68 @@ async function atualizarGraficoDeCusto() {
 
 // --- Carga e renderização da aba ---------------------------------------------------
 
+// Tabela por campanha do Meta, no formato do relatório de tráfego: uma linha
+// por campanha e uma linha de total. Cada número abre a lista dos leads.
+const COLUNAS_POR_CAMPANHA = [
+  { campo: "totalLeads", lista: "leads", rotulo: "Leads", titulo: "leads" },
+  { campo: "qualificados", lista: "leadsQualificados", rotulo: "Qualificados", titulo: "qualificados" },
+  { campo: "reuniao", lista: "leadsReuniao", rotulo: "Reuniões marcadas", titulo: "com reunião marcada" },
+  { campo: "realizadas", lista: "leadsRealizadas", rotulo: "Reuniões realizadas", titulo: "com reunião realizada" },
+  { campo: "contratoFechado", lista: "leadsFechados", rotulo: "Contratos fechados", titulo: "com contrato fechado" },
+];
+const moeda = (valor) => (valor === null || valor === undefined ? "—" : valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+
+function renderizarTabelaPorCampanha(a) {
+  const grupos = a.porCampanhaMeta || [];
+  const tabela = $("tabelaPorCampanha");
+  $("notaPorCampanha").textContent = $("apenasNovos").checked
+    ? "Somente leads que chegaram no período, e até onde cada um foi."
+    : "Todos os leads com movimentação no período, inclusive os que chegaram antes.";
+  if (!grupos.length) {
+    tabela.innerHTML = '<tbody><tr><td class="text-inkdim">Sem leads no período.</td></tr></tbody>';
+    $("rodapePorCampanha").textContent = "";
+    return;
+  }
+  const inv = a.investimento || {};
+  const somar = (campo) => grupos.reduce((t, g) => t + (g[campo] || 0), 0);
+  const algumInvestido = grupos.some((g) => g.investido !== null && g.investido !== undefined);
+  const totalInvestido = algumInvestido ? Math.round(grupos.reduce((t, g) => t + (g.investido || 0), 0) * 100) / 100 : null;
+  const celula = (g, i, c, ci) =>
+    `<td class="text-right tabular"><button data-campanha="${i}" data-coluna="${ci}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">${numero(g[c.campo])}</button></td>`;
+  tabela.innerHTML = `
+    <thead><tr class="text-inkdim text-[10px] uppercase tracking-wide">
+      <th class="text-left font-normal">Campanha</th>
+      <th class="text-right font-normal">Investido</th>
+      ${COLUNAS_POR_CAMPANHA.map((c) => `<th class="text-right font-normal">${c.rotulo}</th>`).join("")}
+    </tr></thead>
+    <tbody>
+      ${grupos
+        .map(
+          (g, i) => `<tr>
+        <td class="text-ink max-w-[280px] truncate" title="${esc(g.grupo)}">${esc(g.grupo)}</td>
+        <td class="text-right tabular text-inkdim">${moeda(g.investido)}</td>
+        ${COLUNAS_POR_CAMPANHA.map((c, ci) => celula(g, i, c, ci)).join("")}
+      </tr>`,
+        )
+        .join("")}
+      <tr class="destaque font-semibold">
+        <td class="text-goldbright">Total</td>
+        <td class="text-right tabular text-goldbright">${moeda(totalInvestido)}</td>
+        ${COLUNAS_POR_CAMPANHA.map((c) => `<td class="text-right tabular text-goldbright">${numero(somar(c.campo))}</td>`).join("")}
+      </tr>
+    </tbody>`;
+  tabela.querySelectorAll("button[data-campanha]").forEach((botao) => {
+    const g = grupos[Number(botao.dataset.campanha)];
+    const c = COLUNAS_POR_CAMPANHA[Number(botao.dataset.coluna)];
+    botao.addEventListener("click", () => abrirLeadsDoGrupo(`${g.grupo}: ${c.titulo}`, g[c.lista] || []));
+  });
+  $("rodapePorCampanha").textContent = !inv.configurado
+    ? "Investido: aparece quando a integração com o Meta estiver configurada (token de acesso no servidor)."
+    : inv.erro
+      ? `Investido indisponível: ${inv.erro}`
+      : "Investido: valor gasto no Meta no período, associado pelo nome da campanha. Campanhas cujo nome no Kommo difere do Meta ficam sem valor.";
+}
+
 function renderizarTrafego() {
   const a = analiseDeTrafego;
   if (!a) return;
@@ -299,6 +361,7 @@ function renderizarTrafego() {
     aviso.classList.remove("hidden");
   } else aviso.classList.add("hidden");
 
+  renderizarTabelaPorCampanha(a);
   renderizarGrupo("tabelaPorConjunto", a.porConjunto, "modoPorConjunto", 8);
   renderizarGrupo("tabelaPorAnuncio", a.porAnuncio, "modoPorAnuncio", 8);
   renderizarGrupo("tabelaPorRegiao", a.porRegiao, "modoPorRegiao", 8);

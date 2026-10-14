@@ -10,6 +10,7 @@ import {
 } from "./config.js";
 import { nomeDaEtapa } from "./mapeamento.js";
 import { getLocalizacao } from "./localizacao.js";
+import { reunioesDoLead } from "./metricas.js";
 
 const SEM_VALOR = "(não informado)";
 
@@ -74,6 +75,9 @@ export function consolidarLeads({ leads, eventosPorLead, deTs, ateTs, apenasNovo
       semRastreioDeAnuncio: semRastreio,
       etapasVisitadas,
       qualificado,
+      // Reunião realizada pelas mesmas regras dos indicadores do funil (campo
+      // "Situação da reunião" ou saída de Agendado para uma etapa pós-reunião).
+      reuniaoRealizada: reunioesDoLead(lead, eventos).some((r) => r.resultado === "Realizada"),
       etapaMaisAvancada: nomeDaEtapa(maisAvancada),
       localizacao: getLocalizacao(lead.telefone),
     });
@@ -101,6 +105,7 @@ function agruparEComputar(leads, chaveDoGrupo) {
     const reuniao = passou("AGENDADO");
     const farmer = passou("PROTOCOLO_FARMER");
     const fechados = passou("FECHADO");
+    const realizadas = doGrupo.filter((l) => l.reuniaoRealizada);
     resultado.push({
       grupo,
       totalLeads: doGrupo.length,
@@ -110,6 +115,7 @@ function agruparEComputar(leads, chaveDoGrupo) {
       percentualReuniao: umaCasa(reuniao.length, doGrupo.length),
       remarcacao: passou("REMARCACAO").length,
       farmer: farmer.length,
+      realizadas: realizadas.length,
       reaquecimento: passou("REAQUECIMENTO").length,
       contratoFechado: fechados.length,
       desqualificados: passou("DESQUALIFICADO").length,
@@ -118,6 +124,7 @@ function agruparEComputar(leads, chaveDoGrupo) {
       leadsQualificados: qualificados.map(resumoDoLead),
       leadsReuniao: reuniao.map(resumoDoLead),
       leadsFarmer: farmer.map(resumoDoLead),
+      leadsRealizadas: realizadas.map(resumoDoLead),
       leadsFechados: fechados.map(resumoDoLead),
     });
   }
@@ -221,6 +228,22 @@ export function custoTotalDaSemana(registro) {
   if (!registro.custo?.porAnuncio?.length) return null;
   const dias = diasDoPeriodo(registro.inicio, registro.fim);
   return registro.custo.porAnuncio.reduce((total, c) => total + (custoDoItem(c, dias) || 0), 0);
+}
+
+// Valor investido no Meta por campanha, associado pelo nome da campanha
+// gravado no lead (maiúsculas e espaços ignorados). Gastos de campanhas sem
+// lead no período não entram: a conta de anúncios pode ter campanhas de outras
+// áreas do escritório.
+export function associarInvestimentoPorCampanha(grupos, linhas) {
+  const gastoPorNome = new Map();
+  for (const linha of linhas || []) {
+    const chave = normalizarNome(linha.campanha);
+    if (chave) gastoPorNome.set(chave, (gastoPorNome.get(chave) || 0) + (Number(linha.gasto) || 0));
+  }
+  return (grupos || []).map((g) => {
+    const chave = normalizarNome(g.grupo);
+    return { ...g, investido: gastoPorNome.has(chave) ? doisDecimais(gastoPorNome.get(chave)) : null };
+  });
 }
 
 const normalizarNome = (texto) => String(texto || "").trim().toLowerCase().replace(/\s+/g, " ");

@@ -88,7 +88,7 @@ export function reunioesDoLead(lead, eventos) {
       aberta = { agendadaEm: ev.ts, veioDeRemarcacao: ev.de === "REMARCACAO", desfechoEm: null, resultado: "Em aberto", criterio: "" };
       reunioes.push(aberta);
     } else if (ev.de === "AGENDADO" && ev.para !== "AGENDADO" && aberta) {
-      const comEtiqueta = ev.para === "DESQUALIFICADO" && lead.tags.includes(ETIQUETAS.reuniaoRealizada);
+      const comEtiqueta = ev.para === "DESQUALIFICADO" && (lead.tags || []).includes(ETIQUETAS.reuniaoRealizada);
       const pelaMovimentacao = ETAPAS_REUNIAO_REALIZADA.includes(ev.para) || comEtiqueta;
       const peloCampo = ev === ultimaSaida ? leituraDaSituacao(lead.situacaoDaReuniao) : null;
       const realizada = peloCampo ?? pelaMovimentacao;
