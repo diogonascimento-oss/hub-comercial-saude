@@ -438,16 +438,32 @@ function renderizarEvolucao() {
   const marcas = [0, 0.25, 0.5, 0.75, 1]
     .map((f) => `<line x1="${ML}" y1="${y(maximo * f)}" x2="${W - MR}" y2="${y(maximo * f)}" stroke="#1f2130"/><text x="${ML - 6}" y="${y(maximo * f) + 3}" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="9" fill="#6b6d7a">${Math.round(maximo * f)}</text>`)
     .join("");
+  // Linha unificada: cada trecho e cada ponto têm a cor da categoria da etapa
+  // (triagem, avanço, contrato, perda), a mesma dos nomes no eixo. Com uma
+  // linha por campanha, vale a cor da campanha. Os desvios também são ligados,
+  // por uma linha tracejada, separada do caminho principal.
+  const corDoPonto = (s, i) => (unificado ? corEtapa(etapas[i].chave) : s.cor);
+  const trechos = (s, de, ate, tracoExtra) => {
+    const pontos = s.valores.slice(de, ate).map((v, k) => [x(de + k), y(v)]);
+    if (pontos.length < 2) return "";
+    const traco = tracoExtra || s.traco;
+    if (!unificado) {
+      return `<path d="${pontos.map(([px, py], k) => `${k ? "L" : "M"}${px.toFixed(1)},${py.toFixed(1)}`).join(" ")}" fill="none" stroke="${s.cor}" stroke-width="2"${traco ? ` stroke-dasharray="${traco}"` : ""}/>`;
+    }
+    return pontos
+      .slice(1)
+      .map(([px, py], k) => `<line x1="${pontos[k][0].toFixed(1)}" y1="${pontos[k][1].toFixed(1)}" x2="${px.toFixed(1)}" y2="${py.toFixed(1)}" stroke="${corDoPonto(s, de + k + 1)}" stroke-width="2" stroke-linecap="round"${traco ? ` stroke-dasharray="${traco}"` : ""}/>`)
+      .join("");
+  };
   const linhas = series
     .map((s, si) => {
       // Com várias linhas, o rótulo alterna acima e abaixo do ponto para reduzir a sobreposição.
       const deslocamento = unificado || si !== 1 ? -9 : 15;
-      // A linha liga apenas o caminho principal; os desvios são pontos soltos.
-      return `<path d="${s.valores.slice(0, principais.length).map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/>
+      return `${trechos(s, 0, principais.length)}${trechos(s, principais.length, etapas.length, "5,4")}
       ${s.valores
         .map(
-          (v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="5" fill="#0b0c11" stroke="${s.cor}" stroke-width="2" style="cursor:pointer" data-serie="${si}" data-etapa="${i}"><title>${esc(s.nome)}, ${esc(etapas[i].nome)}: ${v}</title></circle>
-          <text x="${x(i).toFixed(1)}" y="${(y(v) + deslocamento).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" font-weight="600" fill="${s.cor}">${v}</text>`,
+          (v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="5" fill="#0b0c11" stroke="${corDoPonto(s, i)}" stroke-width="2" style="cursor:pointer" data-serie="${si}" data-etapa="${i}"><title>${esc(s.nome)}, ${esc(etapas[i].nome)}: ${v}</title></circle>
+          <text x="${x(i).toFixed(1)}" y="${(y(v) + deslocamento).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" font-weight="600" fill="${corDoPonto(s, i)}">${v}</text>`,
         )
         .join("")}`;
     })
@@ -466,7 +482,13 @@ function renderizarEvolucao() {
       ${marcas}<line x1="${ML}" y1="${base}" x2="${W - MR}" y2="${base}" stroke="#33364a"/>${separador}${linhas}${rotulos}
     </svg>
     <div class="flex flex-wrap gap-x-5 gap-y-1 mt-1 text-[11px] text-inkdim">
-      ${series.map((s) => `<span class="flex items-center gap-1.5"><svg width="20" height="8" aria-hidden="true"><line x1="0" y1="4" x2="20" y2="4" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/></svg>${esc(s.nome)}</span>`).join("")}
+      ${(unificado
+        ? [["Triagem", CORES_DE_CATEGORIA.triagem], ["Avanço", CORES_DE_CATEGORIA.avanco], ["Contrato fechado", CORES_DE_CATEGORIA.sucesso], ["Perda", CORES_DE_CATEGORIA.perda]].map(([nome, cor]) => ({ nome, cor, traco: "" }))
+        : series
+      )
+        .map((s) => `<span class="flex items-center gap-1.5"><svg width="20" height="8" aria-hidden="true"><line x1="0" y1="4" x2="20" y2="4" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/></svg>${esc(s.nome)}</span>`)
+        .join("")}
+      ${desvios.length ? '<span class="flex items-center gap-1.5"><svg width="20" height="8" aria-hidden="true"><line x1="0" y1="4" x2="20" y2="4" stroke="#9a9ca8" stroke-width="2" stroke-dasharray="5,4"/></svg>Desvios do caminho principal</span>' : ""}
     </div>`;
 
   container.querySelectorAll("circle[data-serie]").forEach((ponto) => {
