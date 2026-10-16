@@ -369,13 +369,12 @@ function renderizarCartoes() {
     ? `"Período anterior", nos cartões acima, é ${dataBr(dados.periodoAnterior.inicio)} a ${dataBr(dados.periodoAnterior.fim)}.`
     : "";
 
-  const emAberto = $("avisoEmAberto");
-  if (v.reunioesEmAberto > 0) {
-    emAberto.textContent =
-      `${numero(v.reunioesEmAberto)} reunião(ões) marcada(s) no período ainda sem desfecho registrado (${percentual(t.emAberto)} das marcadas). ` +
-      "As taxas de comparecimento e de não realização podem mudar quando esses desfechos forem lançados.";
-    emAberto.classList.remove("hidden");
-  } else emAberto.classList.add("hidden");
+  // O bloco de reuniões em aberto aparece sempre que há alguma.
+  $("blocoEmAberto").classList.toggle("hidden", !v.reunioesEmAberto);
+  $("resumoEmAberto").textContent = v.reunioesEmAberto
+    ? `${percentual(t.emAberto)} das reuniões marcadas no período ainda estão na coluna Agendado, sem desfecho. ` +
+      "Em vermelho, as marcadas há 3 dias ou mais: provavelmente a reunião já aconteceu e falta mover o lead. As taxas de comparecimento e de não realização mudam quando esses desfechos forem lançados."
+    : "";
 
   const fora = $("avisoForaDaBase");
   const total = dados.avisos.eventosDeLeadsForaDaBase;
@@ -625,6 +624,8 @@ function itemDeLista(principal, secundario, direita) {
 
 const LIMITE_DE_ITENS = 40;
 
+const variasCampanhasNoPainel = () => (dados?.campanhas?.length || 0) > 1;
+
 function renderizarPendencias() {
   const parados = daCampanha(dados.listas.leadsParados);
   $("totalParados").textContent = numero(parados.length);
@@ -635,9 +636,19 @@ function renderizarPendencias() {
 
   const emAberto = daCampanha(dados.listas.reunioesEmAberto);
   $("totalEmAberto").textContent = numero(emAberto.length);
-  $("listaEmAberto").innerHTML = emAberto.length
-    ? emAberto.slice(0, LIMITE_DE_ITENS).map((l) => itemDeLista(esc(l.nome), `${esc(l.campanha)} · agendada em ${dataLocal(l.agendadoEm)}`, `${numero(l.diasAguardando)} dias`)).join("")
-    : '<p class="text-xs text-inkdim">Todas as reuniões marcadas no período têm desfecho registrado.</p>';
+  $("listaEmAberto").innerHTML = emAberto
+    .map((l) => {
+      const atrasada = l.diasAguardando >= 3;
+      return `
+      <div class="flex items-center justify-between gap-3 py-2 border-b border-gold/15 last:border-0">
+        <div class="min-w-0">
+          <button data-lead="${esc(l.id)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(l.nome)}</button>
+          <p class="text-[10px] text-inkfaint">${variasCampanhasNoPainel() ? `${esc(l.campanha)} · ` : ""}marcada em ${dataLocal(l.agendadoEm)}</p>
+        </div>
+        <span class="text-[11px] tabular shrink-0 font-semibold ${atrasada ? "text-negativo" : "text-goldbright"}">${l.diasAguardando === 0 ? "hoje" : `há ${numero(l.diasAguardando)} dia${l.diasAguardando > 1 ? "s" : ""}`}</span>
+      </div>`;
+    })
+    .join("");
 }
 
 function leadsFiltrados() {
@@ -1147,6 +1158,10 @@ $("modoEvolucao").addEventListener("change", () => dados && renderizarEvolucao()
 $("etapasEvolucao").addEventListener("change", () => dados && renderizarEvolucao());
 $("seletorOrigem").addEventListener("change", renderizarDestinos);
 $("buscaLeads").addEventListener("input", () => dados && renderizarLeads());
+$("listaEmAberto").addEventListener("click", (e) => {
+  const botao = e.target.closest("button[data-lead]");
+  if (botao) abrirFichaDoLead(botao.dataset.lead);
+});
 $("btnExportarComparativo").addEventListener("click", exportarComparativo);
 $("btnExportarLeads").addEventListener("click", exportarLeads);
 $("btnExportarParados").addEventListener("click", exportarParados);
