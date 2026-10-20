@@ -337,8 +337,10 @@ function renderizarEvolucao(campanhas, etapas, escopos) {
     .join("");
   const linhas = series
     .map(
-      // A linha liga só o caminho principal; os desvios são pontos soltos.
+      // O caminho principal é uma linha contínua; os desvios, à direita da
+      // divisória, são ligados por uma linha tracejada mais suave.
       (s) => `<path d="${s.valores.slice(0, principais.length).map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${s.cor}" stroke-width="5" stroke-linejoin="round"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/>
+      ${desvios.length > 1 ? `<path d="${s.valores.slice(principais.length).map((v, k) => `${k ? "L" : "M"}${x(principais.length + k).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${s.cor}" stroke-width="4" stroke-linejoin="round" stroke-dasharray="16,10" opacity="0.75"/>` : ""}
       ${s.valores.map((v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="8" fill="${s.cor}" stroke="#12131b" stroke-width="3"/>`).join("")}`,
     )
     .join("");
@@ -353,7 +355,7 @@ function renderizarEvolucao(campanhas, etapas, escopos) {
   $("legendaEvolucao").innerHTML =
     series
       .map((s) => `<span><i style="background:${s.traco ? `repeating-linear-gradient(90deg, ${s.cor} 0 10px, transparent 10px 16px)` : s.cor}"></i>${esc(s.nome)}</span>`)
-      .join("") + '<span style="margin-left:auto">Número colorido: valor de uma campanha. Número branco: valor igual em mais de uma.</span>';
+      .join("") + (desvios.length ? '<span><i style="background:repeating-linear-gradient(90deg, #9a9ca8 0 10px, transparent 10px 16px)"></i>Desvios</span>' : "") + '<span style="margin-left:auto">Número colorido: valor de uma campanha. Número branco: valor igual em mais de uma.</span>';
 }
 
 // --- Tela 3: mapa --------------------------------------------------------------
