@@ -86,8 +86,8 @@ function blocoDaFicha(titulo, linhas) {
   return `
     <section>
       <p class="rotulo mb-2">${esc(titulo)}</p>
-      <dl class="grid grid-cols-[minmax(0,11rem)_1fr] gap-x-4 gap-y-1.5">
-        ${preenchidas.map(([nome, valor]) => `<dt class="text-inkdim">${esc(nome)}</dt><dd class="text-ink break-words">${valor}</dd>`).join("")}
+      <dl class="grid grid-cols-1 sm:grid-cols-[11rem_minmax(0,1fr)] gap-x-4 gap-y-0.5 sm:gap-y-1.5">
+        ${preenchidas.map(([nome, valor]) => `<dt class="text-inkdim pt-1.5 sm:pt-0">${esc(nome)}</dt><dd class="text-ink min-w-0 [overflow-wrap:anywhere]">${valor}</dd>`).join("")}
       </dl>
     </section>`;
 }
@@ -149,8 +149,20 @@ function renderizarFicha(l) {
   // Campos do Kommo já exibidos nos blocos acima não se repetem na lista geral.
   const jaExibidos = new Set([l.origem.campanhaMeta, l.origem.conjunto, l.origem.anuncio, l.responsaveis.sdr, l.responsaveis.closer, l.responsaveis.farmer, l.situacaoDaReuniao, l.substatusFarmer].filter(Boolean));
   const restantes = l.camposDoLead.filter((c) => !jaExibidos.has(c.valor));
-  const outrosCampos = restantes.filter((c) => !c.tecnico);
-  const camposTecnicos = restantes.filter((c) => c.tecnico);
+  // Campos com dados internos das automações (texto em formato JSON) não são
+  // para leitura da equipe: ficam recolhidos no fim da ficha.
+  const ehRegistroInterno = (valor) => {
+    if (!/^\s*[{[]/.test(valor)) return false;
+    try {
+      JSON.parse(valor);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const registrosInternos = restantes.filter((c) => ehRegistroInterno(c.valor));
+  const outrosCampos = restantes.filter((c) => !c.tecnico && !ehRegistroInterno(c.valor));
+  const camposTecnicos = restantes.filter((c) => c.tecnico && !ehRegistroInterno(c.valor));
   const semOrigem = l.origemSemRastreio ? esc(l.origemSemRastreio) : naoInformado;
 
   $("corpoFicha").innerHTML =
@@ -184,6 +196,12 @@ function renderizarFicha(l) {
     ]) +
     blocoDaFicha("Demais campos preenchidos no Kommo", outrosCampos.map((c) => [c.nome, esc(c.valor)])) +
     blocoDaCadencia(camposTecnicos) +
+    (registrosInternos.length
+      ? `<details class="border border-line px-3 py-2"><summary class="cursor-pointer text-inkdim">Registros internos da automação (${numero(registrosInternos.length)})</summary>
+          <p class="text-[10px] text-inkfaint mt-2">Gravados pelo Make para controlar as mensagens automáticas. A equipe não precisa ler nem alterar.</p>
+          ${registrosInternos.map((c) => `<p class="text-inkdim mt-2">${esc(c.nome)}</p><pre class="mt-1 text-[10px] text-inkfaint font-mono whitespace-pre-wrap [overflow-wrap:anywhere] bg-surface2 p-2">${esc(c.valor)}</pre>`).join("")}
+        </details>`
+      : "") +
     `<section>
       <p class="rotulo mb-2">Histórico de movimentações (${numero(l.historico.length)})</p>
       ${
