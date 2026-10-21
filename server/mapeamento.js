@@ -92,7 +92,7 @@ export function montarMapeamento(funis) {
     }
 
     for (const etapa of ETAPAS) {
-      if (!chavesMapeadas.has(etapa.chave)) {
+      if (!chavesMapeadas.has(etapa.chave) && !etapa.opcional) {
         pendencias.push(`Campanha ${campanha.codigo}: etapa "${etapa.nome}" não localizada no funil "${funil.name}".`);
       }
     }

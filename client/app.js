@@ -317,7 +317,7 @@ const REGRAS_DOS_INDICADORES = {
   qualificados: ["Qualificados", "Leads que entraram na coluna Lead Qualificado dentro do período. Também conta quem foi movido direto de uma etapa anterior à qualificação para Em Agendamento ou Agendado."],
   qualificadosSemAgendamento: ["Qualificados sem agendamento", "Leads qualificados no período que não entraram em Agendado depois da qualificação, dentro do período."],
   reunioesMarcadas: ["Leads com reunião marcada", "Leads que entraram na coluna Agendado dentro do período. O número do cartão conta agendamentos: um lead reagendado conta mais de uma vez no cartão e uma vez nesta lista."],
-  reunioesRealizadas: ["Leads com reunião realizada", "Leads que saíram de Agendado dentro do período com a reunião realizada, conforme o campo Situação da reunião. Sem o campo preenchido, contam as saídas para Protocolo Farmer, Reaquecimento ou Fechado; a saída para Desqualificado conta somente se o lead tiver a etiqueta REUNIAO_REALIZADA."],
+  reunioesRealizadas: ["Leads com reunião realizada", "Leads que saíram de Agendado dentro do período com a reunião realizada, conforme o campo Situação da reunião. Sem o campo preenchido, contam as saídas para Reunião Realizada, Protocolo Farmer, Reaquecimento ou Fechado; a saída para Desqualificado conta somente se o lead tiver a etiqueta REUNIAO_REALIZADA."],
   naoRealizadas: ["Leads com reunião não realizada", "Leads que saíram de Agendado para Remarcação, quando o agendamento também ocorreu dentro do período."],
   remarcacoesRecuperadas: ["Remarcações recuperadas", "Leads movidos de Remarcação para Agendado dentro do período."],
   fechados: ["Contratos fechados", "Leads que entraram na coluna final de venda ganha dentro do período."],

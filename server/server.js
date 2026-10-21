@@ -229,7 +229,7 @@ const dataLocal = (ts) => new Date((ts + DESLOCAMENTO_DO_FUSO_S) * 1000).toISOSt
 // Reuniões com data marcada para hoje, pelo campo "Data da Reunião" do lead.
 // Só totais e horários; nenhum dado pessoal. A etapa atual do lead diz em que
 // pé está a reunião: em Agendado, ainda vai acontecer (ou está sem desfecho
-// lançado); em Protocolo Farmer, Reaquecimento ou Fechado, já aconteceu; em
+// lançado); em Reunião Realizada, Protocolo Farmer, Reaquecimento ou Fechado, já aconteceu; em
 // Remarcação, não aconteceu.
 function reunioesDeHoje(leads, agora) {
   const hoje = dataLocal(agora);

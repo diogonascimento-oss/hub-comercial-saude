@@ -276,3 +276,12 @@ test("acontecimentos do dia seguem as mesmas regras dos cartões", () => {
   assert.equal(r.acontecimentos.filter((a) => a.tipo === "realizada").length, r.volume.reunioesRealizadas);
   assert.equal(calcularEscopo({ leads, eventosPorLead, deTs: DE, ateTs: ATE, agora: AGORA }).acontecimentos, undefined);
 });
+
+test("saída de Agendado para a coluna Reunião Realizada conta como reunião realizada", () => {
+  const leads = [lead(91, "REUNIAO_REALIZADA")];
+  const eventos = [ev(91, 1 * HORA, "EM_AGENDAMENTO", "AGENDADO"), ev(91, 2 * DIA, "AGENDADO", "REUNIAO_REALIZADA")];
+  const r = calcularEscopo({ leads, eventosPorLead: new Map([[91, eventos]]), deTs: DE, ateTs: ATE, agora: AGORA });
+  assert.equal(r.volume.reunioesRealizadas, 1);
+  assert.equal(r.volume.realizadasDaCoorte, 1);
+  assert.equal(r.taxas.comparecimento, 100);
+});

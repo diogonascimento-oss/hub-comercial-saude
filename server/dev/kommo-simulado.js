@@ -30,8 +30,10 @@ const escolher = (lista) => lista[Math.floor(sortear() * lista.length)];
 // Os funis simulados usam os mesmos IDs de server/config.js, para que o
 // mapeamento por ID funcione também no ambiente de desenvolvimento.
 const NOMES_DAS_COLUNAS = ["Etapa de leads de entrada", ...ETAPAS.map((e) => e.nome.toUpperCase())];
-NOMES_DAS_COLUNAS[10] = "Venda ganha";
-NOMES_DAS_COLUNAS[11] = "Venda perdida";
+// Posição de cada etapa na lista de colunas (a 0 é a coluna de entrada do Kommo).
+const I = Object.fromEntries(ETAPAS.map((e, i) => [e.chave, i + 1]));
+NOMES_DAS_COLUNAS[I.FECHADO] = "Venda ganha";
+NOMES_DAS_COLUNAS[I.DESQUALIFICADO] = "Venda perdida";
 
 function montarFunil(id, name, idsDasEtapas) {
   const ids = [id * 10, ...ETAPAS.map((e, i) => idsDasEtapas?.[e.chave] || id * 10 + i + 1)];
@@ -98,49 +100,51 @@ for (const [indice, funil] of funis.entries()) {
       return true;
     };
     const perder = (atraso) => {
-      if (mover(11, atraso)) motivo = escolher(MOTIVOS);
+      if (mover(I.DESQUALIFICADO, atraso)) motivo = escolher(MOTIVOS);
     };
 
     percurso: {
-      if (!mover(2, entre(0.01, 0.4))) break percurso;
+      if (!mover(I.CONTATO_INICIADO, entre(0.01, 0.4))) break percurso;
       if (!chance(perfil.responde)) {
         if (chance(0.3)) perder(entre(240, 320));
         break percurso;
       }
-      if (!mover(3, entre(1, 40))) break percurso;
+      if (!mover(I.EM_QUALIFICACAO, entre(1, 40))) break percurso;
       if (!chance(perfil.qualifica)) {
         if (chance(0.7)) perder(entre(2, 48));
         break percurso;
       }
-      if (!mover(4, entre(0.5, 20))) break percurso;
+      if (!mover(I.LEAD_QUALIFICADO, entre(0.5, 20))) break percurso;
       if (chance(0.8)) tags.push("TINTIN_QUALIFICADO_ENVIADO");
-      if (!mover(5, 0.1)) break percurso;
+      if (!mover(I.EM_AGENDAMENTO, 0.1)) break percurso;
       if (!chance(perfil.agenda)) {
         if (chance(0.2)) perder(entre(200, 400));
         break percurso;
       }
-      if (!mover(6, entre(2, 96))) break percurso;
+      if (!mover(I.AGENDADO, entre(2, 96))) break percurso;
       if (chance(0.6)) tags.push("CONFIRMOU_REUNIAO");
 
       let compareceu = chance(perfil.comparece);
       if (!compareceu) {
-        if (!mover(7, entre(24, 72))) break percurso;
+        if (!mover(I.REMARCACAO, entre(24, 72))) break percurso;
         tags.push("NO_SHOW");
         if (!chance(0.45)) break percurso;
-        if (!mover(6, entre(24, 120))) break percurso;
+        if (!mover(I.AGENDADO, entre(24, 120))) break percurso;
         compareceu = chance(0.7);
         if (!compareceu) {
-          mover(7, entre(24, 72));
+          mover(I.REMARCACAO, entre(24, 72));
           break percurso;
         }
       }
-      if (!mover(8, entre(24, 72))) break percurso;
+      // Parte das reuniões passa pela coluna "Reunião Realizada" antes do Farmer.
+      if (chance(0.4) && !mover(I.REUNIAO_REALIZADA, entre(1, 6))) break percurso;
+      if (!mover(I.PROTOCOLO_FARMER, entre(24, 72))) break percurso;
       tags.push("REUNIAO_REALIZADA");
       if (chance(0.7)) tags.push("PROPOSTA_ENVIADA");
       if (chance(perfil.fecha)) {
-        if (mover(10, entre(24, 240)) && chance(0.9)) tags.push("TINTIN_FECHADO_ENVIADO");
+        if (mover(I.FECHADO, entre(24, 240)) && chance(0.9)) tags.push("TINTIN_FECHADO_ENVIADO");
       } else if (chance(0.5)) {
-        if (mover(9, entre(240, 400)) && chance(0.2)) perder(entre(200, 600));
+        if (mover(I.REAQUECIMENTO, entre(240, 400)) && chance(0.2)) perder(entre(200, 600));
       } else if (chance(0.3)) {
         perder(entre(48, 240));
       }
@@ -165,9 +169,9 @@ for (const [indice, funil] of funis.entries()) {
       custom_fields_values: chance(0.9)
         ? [
             { field_id: CAMPOS.sdrResponsavel, field_name: "SDR responsável", values: [{ value: escolher(SDRS) }] },
-            ...(atual >= 6 ? [{ field_id: CAMPOS.closerResponsavel, field_name: "Closer responsável", values: [{ value: escolher(CLOSERS) }] }] : []),
-            ...(atual >= 6 && atual <= 10 ? [{ field_id: CAMPOS.situacaoDaReuniao, field_name: "Situação da reunião", values: [{ value: tags.includes("REUNIAO_REALIZADA") ? "Realizada" : tags.includes("NO_SHOW") ? "No-show (falta do cliente)" : "Agendada" }] }] : []),
-            ...(atual === 8 ? [{ field_id: CAMPOS.farmerResponsavel, field_name: "Farmer responsável", values: [{ value: escolher(FARMERS) }] }, { field_id: CAMPOS.substatusFarmer, field_name: "Substatus Farmer", values: [{ value: escolher(SUBSTATUS) }] }] : []),
+            ...(atual >= I.AGENDADO ? [{ field_id: CAMPOS.closerResponsavel, field_name: "Closer responsável", values: [{ value: escolher(CLOSERS) }] }] : []),
+            ...(atual >= I.AGENDADO && atual <= I.FECHADO ? [{ field_id: CAMPOS.situacaoDaReuniao, field_name: "Situação da reunião", values: [{ value: tags.includes("REUNIAO_REALIZADA") ? "Realizada" : tags.includes("NO_SHOW") ? "No-show (falta do cliente)" : "Agendada" }] }] : []),
+            ...(atual === I.PROTOCOLO_FARMER ? [{ field_id: CAMPOS.farmerResponsavel, field_name: "Farmer responsável", values: [{ value: escolher(FARMERS) }] }, { field_id: CAMPOS.substatusFarmer, field_name: "Substatus Farmer", values: [{ value: escolher(SUBSTATUS) }] }] : []),
             { field_id: CAMPOS.campanhaMeta, field_name: "Campanha Meta", values: [{ value: CAMPANHAS_META[indice === 2 ? 1 : 0] }] },
             { field_id: CAMPOS.conjunto, field_name: "Conjunto de anúncios", values: [{ value: escolher(CONJUNTOS) }] },
             { field_id: CAMPOS.anuncio, field_name: "Anúncio / Criativo", values: [{ value: escolher(ANUNCIOS) }] },

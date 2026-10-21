@@ -24,6 +24,9 @@ export const ETAPAS = [
   { chave: "LEAD_QUALIFICADO", nome: "Lead Qualificado", categoria: "avanco", aliases: ["LEAD QUALIFICADO", "LEADS QUALIFICADOS", "QUALIFICADO"] },
   { chave: "EM_AGENDAMENTO", nome: "Em Agendamento", categoria: "avanco", aliases: ["EM AGENDAMENTO", "AGENDAMENTO"] },
   { chave: "AGENDADO", nome: "Agendado", categoria: "avanco", aliases: ["AGENDADO", "REUNIAO AGENDADA"] },
+  // Coluna criada depois do protocolo, no momento só em parte dos funis. É
+  // localizada pelo nome; nos funis em que não existe, não gera pendência.
+  { chave: "REUNIAO_REALIZADA", nome: "Reunião Realizada", categoria: "avanco", aliases: ["REUNIAO REALIZADA"], opcional: true },
   { chave: "REMARCACAO", nome: "Remarcação", categoria: "avanco", aliases: ["REMARCACAO"] },
   { chave: "PROTOCOLO_FARMER", nome: "Protocolo Farmer", categoria: "avanco", aliases: ["PROTOCOLO FARMER", "FARMER"] },
   { chave: "REAQUECIMENTO", nome: "Reaquecimento", categoria: "avanco", aliases: ["REAQUECIMENTO"] },
@@ -163,7 +166,8 @@ export const ETIQUETAS = {
 export const ETAPAS_PRE_QUALIFICACAO = ["CONTATO_INICIAL", "CONTATO_INICIADO", "EM_QUALIFICACAO"];
 
 // Saída de "Agendado" para uma destas etapas indica que a reunião aconteceu.
-export const ETAPAS_REUNIAO_REALIZADA = ["PROTOCOLO_FARMER", "REAQUECIMENTO", "FECHADO"];
+// "Reunião Realizada" foi criada no Kommo depois do protocolo.
+export const ETAPAS_REUNIAO_REALIZADA = ["REUNIAO_REALIZADA", "PROTOCOLO_FARMER", "REAQUECIMENTO", "FECHADO"];
 
 // Etapas em que o lead não é cobrado por estar parado: as duas finais e o
 // reaquecimento, cuja cadência é espaçada por definição.
