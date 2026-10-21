@@ -297,16 +297,29 @@ function renderizarSeletorDeCampanha() {
   }
 }
 
-// Variação de um volume em relação ao período anterior, de mesma duração.
+// Variação de um volume em relação ao mesmo período do mês anterior. O rótulo
+// traz as datas comparadas. Quando não houve nenhuma movimentação naquelas
+// datas (a operação ainda não estava no Kommo, ou a campanha não existia),
+// a comparação fica oculta em vez de mostrar um zero sem significado.
 // menorEhMelhor inverte a cor para indicadores em que a alta é ruim.
+const diaMesBr = (iso) => iso.split("-").reverse().slice(0, 2).join("/");
+function haPeriodoAnterior() {
+  const volume = dados.escoposAnteriores?.[campanhaSelecionada]?.volume;
+  // Só contam os fatos do intervalo; retratos do momento atual (reuniões em
+  // aberto, leads parados numa etapa) não indicam que houve operação.
+  const fatos = ["leadsRecebidos", "contatados", "comPrimeiraResposta", "qualificados", "reunioesMarcadas", "reunioesRealizadas", "fechados", "desqualificados"];
+  return Boolean(volume && fatos.some((chave) => volume[chave] > 0));
+}
 function comparacaoComAnterior(chave, menorEhMelhor = false) {
+  if (!haPeriodoAnterior() || !dados.periodoAnterior) return "";
   const atual = escopo().volume[chave];
-  const anterior = dados.escoposAnteriores?.[campanhaSelecionada]?.volume[chave];
+  const anterior = dados.escoposAnteriores[campanhaSelecionada].volume[chave];
   if (anterior === undefined) return "";
-  if (anterior === 0) return `<span class="text-inkfaint">Período anterior: 0</span>`;
+  const rotulo = `<span class="text-inkfaint">${diaMesBr(dados.periodoAnterior.inicio)} a ${diaMesBr(dados.periodoAnterior.fim)}: ${numero(anterior)}</span>`;
+  if (anterior === 0) return rotulo;
   const pct = Math.round(((atual - anterior) / anterior) * 1000) / 10;
   const cor = pct === 0 ? "text-inkdim" : pct > 0 !== menorEhMelhor ? "text-positivo" : "text-negativo";
-  return `<span class="text-inkfaint">Período anterior: ${numero(anterior)}</span> <span class="${cor} font-semibold tabular">${pct > 0 ? "+" : ""}${pct.toLocaleString("pt-BR")}%</span>`;
+  return `${rotulo} <span class="${cor} font-semibold tabular">${pct > 0 ? "+" : ""}${pct.toLocaleString("pt-BR")}%</span>`;
 }
 
 // Regra de contagem de cada indicador, exibida junto com a lista de leads.
@@ -365,9 +378,12 @@ function renderizarCartoes() {
   ].join("");
 
   const dataBr = (iso) => iso.split("-").reverse().join("/");
-  $("periodoAnterior").textContent = dados.periodoAnterior
-    ? `"Período anterior", nos cartões acima, é ${dataBr(dados.periodoAnterior.inicio)} a ${dataBr(dados.periodoAnterior.fim)}.`
-    : "";
+  const intervaloAnterior = dados.periodoAnterior ? `${dataBr(dados.periodoAnterior.inicio)} a ${dataBr(dados.periodoAnterior.fim)}` : "";
+  $("periodoAnterior").textContent = !dados.periodoAnterior
+    ? ""
+    : haPeriodoAnterior()
+      ? `Os números menores nos cartões comparam com o mesmo período do mês anterior: ${intervaloAnterior}.`
+      : `A comparação com o mesmo período do mês anterior (${intervaloAnterior}) aparece quando houver movimentação de leads naquelas datas.`;
 
   // O bloco de reuniões em aberto aparece sempre que há alguma.
   $("blocoEmAberto").classList.toggle("hidden", !v.reunioesEmAberto);
