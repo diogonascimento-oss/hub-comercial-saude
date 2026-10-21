@@ -86,10 +86,14 @@ function dataDaReuniao(lead) {
   return Number.isFinite(valor) && valor > 0 ? valor : null;
 }
 
-function motivoDePerda(lead) {
+function motivoDePerda(lead, etapa) {
   const doCampo = valorDoCampo(lead.custom_fields_values, CAMPOS.motivoDesqualificacao);
   if (doCampo) return doCampo;
-  return lead._embedded?.loss_reason?.[0]?.name || "";
+  const nativo = lead._embedded?.loss_reason?.[0]?.name || "";
+  if (nativo) return nativo;
+  // Lead descartado numa coluna criada pela equipe: o nome da coluna é o motivo.
+  if (etapa?.extra && etapa.coluna) return etapa.coluna.charAt(0).toUpperCase() + etapa.coluna.slice(1).toLowerCase();
+  return "";
 }
 
 // Leads normalizados e sem duplicidade. Dois leads com o mesmo telefone na
@@ -116,7 +120,7 @@ export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento) {
       etapa: etapa.chave,
       etapaNome: etapa.nome,
       tags: lead._embedded?.tags?.map((t) => t.name) || [],
-      motivoPerda: motivoDePerda(lead),
+      motivoPerda: motivoDePerda(lead, etapa),
       // Origem de marketing. Os campos do protocolo, preenchidos pelo Make nos
       // leads de formulário, têm prioridade. Sem eles, valem as UTMs que o
       // Kommo grava nos leads de anúncio de WhatsApp: utm_campaign para a

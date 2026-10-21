@@ -83,11 +83,24 @@ export function montarMapeamento(funis) {
         if (porNome && !campanha.etapas?.[porNome] && !chavesMapeadas.has(porNome)) chave = porNome;
       }
       if (chave) chavesMapeadas.add(chave);
+      // 3. Coluna extra criada pela equipe para uma etapa que já tem a sua
+      // (por exemplo, "Sem interesse" além de "Venda perdida").
+      let extra = false;
+      if (!chave) {
+        const alvo = normalizar(coluna.name);
+        const etapa = ETAPAS.find((e) => (e.colunasExtras || []).some((n) => normalizar(n) === alvo));
+        if (etapa) {
+          chave = etapa.chave;
+          extra = true;
+        }
+      }
       etapaPorColuna.set(`${funil.id}:${coluna.id}`, {
         chave: chave || `OUTRA:${coluna.name}`,
         nome: chave ? ETAPA_POR_CHAVE.get(chave).nome : coluna.name,
         campanha: campanha.codigo,
         mapeada: Boolean(chave),
+        coluna: coluna.name,
+        extra,
       });
     }
 

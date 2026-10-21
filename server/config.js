@@ -36,6 +36,10 @@ export const ETAPAS = [
     nome: "Desqualificado / Não Fechado",
     categoria: "perda",
     aliases: ["DESQUALIFICADO NAO FECHADO", "DESQUALIFICADO", "DESQUALIFICADOS", "NAO FECHADO", "VENDA PERDIDA", "CLOSED LOST"],
+    // Colunas comuns criadas pela equipe nos funis para descartar leads, além
+    // da coluna final "Venda perdida". Contam como Desqualificado; o nome da
+    // coluna vira o motivo quando o lead não tem motivo de perda registrado.
+    colunasExtras: ["SEM INTERESSE", "DESQUALIFICADO", "DESQUALIFICADOS"],
   },
 ];
 
