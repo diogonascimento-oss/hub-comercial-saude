@@ -394,7 +394,11 @@ function renderizarBarras(idDoContainer, contagem, detalhe) {
         .map(
           (i) => `
       <div class="flex items-center gap-3">
-        <div class="w-44 shrink-0 text-[11px] text-inkdim text-right truncate" title="${esc(nomeEtapa(i.chave))}">${esc(nomeEtapa(i.chave))}</div>
+        ${
+          idDoContainer === "graficoVolume" && i.total
+            ? `<button type="button" data-etapa-atual="${esc(i.chave)}" class="w-44 shrink-0 text-[11px] text-inkdim text-right truncate underline decoration-dotted underline-offset-2 hover:text-goldbright" title="Ver os leads que estão em ${esc(nomeEtapa(i.chave))}">${esc(nomeEtapa(i.chave))}</button>`
+            : `<div class="w-44 shrink-0 text-[11px] text-inkdim text-right truncate" title="${esc(nomeEtapa(i.chave))}">${esc(nomeEtapa(i.chave))}</div>`
+        }
         <div class="flex-1 h-3.5 bg-surface2"><div class="barra h-full" style="width:${(i.total / maximo) * 100}%;background:${corEtapa(i.chave)}"></div></div>
         <div class="w-24 shrink-0 text-sm tabular text-ink">${numero(i.total)}${detalhe ? `<span class="text-[10px] text-inkfaint ml-2">${detalhe(i.chave)}</span>` : ""}</div>
       </div>`,
@@ -1147,6 +1151,38 @@ async function executarAcaoDeCorrecao(acao, eventId) {
 }
 
 // --- Eventos da página ---------------------------------------------------------
+
+// Relatório por etapa: os leads que estão agora na etapa clicada, com CSV.
+async function abrirLeadsDaEtapa(chave) {
+  const etapa = nomeEtapa(chave);
+  try {
+    const r = await chamarApi(`/leads/etapa?chave=${encodeURIComponent(chave)}&campanha=${encodeURIComponent(campanhaSelecionada)}`);
+    const dataBr = (iso) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "");
+    const semAtualizacao = (d) => (d === null ? "" : d === 0 ? "atualizado hoje" : `sem atualização há ${d} dia${d > 1 ? "s" : ""}`);
+    const leads = r.leads.map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${(dados?.campanhas?.length || 0) > 1 ? `${l.campanha} · ` : ""}${semAtualizacao(l.diasSemAtualizacao)}` }));
+    const comBancos = r.leads.some((l) => l.bancos);
+    const comSdr = r.leads.some((l) => l.sdr);
+    const comCampanha = (dados?.campanhas?.length || 0) > 1;
+    const cabecalho = ["ID", "Nome", "Telefone", "Estado (DDD)", ...(comCampanha ? ["Campanha"] : []), "Etapa atual", "Criado em", "Última atualização", "Dias sem atualização", "Campanha Meta", "Conjunto / público", "Anúncio", "Etiquetas"];
+    if (comSdr) cabecalho.push("SDR responsável");
+    if (comBancos) cabecalho.push("Bancos");
+    const linhas = r.leads.map((l) => {
+      const linha = [l.id, l.nome, l.telefone, l.estado, ...(comCampanha ? [l.campanha] : []), etapa, dataBr(l.criadoEm), dataBr(l.atualizadoEm), l.diasSemAtualizacao ?? "", l.origem?.campanhaMeta || "", l.origem?.conjunto || l.origem?.publico || "", l.origem?.anuncio || "", (l.tags || []).join(", ")];
+      if (comSdr) linha.push(l.sdr);
+      if (comBancos) linha.push(l.bancos);
+      return linha;
+    });
+    const arquivo = `leads_em_${etapa.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()}_${new Date().toISOString().slice(0, 10)}.csv`;
+    abrirLeadsDoGrupo(`Leads em ${etapa} agora`, leads, "Leads que estão nesta etapa neste momento, independente do período do filtro. Os que estão há mais tempo sem atualização aparecem primeiro. O CSV traz também origem, datas e etiquetas.", { nome: arquivo, cabecalho, linhas });
+  } catch (erro) {
+    mostrarErro(erro.message);
+  }
+}
+
+$("graficoVolume").addEventListener("click", (e) => {
+  const botao = e.target.closest("button[data-etapa-atual]");
+  if (botao) abrirLeadsDaEtapa(botao.dataset.etapaAtual);
+});
 
 $("btnFiltrar").addEventListener("click", atualizar);
 $("cartoes").addEventListener("click", (e) => {

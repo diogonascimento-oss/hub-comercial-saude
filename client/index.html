@@ -225,7 +225,7 @@
     <section aria-labelledby="tFunil">
       <h3 id="tFunil" class="titulo-secao mb-3">8. Volume atual por etapa</h3>
       <div class="border border-line p-5">
-        <p class="text-[11px] text-inkfaint mb-4">Situação da base neste momento, independente do período. À direita, média de dias desde a última atualização.</p>
+        <p class="text-[11px] text-inkfaint mb-4">Situação da base neste momento, independente do período. À direita, média de dias desde a última atualização. Clique em uma etapa para ver os leads que estão nela e baixar a lista em CSV.</p>
         <div id="graficoVolume" class="space-y-2.5"></div>
       </div>
     </section>
@@ -515,7 +515,10 @@
     <div class="bg-surface border border-line w-full max-w-lg max-h-[80vh] flex flex-col">
       <div class="p-4 border-b border-line flex items-center justify-between gap-3">
         <h3 id="tituloLeads" class="font-serif text-sm font-semibold text-ink"></h3>
-        <button id="btnFecharLeads" class="text-inkdim hover:text-ink text-sm border border-line px-2 py-0.5">Fechar</button>
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="btnCsvLeads" type="button" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">CSV</button>
+          <button id="btnFecharLeads" class="text-inkdim hover:text-ink text-sm border border-line px-2 py-0.5">Fechar</button>
+        </div>
       </div>
       <p id="regraDosLeads" class="hidden px-4 pt-3 text-[11px] text-inkdim leading-relaxed"></p>
       <div id="corpoLeadsDoGrupo" class="p-4 rolagem text-xs"></div>

@@ -45,7 +45,16 @@ function fecharModaisDeTrafego() {
 // --- Detalhamento: leads de um grupo -------------------------------------------
 
 // regra: texto opcional, exibido acima da lista, explicando como os leads foram contados.
-function abrirLeadsDoGrupo(titulo, leads, regra = "") {
+// csv: { nome, cabecalho, linhas } opcional; sem ele, o CSV traz as colunas da lista.
+let csvDaLista = null;
+function abrirLeadsDoGrupo(titulo, leads, regra = "", csv = null) {
+  const arquivo = titulo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "").toLowerCase().slice(0, 60);
+  csvDaLista = csv || {
+    nome: `${arquivo || "leads"}.csv`,
+    cabecalho: ["ID", "Nome", "Telefone", "Situação"],
+    linhas: leads.map((l) => [l.leadId || "", l.nome, l.telefone || "", l.etapaMaisAvancada || ""]),
+  };
+  $("btnCsvLeads").classList.toggle("hidden", !leads.length);
   $("tituloLeads").textContent = `${titulo} (${numero(leads.length)})`;
   $("regraDosLeads").textContent = regra;
   $("regraDosLeads").classList.toggle("hidden", !regra);
@@ -755,3 +764,5 @@ $("btnFecharSoma").addEventListener("click", () => fecharDialogo("modalSoma"));
 for (const id of ["modalSemana", "modalLeads", "modalSoma"]) {
   $(id).addEventListener("click", (e) => e.target === $(id) && fecharDialogo(id));
 }
+
+$("btnCsvLeads").addEventListener("click", () => csvDaLista && baixarCSV(csvDaLista.nome, csvDaLista.cabecalho, csvDaLista.linhas));

@@ -525,6 +525,42 @@ function localizacaoProvavel(telefone) {
   return { ddd: l.ddd, estado: l.estado, regiao: l.regiao, reconhecido: l.formatoReconhecido };
 }
 
+
+// Leads que estão agora em uma etapa, para o relatório por etapa. Situação
+// atual da base, independente do período do filtro.
+app.get("/api/leads/etapa", async (req, res) => {
+  const chave = String(req.query.chave || "");
+  const campanha = String(req.query.campanha || "TODAS");
+  if (!chave || chave.length > 120) return res.status(400).json({ error: "Informe a etapa." });
+  try {
+    const { leads } = await obterLeads();
+    const agora = Math.floor(Date.now() / 1000);
+    const naEtapa = leads
+      .filter((l) => l.etapa === chave && (campanha === "TODAS" || l.campanha === campanha))
+      .sort((a, b) => (a.atualizadoEm || 0) - (b.atualizadoEm || 0));
+    res.json({
+      etapa: chave,
+      total: naEtapa.length,
+      leads: naEtapa.map((l) => ({
+        id: l.id,
+        nome: l.nome,
+        telefone: l.telefone,
+        campanha: l.campanha,
+        criadoEm: iso(l.criadoEm),
+        atualizadoEm: iso(l.atualizadoEm),
+        diasSemAtualizacao: l.atualizadoEm ? Math.floor((agora - l.atualizadoEm) / 86400) : null,
+        tags: l.tags,
+        origem: l.origem,
+        sdr: l.responsaveis?.sdr || "",
+        bancos: l.bancos || "",
+        estado: getLocalizacao(l.telefone).estado || "",
+      })),
+    });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao listar os leads da etapa");
+  }
+});
+
 // Busca por nome, telefone, título do lead no Kommo ou ID, nos três funis.
 app.get("/api/leads/busca", async (req, res) => {
   const termo = String(req.query.q || "").trim().slice(0, 80);
