@@ -458,18 +458,35 @@ function renderizarEvolucao() {
       .map(([px, py], k) => `<line x1="${pontos[k][0].toFixed(1)}" y1="${pontos[k][1].toFixed(1)}" x2="${px.toFixed(1)}" y2="${py.toFixed(1)}" stroke="${corDoPonto(s, de + k + 1)}" stroke-width="2" stroke-linecap="round"${traco ? ` stroke-dasharray="${traco}"` : ""}/>`)
       .join("");
   };
+  // Posição do número de cada ponto. Com várias linhas, o maior valor da etapa
+  // fica acima do ponto e os demais abaixo, empilhados sem se sobrepor.
+  const yDoRotulo = series.map(() => []);
+  etapas.forEach((_, i) => {
+    const ordem = series.map((s, si) => ({ si, py: y(s.valores[i]) })).sort((a, b) => a.py - b.py);
+    let ultimo = -Infinity;
+    ordem.forEach((o, k) => {
+      let ry = k === 0 ? o.py - 9 : Math.max(o.py + 15, ultimo + 11);
+      if (k === 0 && series.length > 1 && ordem[1] && ordem[1].py - o.py < 4 && o.py - 9 < MT - 6) ry = o.py + 15;
+      yDoRotulo[o.si][i] = ry;
+      ultimo = ry;
+    });
+  });
   const linhas = series
-    .map((s, si) => {
-      // Com várias linhas, o rótulo alterna acima e abaixo do ponto para reduzir a sobreposição.
-      const deslocamento = unificado || si !== 1 ? -9 : 15;
-      return `${trechos(s, 0, principais.length)}${trechos(s, principais.length, etapas.length, "5,4")}
+    .map(
+      (s, si) => `${trechos(s, 0, principais.length)}${trechos(s, principais.length, etapas.length, "5,4")}
       ${s.valores
         .map(
-          (v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="5" fill="#0b0c11" stroke="${corDoPonto(s, i)}" stroke-width="2" style="cursor:pointer" data-serie="${si}" data-etapa="${i}"><title>${esc(s.nome)}, ${esc(etapas[i].nome)}: ${v}</title></circle>
-          <text x="${x(i).toFixed(1)}" y="${(y(v) + deslocamento).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" font-weight="600" fill="${corDoPonto(s, i)}">${v}</text>`,
+          (v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="5" fill="#0b0c11" stroke="${corDoPonto(s, i)}" stroke-width="2"/>
+          <text x="${x(i).toFixed(1)}" y="${yDoRotulo[si][i].toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" font-weight="600" fill="${corDoPonto(s, i)}" paint-order="stroke" stroke="#0b0c11" stroke-width="3">${v}</text>`,
         )
-        .join("")}`;
-    })
+        .join("")}`,
+    )
+    .join("");
+  // Área de toque de cada etapa: a coluna inteira, com o nome da etapa. Em vez
+  // de acertar um ponto pequeno (que no celular fica minúsculo e pode estar
+  // encoberto por outra linha), basta tocar na coluna.
+  const colunas = etapas
+    .map((e, i) => `<rect class="coluna-evolucao" data-coluna="${i}" x="${(x(i) - passo / 2).toFixed(1)}" y="${MT - 8}" width="${passo.toFixed(1)}" height="${(H - MT + 8).toFixed(1)}" fill="transparent" style="cursor:pointer"><title>${esc(e.nome)}: ${series.map((s) => `${s.nome} ${s.valores[i]}`).join(" · ")}</title></rect>`)
     .join("");
   const xDoSeparador = desvios.length ? x(principais.length - 1) + passo / 2 : null;
   const separador = desvios.length
@@ -480,9 +497,11 @@ function renderizarEvolucao() {
     .map((e, i) => `<g transform="translate(${x(i).toFixed(1)},${base + 14}) rotate(-28)"><text text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="${corEtapa(e.chave)}">${esc(e.nome)}</text></g>`)
     .join("");
 
+  container.style.position = "relative";
   container.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução dos leads ao longo das etapas" style="display:block;width:100%;height:auto">
-      ${marcas}<line x1="${ML}" y1="${base}" x2="${W - MR}" y2="${base}" stroke="#33364a"/>${separador}${linhas}${rotulos}
+      <style>.coluna-evolucao:hover,.coluna-evolucao.ativa{fill:rgba(216,181,101,0.06)}</style>
+      ${marcas}<line x1="${ML}" y1="${base}" x2="${W - MR}" y2="${base}" stroke="#33364a"/>${separador}${linhas}${rotulos}${colunas}
     </svg>
     <div class="flex flex-wrap gap-x-5 gap-y-1 mt-1 text-[11px] text-inkdim">
       ${(unificado
@@ -494,16 +513,58 @@ function renderizarEvolucao() {
       ${desvios.length ? '<span class="flex items-center gap-1.5"><svg width="20" height="8" aria-hidden="true"><line x1="0" y1="4" x2="20" y2="4" stroke="#9a9ca8" stroke-width="2" stroke-dasharray="5,4"/></svg>Desvios do caminho principal</span>' : ""}
     </div>`;
 
-  container.querySelectorAll("circle[data-serie]").forEach((ponto) => {
-    ponto.addEventListener("click", () => {
-      const serie = series[Number(ponto.dataset.serie)];
-      const etapa = etapas[Number(ponto.dataset.etapa)];
-      const leads = dados.listas.leadsPorEtapa
+  const abrirSerie = (si, ei) => {
+    const serie = series[si];
+    const etapa = etapas[ei];
+    const leads = dados.listas.leadsPorEtapa
         .filter((l) => l.etapas.includes(etapa.chave) && (serie.campanha === "TODAS" || l.campanha === serie.campanha))
         .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
-      abrirLeadsDoGrupo(`${serie.nome}: entraram em ${etapa.nome}`, leads);
+    abrirLeadsDoGrupo(`${serie.nome}: entraram em ${etapa.nome}`, leads);
+  };
+  const fecharEscolha = () => {
+    container.querySelector(".escolha-evolucao")?.remove();
+    container.querySelectorAll(".coluna-evolucao.ativa").forEach((c) => c.classList.remove("ativa"));
+  };
+  container.querySelectorAll("rect[data-coluna]").forEach((coluna) => {
+    coluna.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      const ei = Number(coluna.dataset.coluna);
+      fecharEscolha();
+      if (series.length === 1) return abrirSerie(0, ei);
+      // Várias campanhas: pergunta qual linha abrir, com o número de cada uma.
+      coluna.classList.add("ativa");
+      const caixa = container.getBoundingClientRect();
+      const menu = document.createElement("div");
+      menu.className = "escolha-evolucao absolute z-20 bg-surface border border-line shadow-lg p-1 text-xs min-w-[11rem]";
+      menu.innerHTML = `<p class="rotulo px-2 pt-1.5 pb-1">${esc(etapas[ei].nome)}</p>${series
+        .map((s, si) => ({ s, si }))
+        .sort((a, b) => b.s.valores[ei] - a.s.valores[ei])
+        .map(({ s, si }) => `<button type="button" data-si="${si}" class="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-surface2"><svg width="16" height="8" aria-hidden="true"><line x1="0" y1="4" x2="16" y2="4" stroke="${s.cor}" stroke-width="2"${s.traco ? ` stroke-dasharray="${s.traco}"` : ""}/></svg><span class="flex-1 text-ink">${esc(s.nome)}</span><span class="tabular text-inkdim">${numero(s.valores[ei])}</span></button>`)
+        .join("")}`;
+      container.appendChild(menu);
+      const largura = menu.offsetWidth;
+      const esquerda = Math.min(Math.max(evento.clientX - caixa.left - largura / 2, 0), caixa.width - largura);
+      menu.style.left = `${esquerda}px`;
+      menu.style.top = `${Math.max(evento.clientY - caixa.top + 8, 0)}px`;
+      menu.querySelectorAll("button[data-si]").forEach((b) =>
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          fecharEscolha();
+          abrirSerie(Number(b.dataset.si), ei);
+        }),
+      );
     });
   });
+  if (!container.dataset.fechaEscolha) {
+    container.dataset.fechaEscolha = "1";
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest?.(".escolha-evolucao")) {
+        container.querySelector(".escolha-evolucao")?.remove();
+        container.querySelectorAll(".coluna-evolucao.ativa").forEach((c) => c.classList.remove("ativa"));
+      }
+    });
+    document.addEventListener("keydown", (e) => e.key === "Escape" && container.querySelector(".escolha-evolucao")?.remove());
+  }
 }
 
 function renderizarFunil() {
