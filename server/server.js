@@ -21,6 +21,7 @@ import {
   ETAPAS_REUNIAO_REALIZADA,
   CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO,
   ROTULO_SEM_RASTREIO_DE_ANUNCIO,
+  MOTIVOS_SEM_INTERESSE,
 } from "./config.js";
 import * as kommo from "./kommo.js";
 import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
@@ -361,6 +362,7 @@ app.get("/api/metrics", async (req, res) => {
     res.json({
       periodo: { inicio: periodo.inicio, fim: periodo.fim },
       periodoAnterior: { inicio: anterior.inicio, fim: anterior.fim },
+      motivosSemInteresse: MOTIVOS_SEM_INTERESSE,
       geradoEm: new Date().toISOString(),
       // Instante em que os dados usados nesta resposta foram lidos do Kommo.
       // Pode ser alguns segundos anterior à resposta, por causa do cache.

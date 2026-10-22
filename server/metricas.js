@@ -558,11 +558,11 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
     resultado.listas = {
       leadsPorIndicador: [...indicadoresPorLead].map(([leadId, indicadores]) => {
         const l = porId.get(leadId);
-        return { id: l.id, nome: l.nome, telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, indicadores };
+        return { id: l.id, nome: l.nome, telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, motivoPerda: l.etapa === "DESQUALIFICADO" ? l.motivoPerda || "" : undefined, indicadores };
       }),
       leadsPorEtapa: [...etapasPorLead].map(([leadId, etapas]) => {
         const l = porId.get(leadId);
-        return { id: l.id, nome: l.nome, telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, etapas };
+        return { id: l.id, nome: l.nome, telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, motivoPerda: l.etapa === "DESQUALIFICADO" ? l.motivoPerda || "" : undefined, etapas };
       }),
       leadsDoPeriodo: leads
         .filter((l) => ultimaEtapaNoPeriodo.has(l.id))

@@ -340,11 +340,20 @@ const REGRAS_DOS_INDICADORES = {
 };
 
 // Abre a relação dos leads contados em um indicador, na campanha selecionada.
+// Onde o lead está hoje. Para os perdidos, em vez do nome genérico da etapa,
+// aparece o tipo de perda e o motivo registrado no Kommo.
+function situacaoAtual(l) {
+  if (l.etapaAtual !== "DESQUALIFICADO" || l.motivoPerda === undefined) return `hoje em ${nomeEtapa(l.etapaAtual)}`;
+  const chave = (m) => String(m || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const semInteresse = (dados.motivosSemInteresse || []).map(chave).includes(chave(l.motivoPerda));
+  return `hoje perdido: ${semInteresse ? "sem interesse" : "desqualificado"}${l.motivoPerda ? ` (${l.motivoPerda})` : ""}`;
+}
+
 function abrirLeadsDoIndicador(indicador) {
   const [titulo, regra] = REGRAS_DOS_INDICADORES[indicador];
   const leads = daCampanha(dados.listas.leadsPorIndicador)
     .filter((l) => l.indicadores.includes(indicador))
-    .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
+    .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · ${situacaoAtual(l)}` }));
   abrirLeadsDoGrupo(titulo, leads, regra);
 }
 
@@ -537,7 +546,7 @@ function renderizarEvolucao() {
     const etapa = etapas[ei];
     const leads = dados.listas.leadsPorEtapa
         .filter((l) => l.etapas.includes(etapa.chave) && (serie.campanha === "TODAS" || l.campanha === serie.campanha))
-        .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
+        .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · ${situacaoAtual(l)}` }));
     abrirLeadsDoGrupo(`${serie.nome}: entraram em ${etapa.nome}`, leads);
   };
   const fecharEscolha = () => {
@@ -1330,7 +1339,7 @@ function abrirIndicadorDaPessoa(papel, nome, indicador) {
   const leads = (indicador === "emAgendamento"
     ? daCampanha(dados.listas.leadsPorEtapa).filter((l) => ids.has(String(l.id)) && l.etapas.includes("EM_AGENDAMENTO"))
     : daCampanha(dados.listas.leadsPorIndicador).filter((l) => ids.has(String(l.id)) && l.indicadores.includes(indicador)))
-    .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
+    .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · ${situacaoAtual(l)}` }));
   abrirLeadsDoGrupo(`${titulo} · ${rotulo} ${nome}`, leads, `${regra} Aqui, só os leads com "${nome}" no campo "${rotulo} responsável".`);
 }
 
