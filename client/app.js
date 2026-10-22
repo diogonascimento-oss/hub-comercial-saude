@@ -825,7 +825,7 @@ function renderizarPorPessoa() {
         ? `<table class="w-full text-xs">
             <thead><tr class="text-inkfaint text-[10px] text-left"><th class="font-normal pb-1.5">Nome</th>${colunas.map(([rotulo]) => `<th class="font-normal pb-1.5 text-right">${rotulo}</th>`).join("")}</tr></thead>
             <tbody>${pessoas
-              .map((pessoa) => `<tr class="border-t border-line"><td class="py-1.5 text-ink truncate max-w-[140px]" title="${esc(pessoa.nome)}">${esc(pessoa.nome)}</td>${colunas.map(([, chave]) => `<td class="py-1.5 text-right tabular text-ink">${numero(pessoa[chave])}</td>`).join("")}</tr>`)
+              .map((pessoa) => `<tr class="border-t border-line"><td class="py-1.5 truncate max-w-[140px]"><button type="button" data-papel="${esc(papel.chave)}" data-pessoa="${esc(pessoa.nome)}" title="Ver todos os leads de ${esc(pessoa.nome)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(pessoa.nome)}</button></td>${colunas.map(([, chave]) => `<td class="py-1.5 text-right tabular text-ink">${numero(pessoa[chave])}</td>`).join("")}</tr>`)
               .join("")}</tbody>
           </table>`
         : `<p class="text-xs text-inkdim">Campo "${esc(papel.rotulo)} responsável" ainda não preenchido nos leads.</p>`;
@@ -1273,6 +1273,34 @@ async function abrirLeadsDaEtapa(chave) {
     mostrarErro(erro.message);
   }
 }
+
+// Todos os leads atribuídos à pessoa no Kommo, em qualquer etapa.
+async function abrirLeadsDoResponsavel(papel, pessoa) {
+  const rotulo = (dados.papeis || []).find((p) => p.chave === papel)?.rotulo || papel.toUpperCase();
+  try {
+    const r = await chamarApi(`/leads/responsavel?papel=${encodeURIComponent(papel)}&nome=${encodeURIComponent(pessoa)}&campanha=${encodeURIComponent(campanhaSelecionada)}`);
+    const dataBr = (iso) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "");
+    const semAtualizacao = (d) => (d === null ? "" : d === 0 ? " · atualizado hoje" : ` · sem atualização há ${d} dia${d > 1 ? "s" : ""}`);
+    const comCampanha = (dados?.campanhas?.length || 0) > 1;
+    const leads = r.leads.map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${comCampanha ? `${l.campanha} · ` : ""}em ${nomeEtapa(l.etapa)}${semAtualizacao(l.diasSemAtualizacao)}` }));
+    const cabecalho = ["ID", "Nome", "Telefone", "Estado (DDD)", ...(comCampanha ? ["Campanha"] : []), "Etapa atual", "Criado em", "Última atualização", "Dias sem atualização", "Campanha Meta", "Conjunto / público", "Anúncio", "Etiquetas"];
+    const linhas = r.leads.map((l) => [l.id, l.nome, l.telefone, l.estado, ...(comCampanha ? [l.campanha] : []), nomeEtapa(l.etapa), dataBr(l.criadoEm), dataBr(l.atualizadoEm), l.diasSemAtualizacao ?? "", l.origem?.campanhaMeta || "", l.origem?.conjunto || l.origem?.publico || "", l.origem?.anuncio || "", (l.tags || []).join(", ")]);
+    const arquivo = `leads_${papel}_${pessoa.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()}_${new Date().toISOString().slice(0, 10)}.csv`;
+    abrirLeadsDoGrupo(
+      `${rotulo} ${pessoa}: todos os leads`,
+      leads,
+      `Leads com "${pessoa}" no campo "${rotulo} responsável" do Kommo, em qualquer etapa e independente do período do filtro, na ordem do funil. A atribuição é feita no Kommo; o painel só consulta. Toque em um lead para abrir a ficha e o atalho para ele no Kommo.`,
+      { nome: arquivo, cabecalho, linhas },
+    );
+  } catch (erro) {
+    mostrarErro(erro.message);
+  }
+}
+
+$("porPessoa").addEventListener("click", (e) => {
+  const botao = e.target.closest("button[data-pessoa]");
+  if (botao) abrirLeadsDoResponsavel(botao.dataset.papel, botao.dataset.pessoa);
+});
 
 $("graficoVolume").addEventListener("click", (e) => {
   const botao = e.target.closest("button[data-etapa-atual]");

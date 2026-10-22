@@ -561,6 +561,47 @@ app.get("/api/leads/etapa", async (req, res) => {
   }
 });
 
+// Todos os leads atribuídos a uma pessoa num papel (SDR, Closer ou Farmer),
+// pelo nome gravado no campo do Kommo, em qualquer etapa e sem filtro de
+// período. A atribuição continua sendo feita no Kommo; aqui só se consulta.
+app.get("/api/leads/responsavel", async (req, res) => {
+  const papel = String(req.query.papel || "");
+  const nome = String(req.query.nome || "").trim();
+  const campanha = String(req.query.campanha || "TODAS");
+  if (!PAPEIS.some((p) => p.chave === papel) || !nome || nome.length > 120) {
+    return res.status(400).json({ error: "Informe o papel e o nome do responsável." });
+  }
+  try {
+    const { leads } = await obterLeads();
+    const agora = Math.floor(Date.now() / 1000);
+    const ordem = new Map(ETAPAS.map((e, i) => [e.chave, i]));
+    const alvo = semAcento(nome);
+    const daPessoa = leads
+      .filter((l) => semAcento(l.responsaveis?.[papel] || "").trim() === alvo && (campanha === "TODAS" || l.campanha === campanha))
+      .sort((a, b) => (ordem.get(a.etapa) ?? 99) - (ordem.get(b.etapa) ?? 99) || (a.atualizadoEm || 0) - (b.atualizadoEm || 0));
+    res.json({
+      papel,
+      nome,
+      total: daPessoa.length,
+      leads: daPessoa.map((l) => ({
+        id: l.id,
+        nome: l.nome,
+        telefone: l.telefone,
+        campanha: l.campanha,
+        etapa: l.etapa,
+        criadoEm: iso(l.criadoEm),
+        atualizadoEm: iso(l.atualizadoEm),
+        diasSemAtualizacao: l.atualizadoEm ? diasDeCalendario(l.atualizadoEm, agora) : null,
+        tags: l.tags,
+        origem: l.origem,
+        estado: getLocalizacao(l.telefone).estado || "",
+      })),
+    });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao listar os leads do responsável");
+  }
+});
+
 // Busca por nome, telefone, título do lead no Kommo ou ID, nos três funis.
 app.get("/api/leads/busca", async (req, res) => {
   const termo = String(req.query.q || "").trim().slice(0, 80);

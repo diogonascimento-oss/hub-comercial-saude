@@ -360,7 +360,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
   for (const lead of leads) {
     volumeAtual[lead.etapa] = (volumeAtual[lead.etapa] || 0) + 1;
     if (lead.atualizadoEm) {
-      somaDeDiasPorEtapa[lead.etapa] = (somaDeDiasPorEtapa[lead.etapa] || 0) + (agora - lead.atualizadoEm) / DIA;
+      somaDeDiasPorEtapa[lead.etapa] = (somaDeDiasPorEtapa[lead.etapa] || 0) + Math.max(0, agora - lead.atualizadoEm) / DIA;
     }
   }
   const tempoMedioPorEtapa = {};
