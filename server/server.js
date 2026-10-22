@@ -724,11 +724,16 @@ app.get("/api/leads/:id", async (req, res) => {
       criterio: r.criterio,
       divergente: Boolean(r.divergente),
     }));
+    // Na última movimentação, quando ela levou o lead à etapa de perda em que
+    // ele está, o motivo registrado no Kommo aparece junto do nome da etapa.
+    const ultimoEvento = eventosDoLead.at(-1);
+    const comMotivo = (ev) =>
+      ev === ultimoEvento && ev.para === lead.etapa && lead.etapa === "DESQUALIFICADO" && lead.motivoPerda ? `${nomeDaEtapa(ev.para)} · ${lead.motivoPerda}` : nomeDaEtapa(ev.para);
     const historico = eventosDoLead
       .map((ev) => ({
         data: iso(ev.ts),
         de: nomeDaEtapa(ev.de),
-        para: nomeDaEtapa(ev.para),
+        para: comMotivo(ev),
         excluido: idsExcluidos.has(ev.id),
         corrigido: correcoesPorId.has(ev.id),
         // Quem excluiu ou corrigiu pelo painel, quando e por quê.
