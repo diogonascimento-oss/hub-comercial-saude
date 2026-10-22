@@ -189,6 +189,7 @@ for (const [indice, funil] of funis.entries()) {
 // --- Rotas ----------------------------------------------------------------
 
 const app = express();
+app.use(express.json());
 
 app.use((req, res, next) => {
   if (!req.get("authorization")) return res.status(401).json({ title: "Unauthorized" });
@@ -218,7 +219,7 @@ app.get("/api/v4/leads/pipelines", (req, res) =>
 );
 
 app.get("/api/v4/leads/custom_fields", (req, res) =>
-  res.json({ _embedded: { custom_fields: [{ id: 7001, name: "Motivo de desqualificação", code: null, type: "select" }] } }),
+  res.json({ _embedded: { custom_fields: [{ id: 7001, name: "Motivo de desqualificação", code: null, type: "select" }, { id: 7002, name: "Descrição", code: null, type: "textarea" }] } }),
 );
 
 app.get("/api/v4/leads", (req, res) => {
@@ -230,6 +231,21 @@ app.get("/api/v4/leads/:id", (req, res) => {
   const lead = leads.find((l) => String(l.id) === req.params.id);
   return lead ? res.json(lead) : res.status(404).json({ title: "Not found" });
 });
+
+// Escritas usadas pelo painel: campo de texto do lead e nota.
+app.patch("/api/v4/leads/:id", (req, res) => {
+  const lead = leads.find((l) => String(l.id) === req.params.id);
+  if (!lead) return res.status(404).json({ title: "Not found" });
+  for (const novo of req.body?.custom_fields_values || []) {
+    const campos = (lead.custom_fields_values ||= []);
+    const i = campos.findIndex((c) => c.field_id === novo.field_id);
+    if (i >= 0) campos.splice(i, 1);
+    if (novo.values) campos.push({ field_id: novo.field_id, field_name: novo.field_id === 7002 ? "Descrição" : `Campo ${novo.field_id}`, values: novo.values });
+  }
+  lead.updated_at = Math.floor(Date.now() / 1000);
+  res.json({ id: lead.id });
+});
+app.post("/api/v4/leads/:id/notes", (req, res) => res.json({ _embedded: { notes: [{ id: Date.now() }] } }));
 
 app.get("/api/v4/contacts", (req, res) => {
   const ids = valoresDoFiltro(req.query.filter?.id);

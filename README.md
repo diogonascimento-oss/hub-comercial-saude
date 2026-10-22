@@ -140,7 +140,7 @@ As regras de contagem e as limitações de cada indicador estão documentadas no
 ├── server/                 API em Node.js e Express
 │   ├── server.js           Rotas e controle de acesso
 │   ├── config.js           Funis, etapas, campos e etiquetas do Kommo
-│   ├── kommo.js            Cliente da API do Kommo (somente leitura)
+│   ├── kommo.js            Cliente da API do Kommo (leitura; grava só a descrição do lead e uma nota)
 │   ├── mapeamento.js       Associação entre colunas do Kommo e etapas do painel
 │   ├── leads.js            Normalização de leads e eventos
 │   ├── metricas.js         Cálculo dos indicadores do funil

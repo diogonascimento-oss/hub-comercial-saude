@@ -638,6 +638,21 @@ app.get("/api/leads/busca", async (req, res) => {
 
 // Ficha completa de um lead: dados atuais, origem, campos preenchidos,
 // localização provável e histórico de movimentações.
+// Campo "Descrição" do lead, localizado pelo nome na lista de campos da conta
+// (o ID não consta da configuração). Fica em memória por uma hora.
+let campoDeDescricaoEmCache = { valor: undefined, ate: 0 };
+async function campoDeDescricao() {
+  if (campoDeDescricaoEmCache.ate > Date.now()) return campoDeDescricaoEmCache.valor;
+  const campos = await kommo.listarCamposDeLead();
+  const campo = campos.find((c) => /^descri[cç][aã]o$/i.test(String(c.name || "").trim()));
+  const valor = campo ? { id: Number(campo.id), nome: campo.name } : null;
+  campoDeDescricaoEmCache = { valor, ate: Date.now() + 3600_000 };
+  return valor;
+}
+const textoDoCampo = (bruto, campoId) =>
+  String((bruto.custom_fields_values || []).find((c) => Number(c.field_id) === Number(campoId))?.values?.[0]?.value ?? "");
+const textoComparavel = (t) => String(t ?? "").replace(/\r\n/g, "\n").trim();
+
 app.get("/api/leads/:id", async (req, res) => {
   const leadId = String(req.params.id);
   if (!/^\d+$/.test(leadId)) return res.status(400).json({ error: "ID de lead inválido." });
@@ -648,11 +663,13 @@ app.get("/api/leads/:id", async (req, res) => {
     if (!campanha) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
 
     const idContato = bruto._embedded?.contacts?.[0]?.id;
-    const [contato, eventosBrutos, exclusoes, correcoes] = await Promise.all([
+    const [contato, eventosBrutos, exclusoes, correcoes, campoDescricao, edicoesDeDescricao] = await Promise.all([
       idContato ? kommo.buscarContato(idContato) : null,
       kommo.listarMudancasDeEtapaDoLead(leadId),
       armazenamento.lerExclusoes(),
       armazenamento.lerCorrecoes(),
+      campoDeDescricao().catch(() => null),
+      armazenamento.lerEdicoesDeDescricao().catch(() => ({})),
     ]);
     const contatosPorId = new Map(contato ? [[contato.id, contato]] : []);
     const [lead] = normalizarLeads([bruto], contatosPorId, mapeamento);
@@ -742,7 +759,11 @@ app.get("/api/leads/:id", async (req, res) => {
       situacaoDaReuniao: lead.situacaoDaReuniao,
       substatusFarmer: lead.substatusFarmer,
       reunioes,
-      camposDoLead: camposPreenchidos(bruto.custom_fields_values),
+      camposDoLead: camposPreenchidos(bruto.custom_fields_values).filter((c) => !campoDescricao || c.nome !== campoDescricao.nome),
+      // Descrição editável pelo painel, com a última edição feita por ele.
+      descricao: campoDescricao
+        ? { nome: campoDescricao.nome, texto: textoDoCampo(bruto, campoDescricao.id), edicao: edicoesDeDescricao[leadId] || null }
+        : null,
       camposDoContato: camposPreenchidos(contato?.custom_fields_values),
       historico,
       linkNoKommo: process.env.KOMMO_SUBDOMAIN ? `https://${process.env.KOMMO_SUBDOMAIN}.kommo.com/leads/detail/${lead.id}` : null,
@@ -770,6 +791,45 @@ async function registrarAlteracao(req, acao, detalhes = {}) {
     console.error("Falha ao anotar o registro de alterações:", erro.message);
   }
 }
+
+// Edição da descrição do lead pelo painel. Grava direto no Kommo, guarda quem
+// editou e quando, e deixa uma nota no lead para a equipe ver no próprio
+// Kommo. Para não sobrescrever o que alguém escreveu enquanto a ficha estava
+// aberta, o texto anterior enviado pelo navegador precisa ser igual ao atual.
+app.put("/api/leads/:id/descricao", async (req, res) => {
+  const leadId = String(req.params.id);
+  if (!/^\d+$/.test(leadId)) return res.status(400).json({ error: "ID de lead inválido." });
+  const texto = textoComparavel(req.body?.texto);
+  if (texto.length > 4000) return res.status(400).json({ error: "A descrição pode ter no máximo 4.000 caracteres." });
+  const usuario = usuarioDa(req) || (MODO_LOCAL ? "modo local" : null);
+  if (!usuario) return res.status(401).json({ error: "Não foi possível identificar quem está editando. Recarregue a página e entre novamente." });
+  try {
+    const campo = await campoDeDescricao();
+    if (!campo) return res.status(409).json({ error: "O Kommo não tem um campo chamado Descrição nos leads." });
+    const { valor: mapeamento } = await obterMapeamento();
+    const bruto = await kommo.buscarLead(leadId);
+    if (!mapeamento.campanhaPorFunil.get(Number(bruto.pipeline_id))) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
+    const atual = textoComparavel(textoDoCampo(bruto, campo.id));
+    if (atual !== textoComparavel(req.body?.textoAnterior)) {
+      return res.status(409).json({ error: "A descrição mudou no Kommo enquanto a ficha estava aberta.", textoAtual: atual });
+    }
+    if (atual === texto) return res.json({ texto, edicao: null, semMudanca: true });
+
+    await kommo.gravarCampoDeTextoDoLead(leadId, campo.id, texto);
+    const edicao = { usuario, quando: new Date().toISOString() };
+    const quando = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Recife" });
+    await Promise.all([
+      armazenamento.gravarEdicaoDeDescricao(leadId, edicao).catch((e) => console.error("Falha ao guardar a autoria da descrição:", e.message)),
+      kommo.anotarNoLead(leadId, `Descrição ${texto ? "editada" : "apagada"} pelo painel por ${usuario} em ${quando}.`).catch((e) => console.error("Falha ao anotar no Kommo:", e.message)),
+      registrarAlteracao(req, texto ? "Descrição do lead editada" : "Descrição do lead apagada", { leadId }),
+    ]);
+    res.json({ texto, edicao });
+  } catch (erro) {
+    if (erro.response?.status === 404 || erro.response?.status === 204) return res.status(404).json({ error: "Lead não encontrado no Kommo." });
+    if (erro.response?.status === 403 || erro.response?.status === 401) return res.status(502).json({ error: "O Kommo recusou a gravação. O token do painel pode não ter permissão de escrita." });
+    responderErro(res, erro, "Falha ao gravar a descrição no Kommo");
+  }
+});
 
 const leadInformado = (req) => (/^\d{1,15}$/.test(String(req.body?.leadId ?? req.query?.leadId ?? "")) ? String(req.body?.leadId ?? req.query?.leadId) : null);
 

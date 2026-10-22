@@ -92,6 +92,98 @@ function blocoDaFicha(titulo, linhas) {
     </section>`;
 }
 
+// Descrição do lead, editável pelo painel. O texto é gravado direto no Kommo;
+// abaixo dele aparece quem fez a última edição pelo painel, e quando.
+let descricaoAberta = null; // { leadId, texto } da ficha exibida, base para detectar edição concorrente
+
+function autoriaDaDescricao(edicao) {
+  return edicao ? `Última edição pelo painel: ${esc(edicao.usuario || "autor não registrado")}, em ${dataHoraBr(edicao.quando)}.` : "";
+}
+
+function blocoDaDescricao(l) {
+  if (!l.descricao) return "";
+  descricaoAberta = { leadId: l.id, texto: l.descricao.texto };
+  return `
+    <section id="blocoDescricao">
+      <div class="flex items-baseline justify-between gap-3 mb-2">
+        <p class="rotulo">${esc(l.descricao.nome)}</p>
+        <button type="button" id="btnEditarDescricao" class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink">Editar</button>
+      </div>
+      <div id="leituraDescricao">
+        <p id="textoDescricao" class="text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">${l.descricao.texto ? esc(l.descricao.texto) : '<span class="text-inkfaint">Sem descrição.</span>'}</p>
+      </div>
+      <div id="edicaoDescricao" class="hidden">
+        <textarea id="campoDescricao" rows="5" maxlength="4000" class="w-full bg-surface2 border border-line px-3 py-2 text-ink text-xs leading-relaxed"></textarea>
+        <div class="flex flex-wrap items-center gap-2 mt-2">
+          <button type="button" id="btnSalvarDescricao" class="bg-gold hover:bg-goldbright text-bg text-[11px] font-semibold px-3 py-1.5">Salvar no Kommo</button>
+          <button type="button" id="btnCancelarDescricao" class="border border-line hover:border-inkdim text-inkdim text-[11px] px-3 py-1.5">Cancelar</button>
+          <span id="statusDescricao" class="text-[11px] text-inkdim"></span>
+        </div>
+      </div>
+      <p id="autoriaDescricao" class="text-[10px] text-inkfaint mt-1.5">${autoriaDaDescricao(l.descricao.edicao)}</p>
+    </section>`;
+}
+
+function mostrarLeituraDaDescricao(texto) {
+  $("textoDescricao").innerHTML = texto ? esc(texto) : '<span class="text-inkfaint">Sem descrição.</span>';
+  $("edicaoDescricao").classList.add("hidden");
+  $("leituraDescricao").classList.remove("hidden");
+  $("btnEditarDescricao").classList.remove("hidden");
+}
+
+async function salvarDescricao() {
+  if (!descricaoAberta) return;
+  const botao = $("btnSalvarDescricao");
+  const status = $("statusDescricao");
+  const texto = $("campoDescricao").value;
+  botao.disabled = true;
+  status.className = "text-[11px] text-inkdim";
+  status.textContent = "Salvando no Kommo.";
+  try {
+    const r = await fetch(`${API}/leads/${encodeURIComponent(descricaoAberta.leadId)}/descricao`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texto, textoAnterior: descricaoAberta.texto }),
+    });
+    const corpo = (r.headers.get("Content-Type") || "").includes("application/json") ? await r.json() : { error: "A sessão expirou. Recarregue a página para entrar novamente." };
+    if (r.status === 409 && corpo.textoAtual !== undefined) {
+      // Alguém mudou a descrição no Kommo: o texto digitado fica no campo e o
+      // texto atual do Kommo aparece embaixo. Um novo clique em Salvar
+      // substitui o texto do Kommo, agora de forma consciente.
+      descricaoAberta.texto = corpo.textoAtual;
+      status.className = "text-[11px] text-negativo block w-full";
+      status.innerHTML = `A descrição mudou no Kommo enquanto você editava. Texto atual lá: <span class="text-ink whitespace-pre-wrap">${corpo.textoAtual ? esc(corpo.textoAtual) : "(vazio)"}</span><br>Ajuste o seu texto se precisar e clique em Salvar de novo para substituí-lo.`;
+      return;
+    }
+    if (!r.ok) throw new Error(corpo.error || `O servidor respondeu com o código ${r.status}.`);
+    descricaoAberta.texto = corpo.texto;
+    mostrarLeituraDaDescricao(corpo.texto);
+    if (corpo.edicao) $("autoriaDescricao").innerHTML = autoriaDaDescricao(corpo.edicao);
+  } catch (erro) {
+    status.className = "text-[11px] text-negativo";
+    status.textContent = erro.message;
+  } finally {
+    botao.disabled = false;
+  }
+}
+
+$("corpoFicha").addEventListener("click", (e) => {
+  const alvo = e.target.closest("button");
+  if (!alvo || !descricaoAberta) return;
+  if (alvo.id === "btnEditarDescricao") {
+    $("campoDescricao").value = descricaoAberta.texto;
+    $("statusDescricao").textContent = "";
+    $("leituraDescricao").classList.add("hidden");
+    $("edicaoDescricao").classList.remove("hidden");
+    alvo.classList.add("hidden");
+    $("campoDescricao").focus();
+  } else if (alvo.id === "btnCancelarDescricao") {
+    mostrarLeituraDaDescricao(descricaoAberta.texto);
+  } else if (alvo.id === "btnSalvarDescricao") {
+    salvarDescricao();
+  }
+});
+
 // Reuniões do lead, com o desfecho que o painel considerou e o critério usado.
 function blocoDeReunioes(l) {
   if (!l.reunioes?.length) return "";
@@ -194,6 +286,7 @@ function renderizarFicha(l) {
       ["Closer", texto(l.responsaveis.closer)],
       ["Farmer", texto(l.responsaveis.farmer)],
     ]) +
+    blocoDaDescricao(l) +
     blocoDaFicha("Demais campos preenchidos no Kommo", outrosCampos.map((c) => [c.nome, esc(c.valor)])) +
     blocoDaCadencia(camposTecnicos) +
     (registrosInternos.length
@@ -226,6 +319,7 @@ function renderizarFicha(l) {
 async function abrirFichaDoLead(leadId) {
   $("tituloFicha").textContent = "Ficha do lead";
   $("subtituloFicha").textContent = `Lead ${leadId}`;
+  descricaoAberta = null;
   $("corpoFicha").innerHTML = '<p class="text-inkdim">Carregando.</p>';
   abrirDialogo("modalFicha");
   try {

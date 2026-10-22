@@ -1391,6 +1391,8 @@ $("btnFecharCorrecao").addEventListener("click", fecharModal);
 modal.addEventListener("click", (e) => e.target === modal && fecharModal());
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
+  // Durante a edição da descrição, Esc só cancela a edição, sem perder a ficha.
+  if (document.activeElement?.id === "campoDescricao") return $("btnCancelarDescricao")?.click();
   // A ficha do lead abre sobre os demais diálogos; fecha primeiro.
   if (fecharFichaDoLead()) return;
   if (!$("modalMetas").classList.contains("hidden")) return fecharDialogo("modalMetas");

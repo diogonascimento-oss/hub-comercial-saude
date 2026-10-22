@@ -115,3 +115,13 @@ export async function acrescentarAoRegistro(entrada) {
 const CHAVE_METAS = "hubsaude:metas";
 export const lerMetasDefinidas = async () => (await lerRegistro(CHAVE_METAS)) || {};
 export const gravarMetasDefinidas = (metas) => gravar(CHAVE_METAS, metas);
+
+// Quem editou a descrição de cada lead pelo painel, e quando: um único
+// registro no formato { "<leadId>": { usuario, quando } }.
+const CHAVE_DESCRICOES = "hubsaude:descricoes";
+export const lerEdicoesDeDescricao = async () => (await lerRegistro(CHAVE_DESCRICOES)) || {};
+export async function gravarEdicaoDeDescricao(leadId, edicao) {
+  const todas = await lerEdicoesDeDescricao();
+  todas[String(leadId)] = edicao;
+  await gravar(CHAVE_DESCRICOES, todas);
+}

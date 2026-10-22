@@ -1,4 +1,5 @@
-// Cliente da API v4 do Kommo. Somente leitura.
+// Cliente da API v4 do Kommo. Leitura, mais duas escritas pontuais pedidas
+// pela equipe: a descrição do lead e uma nota que registra quem a editou.
 
 import axios from "axios";
 
@@ -121,4 +122,29 @@ export async function buscarLead(leadId) {
 export async function buscarContato(contatoId) {
   const r = await requisitar(`/contacts/${contatoId}`);
   return r.data;
+}
+
+// Escrita no Kommo. Repete só quando o Kommo sinaliza excesso de chamadas
+// (429), caso em que a requisição comprovadamente não foi processada.
+async function escrever(metodo, caminho, corpo) {
+  for (let i = 1; ; i++) {
+    try {
+      return await obterCliente().request({ method: metodo, url: caminho, data: corpo });
+    } catch (erro) {
+      if (erro.response?.status !== 429 || i >= 4) throw erro;
+      await esperar(500 * 2 ** (i - 1));
+    }
+  }
+}
+
+// Grava um campo de texto do lead. Texto vazio apaga o conteúdo do campo.
+export function gravarCampoDeTextoDoLead(leadId, campoId, texto) {
+  return escrever("patch", `/leads/${leadId}`, {
+    custom_fields_values: [{ field_id: Number(campoId), values: texto ? [{ value: texto }] : null }],
+  });
+}
+
+// Nota comum no histórico do lead, visível para a equipe no Kommo.
+export function anotarNoLead(leadId, texto) {
+  return escrever("post", `/leads/${leadId}/notes`, [{ note_type: "common", params: { text: texto } }]);
 }
