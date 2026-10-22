@@ -822,7 +822,7 @@ function renderizarMetas() {
 
 // Colunas exibidas para cada papel.
 const COLUNAS_POR_PAPEL = {
-  sdr: [["Leads", "leadsRecebidos"], ["Qualif.", "qualificados"], ["Em agend.", "emAgendamento"], ["Marcadas", "reunioesMarcadas"], ["Em aberto", "reunioesEmAberto"], ["Realizadas", "reunioesRealizadas"], ["Não realiz.", "naoRealizadas"], ["Fechados", "fechados"], ["Comparec.", "comparecimento", "%"]],
+  sdr: [["Leads", "leadsRecebidos"], ["Qualif.", "qualificados"], ["Em agend.", "emAgendamento"], ["Em agend. agora", "emAgendamentoAgora"], ["Marcadas", "reunioesMarcadas"], ["Em aberto", "reunioesEmAberto"], ["Realizadas", "reunioesRealizadas"], ["Não realiz.", "naoRealizadas"], ["Fechados", "fechados"], ["Comparec.", "comparecimento", "%"]],
   closer: [["Realizadas", "reunioesRealizadas"], ["Não realizadas", "naoRealizadas"], ["Fechados", "fechados"]],
   farmer: [["Realizadas", "reunioesRealizadas"], ["Fechados", "fechados"]],
 };
@@ -842,7 +842,7 @@ function renderizarPorPessoa() {
                   formato === "%"
                     ? `<td class="py-1.5 text-right tabular ${classeDaTaxa(pessoa[chave])}">${percentual(pessoa[chave])}</td>`
                     : pessoa[chave] > 0 && pessoa.ids
-                    ? `<td class="py-1.5 text-right tabular"><button type="button" data-papel="${esc(papel.chave)}" data-indicador-pessoa="${chave}" data-nome="${esc(pessoa.nome)}" title="Ver os leads e a regra de cálculo" class="${chave === "reunioesEmAberto" ? "text-goldbright font-semibold" : "text-ink"} hover:text-goldbright underline decoration-dotted underline-offset-2">${numero(pessoa[chave])}</button></td>`
+                    ? `<td class="py-1.5 text-right tabular"><button type="button" data-papel="${esc(papel.chave)}" data-indicador-pessoa="${chave}" data-nome="${esc(pessoa.nome)}" title="Ver os leads e a regra de cálculo" class="${chave === "reunioesEmAberto" || chave === "emAgendamentoAgora" ? "text-goldbright font-semibold" : "text-ink"} hover:text-goldbright underline decoration-dotted underline-offset-2">${numero(pessoa[chave])}</button></td>`
                     : `<td class="py-1.5 text-right tabular text-ink">${numero(pessoa[chave])}</td>`,
                 )
                 .join("")}</tr>`)
@@ -1295,10 +1295,11 @@ async function abrirLeadsDaEtapa(chave) {
 }
 
 // Todos os leads atribuídos à pessoa no Kommo, em qualquer etapa.
-async function abrirLeadsDoResponsavel(papel, pessoa) {
+async function abrirLeadsDoResponsavel(papel, pessoa, soNaEtapa = null) {
   const rotulo = (dados.papeis || []).find((p) => p.chave === papel)?.rotulo || papel.toUpperCase();
   try {
     const r = await chamarApi(`/leads/responsavel?papel=${encodeURIComponent(papel)}&nome=${encodeURIComponent(pessoa)}&campanha=${encodeURIComponent(campanhaSelecionada)}`);
+    if (soNaEtapa) r.leads = r.leads.filter((l) => l.etapa === soNaEtapa);
     const dataBr = (iso) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "");
     const semAtualizacao = (d) => (d === null ? "" : d === 0 ? " · atualizado hoje" : ` · sem atualização há ${d} dia${d > 1 ? "s" : ""}`);
     const comCampanha = (dados?.campanhas?.length || 0) > 1;
@@ -1307,10 +1308,12 @@ async function abrirLeadsDoResponsavel(papel, pessoa) {
     const linhas = r.leads.map((l) => [l.id, l.nome, l.telefone, l.estado, ...(comCampanha ? [l.campanha] : []), nomeEtapa(l.etapa), dataBr(l.criadoEm), dataBr(l.atualizadoEm), l.diasSemAtualizacao ?? "", l.origem?.campanhaMeta || "", l.origem?.conjunto || l.origem?.publico || "", l.origem?.anuncio || "", (l.tags || []).join(", ")]);
     const arquivo = `leads_${papel}_${pessoa.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()}_${new Date().toISOString().slice(0, 10)}.csv`;
     abrirLeadsDoGrupo(
-      `${rotulo} ${pessoa}: todos os leads`,
+      soNaEtapa ? `${rotulo} ${pessoa}: na coluna ${nomeEtapa(soNaEtapa)} agora` : `${rotulo} ${pessoa}: todos os leads`,
       leads,
-      `Leads com "${pessoa}" no campo "${rotulo} responsável" do Kommo, em qualquer etapa e independente do período do filtro, na ordem do funil. A atribuição é feita no Kommo; o painel só consulta. Toque em um lead para abrir a ficha e o atalho para ele no Kommo.`,
-      { nome: arquivo, cabecalho, linhas },
+      soNaEtapa
+        ? `Leads com "${pessoa}" no campo "${rotulo} responsável" que estão agora na coluna ${nomeEtapa(soNaEtapa)}, esperando o horário da reunião. Independe do período do filtro. Os que estão há mais tempo sem atualização aparecem primeiro.`
+        : `Leads com "${pessoa}" no campo "${rotulo} responsável" do Kommo, em qualquer etapa e independente do período do filtro, na ordem do funil. A atribuição é feita no Kommo; o painel só consulta. Toque em um lead para abrir a ficha e o atalho para ele no Kommo.`,
+      { nome: soNaEtapa ? arquivo.replace(/^leads_/, `leads_${soNaEtapa.toLowerCase()}_`) : arquivo, cabecalho, linhas },
     );
   } catch (erro) {
     mostrarErro(erro.message);
@@ -1323,6 +1326,7 @@ function abrirIndicadorDaPessoa(papel, nome, indicador) {
   const pessoa = (escopo().porPessoa?.[papel] || []).find((p) => p.nome === nome);
   if (!pessoa) return;
   const rotulo = (dados.papeis || []).find((p) => p.chave === papel)?.rotulo || papel.toUpperCase();
+  if (indicador === "emAgendamentoAgora") return abrirLeadsDoResponsavel(papel, nome, "EM_AGENDAMENTO");
   if (indicador === "reunioesEmAberto") {
     const doSdr = new Set(pessoa.ids.map(String));
     const leads = daCampanha(dados.listas.reunioesEmAberto)

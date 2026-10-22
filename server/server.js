@@ -276,7 +276,7 @@ function indicadoresPorPessoa(leadsDoEscopo, base) {
     }
     resultado[papel.chave] = [...grupos]
       .map(([nome, leadsDaPessoa]) => {
-        const { volume, taxas, entradasPorEtapa } = calcularEscopo({ ...base, leads: leadsDaPessoa });
+        const { volume, taxas, entradasPorEtapa, volumeAtual } = calcularEscopo({ ...base, leads: leadsDaPessoa });
         return {
           nome,
           leadsNaBase: leadsDaPessoa.length,
@@ -285,6 +285,8 @@ function indicadoresPorPessoa(leadsDoEscopo, base) {
           leadsRecebidos: volume.leadsRecebidos,
           qualificados: volume.qualificados,
           emAgendamento: entradasPorEtapa.EM_AGENDAMENTO || 0,
+          // Retrato do momento, independente do período: a fila de trabalho.
+          emAgendamentoAgora: volumeAtual.EM_AGENDAMENTO || 0,
           reunioesMarcadas: volume.reunioesMarcadas,
           reunioesEmAberto: volume.reunioesEmAberto,
           reunioesRealizadas: volume.reunioesRealizadas,
