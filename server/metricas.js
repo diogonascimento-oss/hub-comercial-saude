@@ -348,8 +348,8 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
   };
   const etiquetaEmUso = (etiqueta) => leads.some((l) => l.tags.includes(etiqueta));
 
-  // Perdas do período, separadas pelo motivo: "Sem interesse" (tinha perfil e
-  // não seguiu, ver MOTIVOS_SEM_INTERESSE) e Desqualificados (os demais).
+  // Perdas do período, separadas pelo motivo: "Sem interesse" (desinteresse ou
+  // desistência, ver MOTIVOS_SEM_INTERESSE) e Desqualificados (os demais).
   const chaveDoMotivo = (m) => String(m || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
   const motivosSemInteresse = new Set(MOTIVOS_SEM_INTERESSE.map(chaveDoMotivo));
   const leadsSemInteresse = new Set([...leadsDesqualificados].filter((id) => motivosSemInteresse.has(chaveDoMotivo(porId.get(id)?.motivoPerda))));

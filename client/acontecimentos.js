@@ -74,8 +74,13 @@ function renderizarAcontecimentos() {
     .map((a) => {
       const tipo = TIPOS_DE_ACONTECIMENTO[a.tipo] || { rotulo: a.tipo, cor: "#9a9ca8" };
       const hora = new Date(a.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Recife" });
-      const pessoa = a.responsaveis?.[tipo.responsavel];
-      const papel = tipo.responsavel === "closer" ? "Closer" : "SDR";
+      // Nos acontecimentos da reunião em diante, aparecem o SDR que marcou e o
+      // closer; nos demais, só o SDR.
+      const papeis = tipo.responsavel === "closer" ? [["sdr", "SDR"], ["closer", "Closer"]] : [["sdr", "SDR"]];
+      const pessoas = papeis
+        .filter(([chave]) => a.responsaveis?.[chave])
+        .map(([chave, rotulo]) => `<span class="block">${rotulo}: ${esc(a.responsaveis[chave])}</span>`)
+        .join("");
       const caminho = a.de ? `${esc(a.de)} → ${esc(a.para)}` : esc(a.para);
       return `
       <li class="grid grid-cols-[3rem_minmax(0,1fr)] sm:grid-cols-[3.5rem_13rem_minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-0.5 px-4 py-2.5">
@@ -86,7 +91,7 @@ function renderizarAcontecimentos() {
           <span class="text-inkfaint"> · ${esc(a.lead.campanha)}</span>
           <span class="block text-[11px] text-inkfaint truncate">${caminho}${a.detalhe ? ` · ${esc(a.detalhe)}` : ""}</span>
         </span>
-        <span class="col-start-2 sm:col-start-auto text-[11px] text-inkdim sm:text-right whitespace-nowrap">${pessoa ? `${papel}: ${esc(pessoa)}` : ""}</span>
+        <span class="col-start-2 sm:col-start-auto text-[11px] text-inkdim sm:text-right whitespace-nowrap">${pessoas}</span>
       </li>`;
     })
     .join("");

@@ -146,8 +146,8 @@ export const RESPONSAVEIS = {
   farmer: [],
 };
 
-// Motivos de perda que NÃO são desqualificação: o lead tinha perfil para o
-// caso, mas não seguiu. Os leads perdidos com um destes motivos vão para o
+// Motivos de perda que NÃO são desqualificação: desinteresse ou desistência,
+// em qualquer etapa (inclusive antes de terminar a qualificação). Os leads perdidos com um destes motivos vão para o
 // cartão "Sem interesse"; todos os demais motivos (inclusive "Motivo
 // indefinido", "Outro" e perda sem motivo) continuam em "Desqualificados".
 // A comparação ignora maiúsculas e acentos. A coluna "Sem interesse" criada
