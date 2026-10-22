@@ -139,6 +139,7 @@ const LINHAS_DO_COMPARATIVO = [
   ["Reunião para fechamento", (e) => e.taxas.reuniaoParaFechamento, true],
   ["Conversão final", (e) => e.taxas.conversaoFinal, true],
   ["Desqualificados", (e) => e.volume.desqualificados],
+  ["Sem interesse", (e) => e.volume.semInteresse],
 ];
 
 const formatarIndicador = ([, valor, ehTaxa], e) => (ehTaxa ? percentual(valor(e)) : numero(valor(e)));
@@ -307,7 +308,7 @@ function haPeriodoAnterior() {
   const volume = dados.escoposAnteriores?.[campanhaSelecionada]?.volume;
   // Só contam os fatos do intervalo; retratos do momento atual (reuniões em
   // aberto, leads parados numa etapa) não indicam que houve operação.
-  const fatos = ["leadsRecebidos", "contatados", "comPrimeiraResposta", "qualificados", "reunioesMarcadas", "reunioesRealizadas", "fechados", "desqualificados"];
+  const fatos = ["leadsRecebidos", "contatados", "comPrimeiraResposta", "qualificados", "reunioesMarcadas", "reunioesRealizadas", "fechados", "desqualificados", "semInteresse"];
   return Boolean(volume && fatos.some((chave) => volume[chave] > 0));
 }
 function comparacaoComAnterior(chave, menorEhMelhor = false) {
@@ -334,7 +335,8 @@ const REGRAS_DOS_INDICADORES = {
   naoRealizadas: ["Leads com reunião não realizada", "Leads que saíram de Agendado para Remarcação, quando o agendamento também ocorreu dentro do período."],
   remarcacoesRecuperadas: ["Remarcações recuperadas", "Leads movidos de Remarcação para Agendado dentro do período."],
   fechados: ["Contratos fechados", "Leads que entraram na coluna final de venda ganha dentro do período."],
-  desqualificados: ["Desqualificados", "Leads que entraram na coluna final de venda perdida dentro do período."],
+  desqualificados: ["Desqualificados", "Leads perdidos no período (Venda perdida ou coluna de descarte) por falta de perfil para o caso: não atende aos critérios, contato inválido, duplicado, já tem advogado, documentação irrecuperável, além de motivo indefinido, \"Outro\" ou perda sem motivo."],
+  semInteresse: ["Sem interesse", "Leads perdidos no período (Venda perdida ou coluna Sem interesse) que tinham perfil, mas não seguiram: sem interesse, honorários, orçamento, fechou com outro escritório, parou de responder, desistiu após a reunião, entre outros motivos desse tipo."],
 };
 
 // Abre a relação dos leads contados em um indicador, na campanha selecionada.
@@ -374,7 +376,8 @@ function renderizarCartoes() {
     cartao(numero(v.naoRealizadas), "Não realizadas", `${percentual(t.naoRealizacao)} das marcadas<br>${esc(noShow)}`, "text-negativo", c("naoRealizadas", true), "naoRealizadas"),
     cartao(numero(v.remarcacoesRecuperadas), "Remarcações recuperadas", `De ${numero(v.entradasEmRemarcacao)} entradas em Remarcação: ${percentual(t.remarcacaoRecuperada)}<br>${numero(v.remarcacoesRecuperadasERealizadas)} recuperadas e realizadas`, "text-ink", c("remarcacoesRecuperadas"), "remarcacoesRecuperadas"),
     cartao(numero(v.fechados), "Contratos fechados", `Reunião para fechamento: <span class="${classeDaTaxa(t.reuniaoParaFechamento)}">${percentual(t.reuniaoParaFechamento)}</span><br>Conversão final: ${percentual(t.conversaoFinal)}`, "text-positivo", c("fechados"), "fechados"),
-    cartao(numero(v.desqualificados), "Desqualificados", `${numero(v.perdidasAntesDaReuniao)} perdidos entre o agendamento e a reunião`, "text-ink", c("desqualificados", true), "desqualificados"),
+    cartao(numero(v.desqualificados), "Desqualificados", "Sem perfil para o caso, contato inválido ou duplicado", "text-ink", c("desqualificados", true), "desqualificados"),
+    cartao(numero(v.semInteresse ?? 0), "Sem interesse", `Tinham perfil e não seguiram<br>${numero(v.perdidasAntesDaReuniao)} perdas, dos dois tipos, entre o agendamento e a reunião`, "text-ink", c("semInteresse", true), "semInteresse"),
   ].join("");
 
   const dataBr = (iso) => iso.split("-").reverse().join("/");
@@ -675,7 +678,7 @@ function listaComBarras(itens, rotuloDe, vazio) {
 
 function renderizarPerdas() {
   const e = escopo();
-  $("motivos").innerHTML = listaComBarras(e.desqualificadosPorMotivo, (i) => i.motivo, "Nenhum lead desqualificado no período.");
+  $("motivos").innerHTML = listaComBarras(e.desqualificadosPorMotivo, (i) => `${i.motivo}${i.semInteresse ? " · sem interesse" : ""}`, "Nenhum lead perdido no período.");
   $("etiquetasFrequentes").innerHTML = listaComBarras(e.etiquetasMaisFrequentes, (i) => i.tag, "Nenhuma etiqueta na base.");
 
   const linhas = [

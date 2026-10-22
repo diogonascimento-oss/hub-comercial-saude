@@ -53,7 +53,7 @@ function tabelaDeGrupos(titulo, lista, nota = "") {
     <h3>${esc(titulo)}</h3>
     ${nota ? `<p class="nota">${esc(nota)}</p>` : ""}
     <table>
-      <thead><tr><th>Grupo</th><th class="num">Leads</th><th class="num">Qualificados</th><th class="num">Taxa de qualificação</th><th class="num">Reuniões</th><th class="num">Remarcação</th><th class="num">Farmer</th><th class="num">Fechados</th><th class="num">Desqualificados</th></tr></thead>
+      <thead><tr><th>Grupo</th><th class="num">Leads</th><th class="num">Qualificados</th><th class="num">Taxa de qualificação</th><th class="num">Reuniões</th><th class="num">Remarcação</th><th class="num">Farmer</th><th class="num">Fechados</th><th class="num">Perdidos</th></tr></thead>
       <tbody>${lista
         .map(
           (g) => `<tr><td>${esc(g.grupo)}</td><td class="num">${g.totalLeads}</td><td class="num">${g.qualificados}</td><td class="num destaque">${percentual(g.percentualQualificados)}</td><td class="num">${g.reuniao}</td><td class="num">${g.remarcacao ?? 0}</td><td class="num">${g.farmer}</td><td class="num">${g.contratoFechado}</td><td class="num">${g.desqualificados ?? 0}</td></tr>`,

@@ -13,6 +13,7 @@ import {
   DIAS_PARA_LEAD_PARADO,
   PARES_CONVERSAO_AMPLA,
   SITUACAO_DA_REUNIAO,
+  MOTIVOS_SEM_INTERESSE,
 } from "./config.js";
 import { segundosUteis } from "./expediente.js";
 import { nomeDaEtapa } from "./mapeamento.js";
@@ -347,9 +348,14 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
   };
   const etiquetaEmUso = (etiqueta) => leads.some((l) => l.tags.includes(etiqueta));
 
-  // Motivos de perda dos leads desqualificados no período.
+  // Perdas do período, separadas pelo motivo: "Sem interesse" (tinha perfil e
+  // não seguiu, ver MOTIVOS_SEM_INTERESSE) e Desqualificados (os demais).
+  const chaveDoMotivo = (m) => String(m || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const motivosSemInteresse = new Set(MOTIVOS_SEM_INTERESSE.map(chaveDoMotivo));
+  const leadsSemInteresse = new Set([...leadsDesqualificados].filter((id) => motivosSemInteresse.has(chaveDoMotivo(porId.get(id)?.motivoPerda))));
+  for (const id of leadsSemInteresse) leadsDesqualificados.delete(id);
   const contagemDeMotivos = new Map();
-  for (const id of leadsDesqualificados) {
+  for (const id of [...leadsDesqualificados, ...leadsSemInteresse]) {
     const motivo = porId.get(id)?.motivoPerda || "Sem motivo registrado";
     contagemDeMotivos.set(motivo, (contagemDeMotivos.get(motivo) || 0) + 1);
   }
@@ -444,6 +450,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
       emReaquecimentoAgora: volumeAtual.REAQUECIMENTO || 0,
       fechados,
       desqualificados: leadsDesqualificados.size,
+      semInteresse: leadsSemInteresse.size,
     },
     taxas: {
       qualificacao: taxa(qualificados, leadsRecebidos),
@@ -497,7 +504,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
       daQualificacaoAoAgendamento: resumirTempos(temposDaQualificacaoAoAgendamento),
     },
     desqualificadosPorMotivo: [...contagemDeMotivos]
-      .map(([motivo, total]) => ({ motivo, total }))
+      .map(([motivo, total]) => ({ motivo, total, semInteresse: motivosSemInteresse.has(chaveDoMotivo(motivo)) }))
       .sort((a, b) => b.total - a.total),
     entradasPorEtapa,
     volumeAtual,
@@ -539,6 +546,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
       remarcacoesRecuperadas: leadsComRemarcacaoRecuperada,
       fechados: leadsFechados,
       desqualificados: leadsDesqualificados,
+      semInteresse: leadsSemInteresse,
     };
     const indicadoresPorLead = new Map();
     for (const [indicador, ids] of Object.entries(conjuntos)) {

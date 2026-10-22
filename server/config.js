@@ -146,6 +146,27 @@ export const RESPONSAVEIS = {
   farmer: [],
 };
 
+// Motivos de perda que NÃO são desqualificação: o lead tinha perfil para o
+// caso, mas não seguiu. Os leads perdidos com um destes motivos vão para o
+// cartão "Sem interesse"; todos os demais motivos (inclusive "Motivo
+// indefinido", "Outro" e perda sem motivo) continuam em "Desqualificados".
+// A comparação ignora maiúsculas e acentos. A coluna "Sem interesse" criada
+// nos funis entra aqui pelo próprio nome.
+export const MOTIVOS_SEM_INTERESSE = [
+  "Sem interesse",
+  "Orçamento insuficiente",
+  "Fechou com outro escritório",
+  "Parou de responder",
+  "Não aceitou condições",
+  "Considerou os honorários elevados",
+  "Não percebeu urgência/benefício",
+  "Não gostou do atendimento",
+  "Demora ou falha no retorno do escritório",
+  "Desistiu após reunião",
+  "Preferiu não ajuizar",
+  "Opt-out/bloqueio",
+];
+
 // Metas do mês corrente, somadas as três campanhas.
 //
 // A meta de contratos (25) foi definida em outubro de 2026. As de reuniões

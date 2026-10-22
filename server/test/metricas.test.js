@@ -100,7 +100,9 @@ test("volumes do período", () => {
   assert.equal(volume.leadsComReuniaoMarcada, 3);
   assert.equal(volume.reunioesRealizadas, 2); // 1 e 2
   assert.equal(volume.fechados, 1);
-  assert.equal(volume.desqualificados, 1);
+  // O único lead perdido tem o motivo "Sem interesse": vai para esse cartão.
+  assert.equal(volume.desqualificados, 0);
+  assert.equal(volume.semInteresse, 1);
 });
 
 test("a falta de um lead agendado antes do período não entra na taxa", () => {
@@ -147,7 +149,7 @@ test("etiquetas, motivos e listas", () => {
   const r = calcular();
   assert.deepEqual(r.etiquetas.noShow, { total: 1, emUso: true });
   assert.deepEqual(r.etiquetas.confirmadas, { total: 0, emUso: false });
-  assert.deepEqual(r.desqualificadosPorMotivo, [{ motivo: "Sem interesse", total: 1 }]);
+  assert.deepEqual(r.desqualificadosPorMotivo, [{ motivo: "Sem interesse", total: 1, semInteresse: true }]);
   assert.deepEqual(r.listas.reunioesEmAberto.map((l) => l.id), [6]);
   assert.deepEqual(r.listas.leadsParados.map((l) => l.id), [4]);
   assert.equal(r.listas.leadsDoPeriodo.length, 7);
