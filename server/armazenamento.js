@@ -125,3 +125,13 @@ export async function gravarEdicaoDeDescricao(leadId, edicao) {
   todas[String(leadId)] = edicao;
   await gravar(CHAVE_DESCRICOES, todas);
 }
+
+// Quem anexou cada arquivo pelo painel, e quando: { "<uuid>": { usuario, quando } }.
+const CHAVE_ANEXOS = "hubsaude:anexos";
+export const lerAutoriaDosAnexos = async () => (await lerRegistro(CHAVE_ANEXOS)) || {};
+export async function gravarAutoriaDoAnexo(uuid, autoria) {
+  const todas = await lerAutoriaDosAnexos();
+  if (autoria) todas[String(uuid)] = autoria;
+  else delete todas[String(uuid)];
+  await gravar(CHAVE_ANEXOS, todas);
+}

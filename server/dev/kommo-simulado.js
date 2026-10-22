@@ -247,6 +247,63 @@ app.patch("/api/v4/leads/:id", (req, res) => {
 });
 app.post("/api/v4/leads/:id/notes", (req, res) => res.json({ _embedded: { notes: [{ id: Date.now() }] } }));
 
+// Serviço de arquivos (Drive), no mesmo formato do Kommo.
+const arquivos = new Map(); // uuid -> { uuid, name, size, metadata, created_at, conteudo, apagado }
+const arquivosPorLead = new Map(); // leadId -> [{ id, file_uuid }]
+const sessoes = new Map();
+let proximoIdDeArquivo = 1;
+app.get("/api/v4/account", (req, res) => res.json({ id: 1, name: "Simulado", drive_url: `http://localhost:${PORTA}/drive` }));
+app.post("/drive/v1.0/sessions", (req, res) => {
+  const token = `s${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+  sessoes.set(token, { ...req.body, partes: [] });
+  res.json({ session_id: sessoes.size, upload_url: `http://localhost:${PORTA}/drive/upload/${token}`, max_file_size: 314572800, max_part_size: 131072 });
+});
+app.post("/drive/upload/:token", express.raw({ type: () => true, limit: "50mb" }), (req, res) => {
+  const sessao = sessoes.get(req.params.token);
+  if (!sessao) return res.status(400).json({});
+  sessao.partes.push(req.body);
+  const recebido = sessao.partes.reduce((n, p) => n + p.length, 0);
+  if (recebido < sessao.file_size) return res.json({ session_id: 1, next_url: `http://localhost:${PORTA}/drive/upload/${req.params.token}` });
+  const uuid = `f${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
+  const ext = (sessao.file_name.split(".").pop() || "").toLowerCase();
+  const arquivo = { uuid, name: sessao.file_name, size: recebido, type: "file", metadata: { extension: ext, mime_type: sessao.content_type || "application/octet-stream" }, created_at: Math.floor(Date.now() / 1000), conteudo: Buffer.concat(sessao.partes) };
+  arquivos.set(uuid, arquivo);
+  sessoes.delete(req.params.token);
+  const { conteudo, ...semConteudo } = arquivo;
+  res.json(semConteudo);
+});
+app.get("/drive/v1.0/files", (req, res) => {
+  const uuids = String(req.query.filter?.uuid || "").split(",").filter(Boolean);
+  const lista = uuids.map((u) => arquivos.get(u)).filter((a) => a && !a.apagado);
+  if (!lista.length) return res.status(204).end();
+  res.json({ _embedded: { files: lista.map(({ conteudo, ...a }) => ({ ...a, _links: { download: { href: `http://localhost:${PORTA}/drive/download/${a.uuid}` } } })) } });
+});
+app.delete("/drive/v1.0/files", (req, res) => {
+  for (const { uuid } of req.body || []) if (arquivos.has(uuid)) arquivos.get(uuid).apagado = true;
+  res.status(202).end();
+});
+app.get("/drive/download/:uuid", (req, res) => {
+  const a = arquivos.get(req.params.uuid);
+  if (!a) return res.status(404).end();
+  res.set("Content-Type", a.metadata.mime_type).send(a.conteudo);
+});
+app.get("/api/v4/leads/:id/files", (req, res) => {
+  const lista = arquivosPorLead.get(req.params.id) || [];
+  if (!lista.length) return res.status(204).end();
+  res.json({ _embedded: { files: lista } });
+});
+app.put("/api/v4/leads/:id/files", (req, res) => {
+  const lista = arquivosPorLead.get(req.params.id) || [];
+  for (const { file_uuid } of req.body || []) lista.push({ id: proximoIdDeArquivo++, file_uuid });
+  arquivosPorLead.set(req.params.id, lista);
+  res.json({ _embedded: { files: lista } });
+});
+app.delete("/api/v4/leads/:id/files", (req, res) => {
+  const tirar = new Set((req.body || []).map((f) => f.file_uuid));
+  arquivosPorLead.set(req.params.id, (arquivosPorLead.get(req.params.id) || []).filter((f) => !tirar.has(f.file_uuid)));
+  res.status(202).end();
+});
+
 app.get("/api/v4/contacts", (req, res) => {
   const ids = valoresDoFiltro(req.query.filter?.id);
   paginar(req, res, "contacts", ids ? contatos.filter((c) => ids.includes(String(c.id))) : contatos);

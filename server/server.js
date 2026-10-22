@@ -842,6 +842,149 @@ app.put("/api/leads/:id/descricao", async (req, res) => {
   }
 });
 
+// --- Anexos do lead ------------------------------------------------------------
+//
+// Os arquivos ficam no Kommo (aba de mídia do lead). O painel lista, envia,
+// abre, baixa e apaga, sempre deixando uma nota no lead com quem fez e quando.
+
+const TAMANHO_MAXIMO_DO_ANEXO = 20 * 1024 * 1024;
+// Só imagens comuns e PDF abrem dentro do navegador; o resto é baixado, para
+// que um arquivo enviado (HTML, SVG) nunca rode como página do painel.
+const ABRE_NO_NAVEGADOR = /^(image\/(png|jpe?g|gif|webp)|application\/pdf)$/i;
+
+async function leadAcompanhado(leadId) {
+  const { valor: mapeamento } = await obterMapeamento();
+  const bruto = await kommo.buscarLead(leadId);
+  return Boolean(mapeamento.campanhaPorFunil.get(Number(bruto.pipeline_id)));
+}
+
+function erroDeArquivos(res, erro, contexto) {
+  const status = erro.response?.status;
+  if (status === 401 || status === 403) {
+    return res.status(502).json({ error: "O Kommo recusou o acesso aos arquivos. A integração do painel no Kommo precisa da permissão de acesso a arquivos (e de apagar arquivos, para excluir)." });
+  }
+  if (status === 404) return res.status(404).json({ error: "Lead ou arquivo não encontrado no Kommo." });
+  return responderErro(res, erro, contexto);
+}
+
+const nomeSeguro = (nome) => String(nome || "arquivo").replace(/[\r\n"\\/]/g, "_").slice(0, 180) || "arquivo";
+const arquivoParaPainel = (f, autoria) => ({
+  uuid: String(f.uuid),
+  nome: f.name || f.sanitized_name || "arquivo",
+  tamanho: Number(f.size) || 0,
+  tipo: f.metadata?.mime_type || "",
+  extensao: f.metadata?.extension || "",
+  criadoEm: f.created_at ? new Date(f.created_at * 1000).toISOString() : null,
+  abreNoNavegador: ABRE_NO_NAVEGADOR.test(f.metadata?.mime_type || ""),
+  autoria: autoria || null,
+});
+
+app.get("/api/leads/:id/anexos", async (req, res) => {
+  const leadId = String(req.params.id);
+  if (!/^\d+$/.test(leadId)) return res.status(400).json({ error: "ID de lead inválido." });
+  try {
+    if (!(await leadAcompanhado(leadId))) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
+    const uuids = await kommo.listarUuidsDosArquivosDoLead(leadId);
+    const [arquivos, autorias] = await Promise.all([kommo.detalharArquivos(uuids), armazenamento.lerAutoriaDosAnexos().catch(() => ({}))]);
+    const ativos = arquivos.filter((f) => !f.deleted_at && !f.is_trashed);
+    ativos.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+    res.json({ total: ativos.length, arquivos: ativos.map((f) => arquivoParaPainel(f, autorias[String(f.uuid)])), tamanhoMaximo: TAMANHO_MAXIMO_DO_ANEXO });
+  } catch (erro) {
+    erroDeArquivos(res, erro, "Falha ao listar os anexos do lead");
+  }
+});
+
+app.post("/api/leads/:id/anexos", express.raw({ type: () => true, limit: TAMANHO_MAXIMO_DO_ANEXO }), async (req, res) => {
+  const leadId = String(req.params.id);
+  if (!/^\d+$/.test(leadId)) return res.status(400).json({ error: "ID de lead inválido." });
+  const conteudo = Buffer.isBuffer(req.body) ? req.body : null;
+  if (!conteudo || !conteudo.length) return res.status(400).json({ error: "Arquivo vazio." });
+  let nome;
+  try {
+    nome = nomeSeguro(decodeURIComponent(String(req.get("x-nome-arquivo") || "")));
+  } catch {
+    nome = "arquivo";
+  }
+  const tipo = String(req.get("x-tipo-arquivo") || "").slice(0, 120);
+  const usuario = usuarioDa(req) || (MODO_LOCAL ? "modo local" : null);
+  if (!usuario) return res.status(401).json({ error: "Não foi possível identificar quem está enviando. Recarregue a página e entre novamente." });
+  try {
+    if (!(await leadAcompanhado(leadId))) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
+    const arquivo = await kommo.enviarArquivo(nome, tipo, conteudo);
+    await kommo.ligarArquivoAoLead(leadId, arquivo.uuid);
+    const autoria = { usuario, quando: new Date().toISOString() };
+    const quando = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Recife" });
+    await Promise.all([
+      armazenamento.gravarAutoriaDoAnexo(arquivo.uuid, autoria).catch((e) => console.error("Falha ao guardar a autoria do anexo:", e.message)),
+      kommo.anotarNoLead(leadId, `Arquivo "${nome}" anexado pelo painel por ${usuario} em ${quando}.`).catch((e) => console.error("Falha ao anotar no Kommo:", e.message)),
+      registrarAlteracao(req, "Arquivo anexado ao lead", { leadId, detalhe: nome }),
+    ]);
+    res.json({ arquivo: arquivoParaPainel({ ...arquivo, metadata: arquivo.metadata || { mime_type: tipo } }, autoria) });
+  } catch (erro) {
+    erroDeArquivos(res, erro, "Falha ao enviar o arquivo ao Kommo");
+  }
+});
+
+// Abre (imagens e PDF) ou baixa o arquivo. Só serve arquivos ligados ao lead.
+app.get("/api/leads/:id/anexos/:uuid", async (req, res) => {
+  const leadId = String(req.params.id);
+  const uuid = String(req.params.uuid);
+  if (!/^\d+$/.test(leadId) || !/^[\w-]{8,64}$/.test(uuid)) return res.status(400).json({ error: "Arquivo inválido." });
+  try {
+    if (!(await leadAcompanhado(leadId))) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
+    const uuids = await kommo.listarUuidsDosArquivosDoLead(leadId);
+    if (!uuids.includes(uuid)) return res.status(404).json({ error: "Arquivo não encontrado neste lead." });
+    const [arquivo] = await kommo.detalharArquivos([uuid]);
+    const link = arquivo?._links?.download?.href || arquivo?._links?.download_version?.href;
+    if (!link) return res.status(502).json({ error: "O Kommo não informou o link de download do arquivo." });
+    const resposta = await kommo.baixarArquivo(link);
+    const tipo = arquivo.metadata?.mime_type || resposta.headers["content-type"] || "application/octet-stream";
+    const abrir = ABRE_NO_NAVEGADOR.test(tipo) && req.query.baixar !== "1";
+    const nome = nomeSeguro(arquivo.name);
+    res.set("Content-Type", abrir ? tipo : "application/octet-stream");
+    res.set("Content-Disposition", `${abrir ? "inline" : "attachment"}; filename="${nome.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(nome)}`);
+    res.set("X-Content-Type-Options", "nosniff");
+    if (resposta.headers["content-length"]) res.set("Content-Length", resposta.headers["content-length"]);
+    resposta.data.pipe(res);
+  } catch (erro) {
+    erroDeArquivos(res, erro, "Falha ao baixar o arquivo do Kommo");
+  }
+});
+
+// Apaga o anexo: desliga do lead e manda o arquivo para a lixeira do Kommo,
+// onde ele ainda pode ser recuperado por 30 dias.
+app.delete("/api/leads/:id/anexos/:uuid", async (req, res) => {
+  const leadId = String(req.params.id);
+  const uuid = String(req.params.uuid);
+  if (!/^\d+$/.test(leadId) || !/^[\w-]{8,64}$/.test(uuid)) return res.status(400).json({ error: "Arquivo inválido." });
+  const usuario = usuarioDa(req) || (MODO_LOCAL ? "modo local" : null);
+  if (!usuario) return res.status(401).json({ error: "Não foi possível identificar quem está apagando. Recarregue a página e entre novamente." });
+  try {
+    if (!(await leadAcompanhado(leadId))) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
+    const uuids = await kommo.listarUuidsDosArquivosDoLead(leadId);
+    if (!uuids.includes(uuid)) return res.status(404).json({ error: "Arquivo não encontrado neste lead." });
+    const [arquivo] = await kommo.detalharArquivos([uuid]).catch(() => []);
+    const nome = arquivo?.name || "arquivo";
+    await kommo.desligarArquivoDoLead(leadId, uuid);
+    let naLixeira = true;
+    try {
+      await kommo.apagarArquivoDoDrive(uuid);
+    } catch (erro) {
+      naLixeira = false;
+      console.error("Arquivo desligado do lead, mas não foi para a lixeira do Kommo:", erro.response?.status || erro.message);
+    }
+    const quando = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Recife" });
+    await Promise.all([
+      armazenamento.gravarAutoriaDoAnexo(uuid, null).catch(() => {}),
+      kommo.anotarNoLead(leadId, `Arquivo "${nome}" apagado pelo painel por ${usuario} em ${quando}.`).catch((e) => console.error("Falha ao anotar no Kommo:", e.message)),
+      registrarAlteracao(req, "Arquivo do lead apagado", { leadId, detalhe: nome }),
+    ]);
+    res.json({ ok: true, naLixeira });
+  } catch (erro) {
+    erroDeArquivos(res, erro, "Falha ao apagar o arquivo no Kommo");
+  }
+});
+
 const leadInformado = (req) => (/^\d{1,15}$/.test(String(req.body?.leadId ?? req.query?.leadId ?? "")) ? String(req.body?.leadId ?? req.query?.leadId) : null);
 
 app.get("/api/registro", async (req, res) => {
@@ -1442,6 +1585,16 @@ app.get("/api/diagnostico/lead/:id", async (req, res) => {
 });
 
 app.use("/api", (req, res) => res.status(404).json({ error: "Rota inexistente." }));
+
+// Erros de leitura do corpo (arquivo grande demais, JSON malformado) também
+// respondem em JSON, que é o que o painel entende.
+app.use((erro, req, res, next) => {
+  if (res.headersSent) return next(erro);
+  if (erro.type === "entity.too.large") return res.status(413).json({ error: "Arquivo grande demais. O limite é de 20 MB." });
+  if (erro.type === "entity.parse.failed") return res.status(400).json({ error: "Dados inválidos." });
+  console.error(erro);
+  res.status(500).json({ error: "Erro interno do servidor." });
+});
 
 app.listen(PORT, () => {
   console.log(`Hub Comercial - Núcleo de Saúde: servidor ativo na porta ${PORT}`);

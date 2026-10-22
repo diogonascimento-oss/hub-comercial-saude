@@ -184,6 +184,139 @@ $("corpoFicha").addEventListener("click", (e) => {
   }
 });
 
+// Anexos do lead: arquivos guardados no Kommo (aba de mídia do lead). A lista
+// é carregada depois da ficha, para não atrasar a abertura.
+let anexosDoLead = null; // leadId da ficha cujos anexos estão na tela
+const TAMANHO_MAXIMO_DO_ANEXO = 20 * 1024 * 1024;
+
+function tamanhoLegivel(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`;
+}
+
+function blocoDosAnexos(l) {
+  return `
+    <section id="blocoAnexos">
+      <div class="flex items-baseline justify-between gap-3 mb-2">
+        <p class="rotulo">Anexos <span id="totalAnexos" class="text-inkfaint"></span></p>
+        <label class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink cursor-pointer">
+          Anexar arquivo<input type="file" id="campoAnexo" multiple class="sr-only">
+        </label>
+      </div>
+      <p id="statusAnexos" class="text-[11px] text-inkdim"></p>
+      <ul id="listaAnexos" class="divide-y divide-line"><li class="text-inkdim py-1">Carregando.</li></ul>
+      <p class="text-[10px] text-inkfaint mt-1.5">Os arquivos ficam no Kommo, na aba de mídia do lead. Até 20 MB por arquivo. Fotos e PDF abrem no navegador; os demais são baixados.</p>
+    </section>`;
+}
+
+function itemDoAnexo(leadId, a) {
+  const base = `${API}/leads/${encodeURIComponent(leadId)}/anexos/${encodeURIComponent(a.uuid)}`;
+  const tipo = (a.extensao || a.nome.split(".").pop() || "").toUpperCase().slice(0, 5);
+  const origem = a.autoria
+    ? `anexado por ${esc(a.autoria.usuario || "autor não registrado")} em ${dataHoraBr(a.autoria.quando)}`
+    : a.criadoEm ? `anexado no Kommo em ${dataHoraBr(a.criadoEm)}` : "anexado no Kommo";
+  return `
+    <li class="py-2 flex items-start justify-between gap-3" data-anexo="${esc(a.uuid)}">
+      <div class="min-w-0">
+        <a href="${a.abreNoNavegador ? base : `${base}?baixar=1`}" target="_blank" rel="noopener" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 [overflow-wrap:anywhere]">${esc(a.nome)}</a>
+        <p class="text-[10px] text-inkfaint mt-0.5">${tipo ? `${esc(tipo)} · ` : ""}${tamanhoLegivel(a.tamanho)} · ${origem}</p>
+      </div>
+      <div class="shrink-0 flex items-center gap-3 text-[11px]">
+        ${a.abreNoNavegador ? `<a href="${base}" target="_blank" rel="noopener" class="text-inkdim hover:text-ink">Abrir</a>` : ""}
+        <a href="${base}?baixar=1" class="text-inkdim hover:text-ink">Baixar</a>
+        <button type="button" data-apagar-anexo="${esc(a.uuid)}" data-nome="${esc(a.nome)}" class="text-inkdim hover:text-negativo">Apagar</button>
+      </div>
+    </li>`;
+}
+
+async function carregarAnexos(leadId) {
+  anexosDoLead = leadId;
+  try {
+    const r = await chamarApi(`/leads/${encodeURIComponent(leadId)}/anexos`);
+    if (anexosDoLead !== leadId || !$("listaAnexos")) return;
+    $("totalAnexos").textContent = r.total ? `(${numero(r.total)})` : "";
+    $("listaAnexos").innerHTML = r.arquivos.length
+      ? r.arquivos.map((a) => itemDoAnexo(leadId, a)).join("")
+      : '<li class="text-inkfaint py-1">Nenhum arquivo anexado.</li>';
+  } catch (erro) {
+    if (anexosDoLead !== leadId || !$("listaAnexos")) return;
+    $("listaAnexos").innerHTML = `<li class="text-negativo py-1">Não foi possível carregar os anexos. ${esc(erro.message)}</li>`;
+  }
+}
+
+async function enviarAnexos(arquivos) {
+  const leadId = anexosDoLead;
+  if (!leadId || !arquivos.length) return;
+  const status = $("statusAnexos");
+  const grandes = arquivos.filter((f) => f.size > TAMANHO_MAXIMO_DO_ANEXO);
+  const validos = arquivos.filter((f) => f.size > 0 && f.size <= TAMANHO_MAXIMO_DO_ANEXO);
+  const erros = grandes.map((f) => `${f.name}: passa de 20 MB`);
+  for (let i = 0; i < validos.length; i++) {
+    const f = validos[i];
+    status.className = "text-[11px] text-inkdim";
+    status.textContent = `Enviando ${validos.length > 1 ? `${i + 1} de ${validos.length}: ` : ""}${f.name}.`;
+    try {
+      const r = await fetch(`${API}/leads/${encodeURIComponent(leadId)}/anexos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream", "x-nome-arquivo": encodeURIComponent(f.name), "x-tipo-arquivo": f.type || "" },
+        body: f,
+      });
+      const corpo = (r.headers.get("Content-Type") || "").includes("application/json") ? await r.json() : { error: "A sessão expirou. Recarregue a página para entrar novamente." };
+      if (!r.ok) throw new Error(corpo.error || `O servidor respondeu com o código ${r.status}.`);
+    } catch (erro) {
+      erros.push(`${f.name}: ${erro.message}`);
+    }
+  }
+  status.className = erros.length ? "text-[11px] text-negativo" : "text-[11px] text-inkdim";
+  status.textContent = erros.length ? `Não enviado. ${erros.join(" · ")}` : "";
+  if (validos.length) await carregarAnexos(leadId);
+}
+
+async function apagarAnexo(botao) {
+  const leadId = anexosDoLead;
+  const uuid = botao.dataset.apagarAnexo;
+  // Primeiro clique pede confirmação; o segundo apaga.
+  if (botao.dataset.confirmar !== "1") {
+    botao.dataset.confirmar = "1";
+    botao.textContent = "Confirmar exclusão";
+    botao.classList.add("text-negativo", "font-semibold");
+    setTimeout(() => {
+      if (!botao.isConnected) return;
+      botao.dataset.confirmar = "";
+      botao.textContent = "Apagar";
+      botao.classList.remove("text-negativo", "font-semibold");
+    }, 5000);
+    return;
+  }
+  botao.disabled = true;
+  botao.textContent = "Apagando.";
+  try {
+    const r = await chamarApi(`/leads/${encodeURIComponent(leadId)}/anexos/${encodeURIComponent(uuid)}`, { method: "DELETE" });
+    $("statusAnexos").className = "text-[11px] text-inkdim";
+    $("statusAnexos").textContent = r.naLixeira
+      ? `"${botao.dataset.nome}" apagado. Fica na lixeira do Kommo por 30 dias.`
+      : `"${botao.dataset.nome}" retirado do lead. O arquivo continua no Drive do Kommo, porque a integração não tem permissão para apagar arquivos.`;
+    await carregarAnexos(leadId);
+  } catch (erro) {
+    botao.disabled = false;
+    botao.textContent = "Apagar";
+    $("statusAnexos").className = "text-[11px] text-negativo";
+    $("statusAnexos").textContent = erro.message;
+  }
+}
+
+$("corpoFicha").addEventListener("change", (e) => {
+  if (e.target.id === "campoAnexo") {
+    enviarAnexos([...e.target.files]);
+    e.target.value = "";
+  }
+});
+$("corpoFicha").addEventListener("click", (e) => {
+  const botao = e.target.closest("button[data-apagar-anexo]");
+  if (botao) apagarAnexo(botao);
+});
+
 // Reuniões do lead, com o desfecho que o painel considerou e o critério usado.
 function blocoDeReunioes(l) {
   if (!l.reunioes?.length) return "";
@@ -287,6 +420,7 @@ function renderizarFicha(l) {
       ["Farmer", texto(l.responsaveis.farmer)],
     ]) +
     blocoDaDescricao(l) +
+    blocoDosAnexos(l) +
     blocoDaFicha("Demais campos preenchidos no Kommo", outrosCampos.map((c) => [c.nome, esc(c.valor)])) +
     blocoDaCadencia(camposTecnicos) +
     (registrosInternos.length
@@ -320,10 +454,12 @@ async function abrirFichaDoLead(leadId) {
   $("tituloFicha").textContent = "Ficha do lead";
   $("subtituloFicha").textContent = `Lead ${leadId}`;
   descricaoAberta = null;
+  anexosDoLead = null;
   $("corpoFicha").innerHTML = '<p class="text-inkdim">Carregando.</p>';
   abrirDialogo("modalFicha");
   try {
     renderizarFicha(await chamarApi(`/leads/${encodeURIComponent(leadId)}`));
+    carregarAnexos(leadId);
   } catch (erro) {
     $("corpoFicha").innerHTML = `<p class="text-negativo">Não foi possível carregar a ficha. ${esc(erro.message)}</p>`;
   }

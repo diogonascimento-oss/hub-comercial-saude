@@ -143,3 +143,30 @@ test("endereço inexistente recebe a página 404 do painel, com código 404", as
   assert.equal(falha.status, 404);
   assert.equal(await falha.text(), "Página não encontrada.");
 });
+
+test("anexos: repassa nome e tipo do arquivo e devolve os cabeçalhos do download", async () => {
+  const r = await chamar("/api/leads/1/anexos", {
+    token: await emitirToken(),
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream", "x-nome-arquivo": "laudo%20m%C3%A9dico.pdf", "x-tipo-arquivo": "application/pdf" },
+    body: new Uint8Array([1, 2, 3]),
+  });
+  assert.equal(r.status, 200);
+  assert.equal(chamadasNaApi[0].cabecalhos["x-nome-arquivo"], "laudo%20m%C3%A9dico.pdf");
+  assert.equal(chamadasNaApi[0].cabecalhos["x-tipo-arquivo"], "application/pdf");
+  assert.equal(chamadasNaApi[0].corpo.byteLength, 3);
+
+  const fetchOriginal = globalThis.fetch;
+  globalThis.fetch = async (destino, opcoes) =>
+    String(destino).includes("/cdn-cgi/") ? fetchOriginal(destino, opcoes)
+      : new Response("png", { headers: { "Content-Type": "image/png", "Content-Disposition": 'inline; filename="foto.png"', "X-Content-Type-Options": "nosniff", "x-interno": "nao" } });
+  try {
+    const d = await chamar("/api/leads/1/anexos/abc12345", { token: await emitirToken() });
+    assert.equal(d.headers.get("Content-Disposition"), 'inline; filename="foto.png"');
+    assert.equal(d.headers.get("X-Content-Type-Options"), "nosniff");
+    assert.match(d.headers.get("Content-Security-Policy"), /default-src 'none'/);
+    assert.equal(d.headers.get("x-interno"), null);
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
+});

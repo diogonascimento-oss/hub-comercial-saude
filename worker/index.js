@@ -154,6 +154,11 @@ export default {
     const tipo = request.headers.get("Content-Type");
     if (tipo) cabecalhos.set("Content-Type", tipo);
     if (usuario.email) cabecalhos.set("x-usuario", usuario.email);
+    // Nome e tipo do arquivo nos envios de anexos.
+    for (const nome of ["x-nome-arquivo", "x-tipo-arquivo"]) {
+      const valor = request.headers.get(nome);
+      if (valor) cabecalhos.set(nome, valor.slice(0, 600));
+    }
 
     const temCorpo = request.method !== "GET" && request.method !== "HEAD";
     let resposta;
@@ -169,6 +174,14 @@ export default {
 
     const saida = new Headers({ "Cache-Control": "no-store" });
     saida.set("Content-Type", resposta.headers.get("Content-Type") || "application/json; charset=utf-8");
+    // Downloads de anexos: nome do arquivo, tamanho e proteção contra execução.
+    for (const nome of ["Content-Disposition", "Content-Length", "X-Content-Type-Options"]) {
+      const valor = resposta.headers.get(nome);
+      if (valor) saida.set(nome, valor);
+    }
+    if (saida.has("Content-Disposition") && /^image\//.test(saida.get("Content-Type"))) {
+      saida.set("Content-Security-Policy", "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'");
+    }
     return new Response(resposta.body, { status: resposta.status, headers: saida });
   },
 };
