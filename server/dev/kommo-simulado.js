@@ -227,6 +227,9 @@ app.get("/api/v4/leads", (req, res) => {
   paginar(req, res, "leads", ids ? leads.filter((l) => ids.includes(String(l.pipeline_id))) : leads);
 });
 
+app.get("/api/v4/leads/loss_reasons", (req, res) =>
+  res.json({ _embedded: { loss_reasons: [{ id: 1, name: "Sem interesse" }, { id: 2, name: "Não atende aos critérios" }, { id: 3, name: "Parou de responder" }] } }),
+);
 app.get("/api/v4/leads/:id", (req, res) => {
   const lead = leads.find((l) => String(l.id) === req.params.id);
   return lead ? res.json(lead) : res.status(404).json({ title: "Not found" });
@@ -242,6 +245,20 @@ app.patch("/api/v4/leads/:id", (req, res) => {
     if (i >= 0) campos.splice(i, 1);
     if (novo.values) campos.push({ field_id: novo.field_id, field_name: novo.field_id === 7002 ? "Descrição" : `Campo ${novo.field_id}`, values: novo.values });
   }
+  if (req.body?.status_id) {
+    const agora = Math.floor(Date.now() / 1000);
+    eventos.push({
+      id: `ev-painel-${Date.now()}`,
+      type: "lead_status_changed",
+      entity_id: lead.id,
+      entity_type: "lead",
+      created_at: agora,
+      value_before: [{ lead_status: { id: lead.status_id, pipeline_id: lead.pipeline_id } }],
+      value_after: [{ lead_status: { id: Number(req.body.status_id), pipeline_id: lead.pipeline_id } }],
+    });
+    lead.status_id = Number(req.body.status_id);
+  }
+  if (req.body?.loss_reason_id) lead._embedded.loss_reason = [{ id: req.body.loss_reason_id, name: ["Sem interesse", "Não atende aos critérios", "Parou de responder"][req.body.loss_reason_id - 1] || "Outro" }];
   lead.updated_at = Math.floor(Date.now() / 1000);
   res.json({ id: lead.id });
 });

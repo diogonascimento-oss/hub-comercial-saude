@@ -251,3 +251,14 @@ export async function baixarArquivo(link) {
   if (destino.origin !== drive.origin && !destino.hostname.endsWith(".kommo.com")) throw new Error("Link de download fora do Kommo.");
   return axios.get(destino.href, { headers: cabecalhoDeAutorizacao(), responseType: "stream", timeout: 60000, maxRedirects: 5 });
 }
+
+// Motivos de perda da conta (usados ao mover para Venda perdida).
+export async function listarMotivosDePerda() {
+  const r = await requisitar("/leads/loss_reasons");
+  return r.status === 204 ? [] : r.data?._embedded?.loss_reasons || [];
+}
+
+// Atualiza campos do lead de uma vez (etapa, motivo de perda, campos personalizados).
+export function atualizarLead(leadId, dados) {
+  return escrever("patch", `/leads/${leadId}`, dados);
+}

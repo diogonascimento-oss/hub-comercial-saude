@@ -22,6 +22,8 @@ import {
   CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO,
   ROTULO_SEM_RASTREIO_DE_ANUNCIO,
   MOTIVOS_SEM_INTERESSE,
+  CAMPOS,
+  RESPONSAVEIS,
 } from "./config.js";
 import * as kommo from "./kommo.js";
 import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
@@ -839,6 +841,172 @@ app.put("/api/leads/:id/descricao", async (req, res) => {
     if (erro.response?.status === 404 || erro.response?.status === 204) return res.status(404).json({ error: "Lead não encontrado no Kommo." });
     if (erro.response?.status === 403 || erro.response?.status === 401) return res.status(502).json({ error: "O Kommo recusou a gravação. O token do painel pode não ter permissão de escrita." });
     responderErro(res, erro, "Falha ao gravar a descrição no Kommo");
+  }
+});
+
+// --- Etapa e responsáveis, editados pela ficha -------------------------------
+//
+// A ficha permite mudar a coluna do lead no Kommo e os campos de SDR, Closer e
+// Farmer. É o mesmo que fazer no Kommo: as automações ligadas à coluna rodam
+// normalmente. Cada mudança deixa uma nota no lead com quem fez e quando.
+
+const STATUS_GANHO = 142;
+const STATUS_PERDIDO = 143;
+const CAMPO_DO_PAPEL = { sdr: CAMPOS.sdrResponsavel, closer: CAMPOS.closerResponsavel, farmer: CAMPOS.farmerResponsavel };
+const ROTULO_DO_PAPEL = { sdr: "SDR", closer: "Closer", farmer: "Farmer" };
+
+let camposDaContaEmCache = { valor: null, ate: 0 };
+async function camposDaConta() {
+  if (camposDaContaEmCache.ate > Date.now()) return camposDaContaEmCache.valor;
+  const valor = await kommo.listarCamposDeLead();
+  camposDaContaEmCache = { valor, ate: Date.now() + 3600_000 };
+  return valor;
+}
+
+function esquecerDadosEmCache() {
+  cacheLeads = null;
+  cacheDados.clear();
+}
+
+const valorDoCampoBruto = (bruto, campoId) => {
+  const campo = (bruto.custom_fields_values || []).find((c) => Number(c.field_id) === Number(campoId));
+  return String(campo?.values?.[0]?.value ?? "").trim();
+};
+
+async function opcoesDeEdicao(leadId) {
+  const [{ valor: mapeamento, funis }, bruto, campos, { leads }] = await Promise.all([
+    obterMapeamento(),
+    kommo.buscarLead(leadId),
+    camposDaConta(),
+    obterLeads(),
+  ]);
+  const campanha = mapeamento.campanhaPorFunil.get(Number(bruto.pipeline_id));
+  if (!campanha) return null;
+  const funil = funis.find((f) => Number(f.id) === Number(bruto.pipeline_id));
+  // A coluna de entrada do Kommo (tipo 1) recebe leads novos; não é destino de movimentação.
+  const colunas = [...(funil?._embedded?.statuses || [])]
+    .filter((c) => Number(c.type) !== 1 || Number(c.id) === Number(bruto.status_id))
+    .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+    .map((c) => {
+      const etapa = mapeamento.etapaPorColuna.get(`${bruto.pipeline_id}:${c.id}`);
+      return {
+        id: Number(c.id),
+        nome: c.name,
+        ganho: Number(c.id) === STATUS_GANHO,
+        // Venda perdida: no Kommo é a coluna 143; o motivo de perda só vale nela.
+        perdido: Number(c.id) === STATUS_PERDIDO || (etapa?.chave === "DESQUALIFICADO" && !etapa.extra && Number(c.id) !== STATUS_GANHO),
+      };
+    });
+  const responsaveis = Object.entries(CAMPO_DO_PAPEL)
+    .filter(([, campoId]) => campoId)
+    .map(([papel, campoId]) => {
+      const def = campos.find((c) => Number(c.id) === Number(campoId));
+      const opcoes = (def?.enums || []).map((e) => ({ id: Number(e.id), valor: e.value }));
+      // Sugestões para campo de texto: nomes oficiais e nomes já usados.
+      const usados = new Set((RESPONSAVEIS[papel] || []).map((r) => r.nome));
+      for (const l of leads) if (l.responsaveis?.[papel]) usados.add(l.responsaveis[papel]);
+      return {
+        papel,
+        rotulo: ROTULO_DO_PAPEL[papel],
+        campoId: Number(campoId),
+        tipo: opcoes.length ? "lista" : "texto",
+        opcoes,
+        sugestoes: opcoes.length ? [] : [...usados].sort((a, b) => a.localeCompare(b, "pt-BR")),
+        atual: valorDoCampoBruto(bruto, campoId),
+      };
+    });
+  return { bruto, campanha, colunas, statusAtual: Number(bruto.status_id), responsaveis };
+}
+
+app.get("/api/leads/:id/edicao", async (req, res) => {
+  const leadId = String(req.params.id);
+  if (!/^\d+$/.test(leadId)) return res.status(400).json({ error: "ID de lead inválido." });
+  try {
+    const [opcoes, motivos] = await Promise.all([opcoesDeEdicao(leadId), kommo.listarMotivosDePerda().catch(() => [])]);
+    if (!opcoes) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
+    const { bruto, ...resto } = opcoes;
+    res.json({
+      ...resto,
+      motivoDePerdaAtual: bruto.loss_reason_id ? Number(bruto.loss_reason_id) : null,
+      motivosDePerda: motivos.map((m) => ({ id: Number(m.id), nome: m.name })),
+    });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao carregar as opções de edição do lead");
+  }
+});
+
+// Grava a nova etapa e/ou os responsáveis. O navegador envia também os
+// valores que via ao abrir a ficha; se algum mudou no Kommo desde então, nada
+// é gravado e a ficha é recarregada.
+app.put("/api/leads/:id/edicao", async (req, res) => {
+  const leadId = String(req.params.id);
+  if (!/^\d+$/.test(leadId)) return res.status(400).json({ error: "ID de lead inválido." });
+  const usuario = usuarioDa(req) || (MODO_LOCAL ? "modo local" : null);
+  if (!usuario) return res.status(401).json({ error: "Não foi possível identificar quem está editando. Recarregue a página e entre novamente." });
+  const corpo = req.body || {};
+  try {
+    const opcoes = await opcoesDeEdicao(leadId);
+    if (!opcoes) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
+    const { bruto, colunas, statusAtual, responsaveis } = opcoes;
+    const dados = {};
+    const mudancas = [];
+
+    if (corpo.etapa && Number(corpo.etapa.statusId) !== statusAtual) {
+      if (Number(corpo.etapa.statusAnterior) !== statusAtual) {
+        return res.status(409).json({ error: "O lead mudou de etapa no Kommo enquanto a ficha estava aberta. A ficha foi recarregada; confira antes de salvar." });
+      }
+      const destino = colunas.find((c) => c.id === Number(corpo.etapa.statusId));
+      if (!destino) return res.status(400).json({ error: "Etapa inválida para o funil deste lead." });
+      dados.status_id = destino.id;
+      dados.pipeline_id = Number(bruto.pipeline_id);
+      let motivoTexto = "";
+      if (destino.perdido && corpo.etapa.motivoPerdaId) {
+        const motivos = await kommo.listarMotivosDePerda();
+        const motivo = motivos.find((m) => Number(m.id) === Number(corpo.etapa.motivoPerdaId));
+        if (!motivo) return res.status(400).json({ error: "Motivo de perda inválido." });
+        dados.loss_reason_id = Number(motivo.id);
+        motivoTexto = ` (motivo: ${motivo.name})`;
+      }
+      const origem = colunas.find((c) => c.id === statusAtual)?.nome || "etapa anterior";
+      mudancas.push(`etapa: ${origem} → ${destino.nome}${motivoTexto}`);
+    }
+
+    const novosCampos = [];
+    for (const r of responsaveis) {
+      const pedido = corpo.responsaveis?.[r.papel];
+      if (!pedido) continue;
+      const novo = String(pedido.valor ?? "").trim().slice(0, 120);
+      if (novo === r.atual) continue;
+      if (String(pedido.anterior ?? "").trim() !== r.atual) {
+        return res.status(409).json({ error: `O campo ${r.rotulo} mudou no Kommo enquanto a ficha estava aberta. A ficha foi recarregada; confira antes de salvar.` });
+      }
+      if (r.tipo === "lista" && novo) {
+        const opcao = r.opcoes.find((o) => o.valor === novo);
+        if (!opcao) return res.status(400).json({ error: `Opção inválida para ${r.rotulo}.` });
+        novosCampos.push({ field_id: r.campoId, values: [{ enum_id: opcao.id }] });
+      } else {
+        novosCampos.push({ field_id: r.campoId, values: novo ? [{ value: novo }] : null });
+      }
+      mudancas.push(`${r.rotulo}: ${r.atual || "vazio"} → ${novo || "vazio"}`);
+    }
+    if (novosCampos.length) dados.custom_fields_values = novosCampos;
+
+    if (!mudancas.length) return res.json({ ok: true, semMudanca: true });
+    await kommo.atualizarLead(leadId, dados);
+    esquecerDadosEmCache();
+    const quando = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Recife" });
+    await Promise.all([
+      kommo.anotarNoLead(leadId, `Alterado pelo painel por ${usuario} em ${quando}: ${mudancas.join("; ")}.`).catch((e) => console.error("Falha ao anotar no Kommo:", e.message)),
+      registrarAlteracao(req, "Lead alterado pela ficha", { leadId, detalhe: mudancas.join("; ") }),
+    ]);
+    res.json({ ok: true, mudancas });
+  } catch (erro) {
+    if (erro.response?.status === 400) {
+      console.error("Kommo recusou a alteração:", JSON.stringify(erro.response.data || {}).slice(0, 500));
+      return res.status(400).json({ error: "O Kommo recusou a alteração. Se a etapa exige campos obrigatórios no Kommo, preencha-os lá." });
+    }
+    if (erro.response?.status === 403 || erro.response?.status === 401) return res.status(502).json({ error: "O Kommo recusou a gravação. O token do painel pode não ter permissão de escrita." });
+    responderErro(res, erro, "Falha ao alterar o lead no Kommo");
   }
 });
 

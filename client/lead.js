@@ -184,6 +184,141 @@ $("corpoFicha").addEventListener("click", (e) => {
   }
 });
 
+// Alteração da etapa e dos responsáveis pela ficha. As opções (colunas do
+// funil do lead, motivos de perda, opções dos campos) vêm do Kommo na hora.
+let edicaoAberta = null; // { leadId, opcoes }
+
+function blocoDeAlteracao() {
+  return `
+    <section id="blocoAlteracao" class="border border-gold/40 bg-gold/[0.04] px-3 py-2.5">
+      <div class="flex items-center justify-between gap-3">
+        <p class="rotulo text-goldbright">Alterar no Kommo</p>
+        <button type="button" id="btnAbrirAlteracao" class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink">Mudar etapa ou responsáveis</button>
+      </div>
+      <div id="formAlteracao" class="hidden mt-3 space-y-3"></div>
+    </section>`;
+}
+
+function campoDoResponsavel(r) {
+  const id = `alteracao-${r.papel}`;
+  const controle =
+    r.tipo === "lista"
+      ? `<select id="${id}" data-papel="${r.papel}" class="w-full bg-surface2 border border-line px-2 py-1.5 text-ink text-xs">
+          <option value="">(vazio)</option>
+          ${r.opcoes.map((o) => `<option value="${esc(o.valor)}" ${o.valor === r.atual ? "selected" : ""}>${esc(o.valor)}</option>`).join("")}
+        </select>`
+      : `<input id="${id}" data-papel="${r.papel}" list="${id}-sugestoes" value="${esc(r.atual)}" maxlength="120" autocomplete="off" class="w-full bg-surface2 border border-line px-2 py-1.5 text-ink text-xs">
+         <datalist id="${id}-sugestoes">${r.sugestoes.map((n) => `<option value="${esc(n)}"></option>`).join("")}</datalist>`;
+  return `<label class="block"><span class="text-[11px] text-inkdim">${esc(r.rotulo)}</span>${controle}</label>`;
+}
+
+function montarFormularioDeAlteracao(o) {
+  const atual = o.colunas.find((c) => c.id === o.statusAtual);
+  $("formAlteracao").innerHTML = `
+    <label class="block"><span class="text-[11px] text-inkdim">Etapa no Kommo</span>
+      <select id="alteracaoEtapa" class="w-full bg-surface2 border border-line px-2 py-1.5 text-ink text-xs">
+        ${o.colunas.map((c) => `<option value="${c.id}" ${c.id === o.statusAtual ? "selected" : ""}>${esc(c.nome)}${c.id === o.statusAtual ? " (atual)" : ""}</option>`).join("")}
+      </select>
+    </label>
+    <label id="linhaMotivoPerda" class="block ${atual?.perdido ? "" : "hidden"}"><span class="text-[11px] text-inkdim">Motivo de perda</span>
+      <select id="alteracaoMotivo" class="w-full bg-surface2 border border-line px-2 py-1.5 text-ink text-xs">
+        <option value="">Escolha o motivo</option>
+        ${o.motivosDePerda.map((m) => `<option value="${m.id}" ${m.id === o.motivoDePerdaAtual ? "selected" : ""}>${esc(m.nome)}</option>`).join("")}
+      </select>
+    </label>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${o.responsaveis.map(campoDoResponsavel).join("")}</div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" id="btnSalvarAlteracao" class="bg-gold hover:bg-goldbright text-bg text-[11px] font-semibold px-3 py-1.5">Salvar no Kommo</button>
+      <button type="button" id="btnCancelarAlteracao" class="border border-line hover:border-inkdim text-inkdim text-[11px] px-3 py-1.5">Cancelar</button>
+      <span id="statusAlteracao" class="text-[11px] text-inkdim"></span>
+    </div>
+    <p class="text-[10px] text-inkfaint">Mudar a etapa aqui é o mesmo que mover o lead no Kommo: as automações da coluna rodam normalmente. A alteração fica registrada numa nota do lead, com o seu e-mail.</p>`;
+}
+
+async function abrirAlteracao(leadId) {
+  const form = $("formAlteracao");
+  form.classList.remove("hidden");
+  $("btnAbrirAlteracao").classList.add("hidden");
+  form.innerHTML = '<p class="text-inkdim text-[11px]">Carregando as opções do Kommo.</p>';
+  try {
+    const opcoes = await chamarApi(`/leads/${encodeURIComponent(leadId)}/edicao`);
+    edicaoAberta = { leadId, opcoes };
+    montarFormularioDeAlteracao(opcoes);
+  } catch (erro) {
+    form.innerHTML = `<p class="text-negativo text-[11px]">Não foi possível carregar as opções. ${esc(erro.message)}</p>`;
+  }
+}
+
+function fecharAlteracao() {
+  edicaoAberta = null;
+  $("formAlteracao").classList.add("hidden");
+  $("formAlteracao").innerHTML = "";
+  $("btnAbrirAlteracao").classList.remove("hidden");
+}
+
+async function salvarAlteracao() {
+  if (!edicaoAberta) return;
+  const { leadId, opcoes } = edicaoAberta;
+  const status = $("statusAlteracao");
+  const statusId = Number($("alteracaoEtapa").value);
+  const destino = opcoes.colunas.find((c) => c.id === statusId);
+  const motivoPerdaId = $("alteracaoMotivo").value ? Number($("alteracaoMotivo").value) : null;
+  if (statusId !== opcoes.statusAtual && destino?.perdido && !motivoPerdaId) {
+    status.className = "text-[11px] text-negativo";
+    status.textContent = "Escolha o motivo de perda.";
+    return;
+  }
+  const corpo = {
+    etapa: { statusId, statusAnterior: opcoes.statusAtual, motivoPerdaId },
+    responsaveis: Object.fromEntries(opcoes.responsaveis.map((r) => [r.papel, { valor: $(`alteracao-${r.papel}`).value.trim(), anterior: r.atual }])),
+  };
+  const botao = $("btnSalvarAlteracao");
+  botao.disabled = true;
+  status.className = "text-[11px] text-inkdim";
+  status.textContent = "Salvando no Kommo.";
+  try {
+    const r = await fetch(`${API}/leads/${encodeURIComponent(leadId)}/edicao`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+    const resposta = (r.headers.get("Content-Type") || "").includes("application/json") ? await r.json() : { error: "A sessão expirou. Recarregue a página para entrar novamente." };
+    if (r.status === 409) {
+      // Alguém mudou o lead no Kommo: recarrega a ficha com os valores atuais.
+      await abrirFichaDoLead(leadId);
+      const aviso = $("statusFicha");
+      if (aviso) {
+        aviso.className = "text-[11px] text-negativo";
+        aviso.textContent = resposta.error;
+      }
+      return;
+    }
+    if (!r.ok) throw new Error(resposta.error || `O servidor respondeu com o código ${r.status}.`);
+    if (resposta.semMudanca) {
+      status.textContent = "Nada mudou.";
+      return;
+    }
+    await abrirFichaDoLead(leadId);
+    const aviso = $("statusFicha");
+    if (aviso) aviso.textContent = `Salvo no Kommo: ${resposta.mudancas.join("; ")}. Os números do painel se atualizam na próxima consulta.`;
+  } catch (erro) {
+    status.className = "text-[11px] text-negativo";
+    status.textContent = erro.message;
+  } finally {
+    if (botao.isConnected) botao.disabled = false;
+  }
+}
+
+$("corpoFicha").addEventListener("change", (e) => {
+  if (e.target.id === "alteracaoEtapa" && edicaoAberta) {
+    const destino = edicaoAberta.opcoes.colunas.find((c) => c.id === Number(e.target.value));
+    $("linhaMotivoPerda").classList.toggle("hidden", !destino?.perdido);
+  }
+});
+$("corpoFicha").addEventListener("click", (e) => {
+  const alvo = e.target.closest("button");
+  if (!alvo) return;
+  if (alvo.id === "btnAbrirAlteracao" && $("corpoFicha").dataset.lead) abrirAlteracao($("corpoFicha").dataset.lead);
+  else if (alvo.id === "btnCancelarAlteracao") fecharAlteracao();
+  else if (alvo.id === "btnSalvarAlteracao") salvarAlteracao();
+});
+
 // Anexos do lead: arquivos guardados no Kommo (aba de mídia do lead). A lista
 // é carregada depois da ficha, para não atrasar a abertura.
 let anexosDoLead = null; // leadId da ficha cujos anexos estão na tela
@@ -390,7 +525,10 @@ function renderizarFicha(l) {
   const camposTecnicos = restantes.filter((c) => c.tecnico && !ehRegistroInterno(c.valor));
   const semOrigem = l.origemSemRastreio ? esc(l.origemSemRastreio) : naoInformado;
 
+  $("corpoFicha").dataset.lead = l.id;
   $("corpoFicha").innerHTML =
+    '<p id="statusFicha" class="text-[11px] text-positivo empty:hidden"></p>' +
+    blocoDeAlteracao() +
     blocoDaFicha("Identificação", [
       ["Nome", esc(l.nome)],
       ["Telefone", `<span class="font-mono">${esc(telefoneFormatado(l.telefone))}</span>`],
@@ -455,6 +593,7 @@ async function abrirFichaDoLead(leadId) {
   $("subtituloFicha").textContent = `Lead ${leadId}`;
   descricaoAberta = null;
   anexosDoLead = null;
+  edicaoAberta = null;
   $("corpoFicha").innerHTML = '<p class="text-inkdim">Carregando.</p>';
   abrirDialogo("modalFicha");
   try {
