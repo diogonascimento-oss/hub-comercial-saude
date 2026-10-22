@@ -825,7 +825,13 @@ function renderizarPorPessoa() {
         ? `<table class="w-full text-xs">
             <thead><tr class="text-inkfaint text-[10px] text-left"><th class="font-normal pb-1.5">Nome</th>${colunas.map(([rotulo]) => `<th class="font-normal pb-1.5 text-right">${rotulo}</th>`).join("")}</tr></thead>
             <tbody>${pessoas
-              .map((pessoa) => `<tr class="border-t border-line"><td class="py-1.5 truncate max-w-[140px]"><button type="button" data-papel="${esc(papel.chave)}" data-pessoa="${esc(pessoa.nome)}" title="Ver todos os leads de ${esc(pessoa.nome)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(pessoa.nome)}</button></td>${colunas.map(([, chave]) => `<td class="py-1.5 text-right tabular text-ink">${numero(pessoa[chave])}</td>`).join("")}</tr>`)
+              .map((pessoa) => `<tr class="border-t border-line"><td class="py-1.5 truncate max-w-[140px]"><button type="button" data-papel="${esc(papel.chave)}" data-pessoa="${esc(pessoa.nome)}" title="Ver todos os leads de ${esc(pessoa.nome)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(pessoa.nome)}</button></td>${colunas
+                .map(([, chave]) =>
+                  pessoa[chave] > 0 && pessoa.ids
+                    ? `<td class="py-1.5 text-right tabular"><button type="button" data-papel="${esc(papel.chave)}" data-indicador-pessoa="${chave}" data-nome="${esc(pessoa.nome)}" title="Ver os leads e a regra de cálculo" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2">${numero(pessoa[chave])}</button></td>`
+                    : `<td class="py-1.5 text-right tabular text-ink">${numero(pessoa[chave])}</td>`,
+                )
+                .join("")}</tr>`)
               .join("")}</tbody>
           </table>`
         : `<p class="text-xs text-inkdim">Campo "${esc(papel.rotulo)} responsável" ainda não preenchido nos leads.</p>`;
@@ -1297,7 +1303,23 @@ async function abrirLeadsDoResponsavel(papel, pessoa) {
   }
 }
 
+// Detalhamento de um número da tabela por responsável: os leads da pessoa que
+// entram naquele indicador no período, com a mesma regra dos cartões.
+function abrirIndicadorDaPessoa(papel, nome, indicador) {
+  const pessoa = (escopo().porPessoa?.[papel] || []).find((p) => p.nome === nome);
+  if (!pessoa) return;
+  const rotulo = (dados.papeis || []).find((p) => p.chave === papel)?.rotulo || papel.toUpperCase();
+  const [titulo, regra] = REGRAS_DOS_INDICADORES[indicador];
+  const ids = new Set(pessoa.ids.map(String));
+  const leads = daCampanha(dados.listas.leadsPorIndicador)
+    .filter((l) => ids.has(String(l.id)) && l.indicadores.includes(indicador))
+    .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
+  abrirLeadsDoGrupo(`${titulo} · ${rotulo} ${nome}`, leads, `${regra} Aqui, só os leads com "${nome}" no campo "${rotulo} responsável".`);
+}
+
 $("porPessoa").addEventListener("click", (e) => {
+  const numeroDaPessoa = e.target.closest("button[data-indicador-pessoa]");
+  if (numeroDaPessoa) return abrirIndicadorDaPessoa(numeroDaPessoa.dataset.papel, numeroDaPessoa.dataset.nome, numeroDaPessoa.dataset.indicadorPessoa);
   const botao = e.target.closest("button[data-pessoa]");
   if (botao) abrirLeadsDoResponsavel(botao.dataset.papel, botao.dataset.pessoa);
 });

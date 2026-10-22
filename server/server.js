@@ -279,6 +279,8 @@ function indicadoresPorPessoa(leadsDoEscopo, base) {
         return {
           nome,
           leadsNaBase: leadsDaPessoa.length,
+          // IDs dos leads da pessoa, para o detalhamento de cada número no painel.
+          ids: leadsDaPessoa.map((l) => l.id),
           leadsRecebidos: volume.leadsRecebidos,
           qualificados: volume.qualificados,
           reunioesMarcadas: volume.reunioesMarcadas,
