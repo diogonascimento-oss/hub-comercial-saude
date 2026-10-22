@@ -25,7 +25,7 @@ import {
 import * as kommo from "./kommo.js";
 import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
 import { normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
-import { calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
+import { diasDeCalendario, calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
 import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
 import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
@@ -548,7 +548,7 @@ app.get("/api/leads/etapa", async (req, res) => {
         campanha: l.campanha,
         criadoEm: iso(l.criadoEm),
         atualizadoEm: iso(l.atualizadoEm),
-        diasSemAtualizacao: l.atualizadoEm ? Math.floor((agora - l.atualizadoEm) / 86400) : null,
+        diasSemAtualizacao: l.atualizadoEm ? diasDeCalendario(l.atualizadoEm, agora) : null,
         tags: l.tags,
         origem: l.origem,
         sdr: l.responsaveis?.sdr || "",

@@ -17,6 +17,15 @@ import {
 import { segundosUteis } from "./expediente.js";
 import { nomeDaEtapa } from "./mapeamento.js";
 
+// Diferença em dias de calendário no fuso do escritório (UTC-3): uma reunião
+// marcada ontem às 23h é "há 1 dia" logo depois da meia-noite, e não "hoje"
+// só porque ainda não se passaram 24 horas.
+const DESLOCAMENTO_DO_FUSO_S = -3 * 3600;
+export function diasDeCalendario(de, ate) {
+  const dia = (ts) => Math.floor((ts + DESLOCAMENTO_DO_FUSO_S) / 86400);
+  return dia(ate) - dia(de);
+}
+
 const DIA = 86400;
 
 // Posição de cada etapa no funil, pela ordem do protocolo.
@@ -567,7 +576,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
           telefone: l.telefone,
           campanha: l.campanha,
           etapaAtual: l.etapa,
-          diasParado: Math.floor((agora - l.atualizadoEm) / DIA),
+          diasParado: diasDeCalendario(l.atualizadoEm, agora),
         }))
         .sort((a, b) => b.diasParado - a.diasParado),
       reunioesEmAberto: [...agendamentoEmAberto]
@@ -579,10 +588,10 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
             telefone: l.telefone,
             campanha: l.campanha,
             agendadoEm: new Date(ts * 1000).toISOString(),
-            diasAguardando: Math.floor((agora - ts) / DIA),
+            diasAguardando: diasDeCalendario(ts, agora),
           };
         })
-        .sort((a, b) => b.diasAguardando - a.diasAguardando),
+        .sort((a, b) => a.agendadoEm.localeCompare(b.agendadoEm)),
     };
   }
 
