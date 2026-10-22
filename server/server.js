@@ -285,6 +285,7 @@ function indicadoresPorPessoa(leadsDoEscopo, base) {
           qualificados: volume.qualificados,
           emAgendamento: entradasPorEtapa.EM_AGENDAMENTO || 0,
           reunioesMarcadas: volume.reunioesMarcadas,
+          reunioesEmAberto: volume.reunioesEmAberto,
           reunioesRealizadas: volume.reunioesRealizadas,
           naoRealizadas: volume.naoRealizadas,
           fechados: volume.fechados,

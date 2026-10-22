@@ -810,7 +810,7 @@ function renderizarMetas() {
 
 // Colunas exibidas para cada papel.
 const COLUNAS_POR_PAPEL = {
-  sdr: [["Leads", "leadsRecebidos"], ["Qualif.", "qualificados"], ["Em agend.", "emAgendamento"], ["Marcadas", "reunioesMarcadas"], ["Realizadas", "reunioesRealizadas"], ["Não realiz.", "naoRealizadas"], ["Fechados", "fechados"], ["Comparec.", "comparecimento", "%"]],
+  sdr: [["Leads", "leadsRecebidos"], ["Qualif.", "qualificados"], ["Em agend.", "emAgendamento"], ["Marcadas", "reunioesMarcadas"], ["Em aberto", "reunioesEmAberto"], ["Realizadas", "reunioesRealizadas"], ["Não realiz.", "naoRealizadas"], ["Fechados", "fechados"], ["Comparec.", "comparecimento", "%"]],
   closer: [["Realizadas", "reunioesRealizadas"], ["Não realizadas", "naoRealizadas"], ["Fechados", "fechados"]],
   farmer: [["Realizadas", "reunioesRealizadas"], ["Fechados", "fechados"]],
 };
@@ -830,7 +830,7 @@ function renderizarPorPessoa() {
                   formato === "%"
                     ? `<td class="py-1.5 text-right tabular ${classeDaTaxa(pessoa[chave])}">${percentual(pessoa[chave])}</td>`
                     : pessoa[chave] > 0 && pessoa.ids
-                    ? `<td class="py-1.5 text-right tabular"><button type="button" data-papel="${esc(papel.chave)}" data-indicador-pessoa="${chave}" data-nome="${esc(pessoa.nome)}" title="Ver os leads e a regra de cálculo" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2">${numero(pessoa[chave])}</button></td>`
+                    ? `<td class="py-1.5 text-right tabular"><button type="button" data-papel="${esc(papel.chave)}" data-indicador-pessoa="${chave}" data-nome="${esc(pessoa.nome)}" title="Ver os leads e a regra de cálculo" class="${chave === "reunioesEmAberto" ? "text-goldbright font-semibold" : "text-ink"} hover:text-goldbright underline decoration-dotted underline-offset-2">${numero(pessoa[chave])}</button></td>`
                     : `<td class="py-1.5 text-right tabular text-ink">${numero(pessoa[chave])}</td>`,
                 )
                 .join("")}</tr>`)
@@ -1311,6 +1311,14 @@ function abrirIndicadorDaPessoa(papel, nome, indicador) {
   const pessoa = (escopo().porPessoa?.[papel] || []).find((p) => p.nome === nome);
   if (!pessoa) return;
   const rotulo = (dados.papeis || []).find((p) => p.chave === papel)?.rotulo || papel.toUpperCase();
+  if (indicador === "reunioesEmAberto") {
+    const doSdr = new Set(pessoa.ids.map(String));
+    const leads = daCampanha(dados.listas.reunioesEmAberto)
+      .filter((l) => doSdr.has(String(l.id)))
+      .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · marcada em ${dataLocal(l.agendadoEm)}${l.dataDaReuniao ? ` · reunião em ${dataLocal(l.dataDaReuniao)}` : ""}` }));
+    const rotuloDoPapel = (dados.papeis || []).find((p) => p.chave === papel)?.rotulo || papel.toUpperCase();
+    return abrirLeadsDoGrupo(`Reuniões em aberto · ${rotuloDoPapel} ${nome}`, leads, `Reuniões marcadas no período que continuam na coluna Agendado, sem desfecho, dos leads com "${nome}" no campo "${rotuloDoPapel} responsável". Se a reunião já aconteceu, falta mover o lead no Kommo.`);
+  }
   const [titulo, regra] =
     indicador === "emAgendamento"
       ? ["Entraram em Em Agendamento", "Leads que entraram na coluna Em Agendamento dentro do período."]
