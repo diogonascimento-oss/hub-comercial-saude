@@ -389,7 +389,7 @@ function renderizarCartoes() {
   $("blocoEmAberto").classList.toggle("hidden", !v.reunioesEmAberto);
   $("resumoEmAberto").textContent = v.reunioesEmAberto
     ? `${percentual(t.emAberto)} das reuniões marcadas no período ainda estão na coluna Agendado, sem desfecho. ` +
-      "Em vermelho, as marcadas há 3 dias ou mais: provavelmente a reunião já aconteceu e falta mover o lead. As taxas de comparecimento e de não realização mudam quando esses desfechos forem lançados."
+      "À direita, a data da reunião, quando preenchida no Kommo; sem ela, há quanto tempo foi marcada. Em vermelho, as que já deveriam ter desfecho (o dia da reunião passou ou, sem data, foram marcadas há 3 dias ou mais): provavelmente a reunião aconteceu e falta mover o lead. As taxas de comparecimento e de não realização mudam quando esses desfechos forem lançados."
     : "";
 
   const fora = $("avisoForaDaBase");
@@ -719,14 +719,32 @@ function renderizarPendencias() {
   $("totalEmAberto").textContent = numero(emAberto.length);
   $("listaEmAberto").innerHTML = emAberto
     .map((l) => {
-      const atrasada = l.diasAguardando >= 3;
+      // Com a data da reunião preenchida no Kommo, vale ela: em vermelho quando
+      // o dia já passou e o lead continua em Agendado. Sem a data, vale o
+      // tempo desde a marcação (3 dias ou mais em vermelho).
+      const d = l.diasAteAReuniao;
+      const temData = d !== null && d !== undefined;
+      const atrasada = temData ? d < 0 : l.diasAguardando >= 3;
+      const horaDaReuniao = temData ? new Date(l.dataDaReuniao).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Recife" }) : "";
+      const comHora = horaDaReuniao && horaDaReuniao !== "00:00" ? ` às ${horaDaReuniao}` : "";
+      const situacao = !temData
+        ? l.diasAguardando === 0
+          ? "marcada hoje"
+          : `marcada há ${numero(l.diasAguardando)} dia${l.diasAguardando > 1 ? "s" : ""}`
+        : d === 0
+          ? `reunião hoje${comHora}`
+          : d === 1
+            ? `reunião amanhã${comHora}`
+            : d > 1
+              ? `reunião em ${dataLocal(l.dataDaReuniao).slice(0, 5)}${comHora}`
+              : `reunião foi há ${numero(-d)} dia${d < -1 ? "s" : ""}`;
       return `
       <div class="flex items-center justify-between gap-3 py-2 border-b border-gold/15 last:border-0">
         <div class="min-w-0">
           <button data-lead="${esc(l.id)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(l.nome)}</button>
           <p class="text-[10px] text-inkfaint">${variasCampanhasNoPainel() ? `${esc(l.campanha)} · ` : ""}marcada em ${dataLocal(l.agendadoEm)}</p>
         </div>
-        <span class="text-[11px] tabular shrink-0 font-semibold ${atrasada ? "text-negativo" : "text-goldbright"}">${l.diasAguardando === 0 ? "hoje" : `há ${numero(l.diasAguardando)} dia${l.diasAguardando > 1 ? "s" : ""}`}</span>
+        <span class="text-[11px] tabular shrink-0 font-semibold text-right ${atrasada ? "text-negativo" : "text-goldbright"}">${situacao}</span>
       </div>`;
     })
     .join("");
@@ -934,8 +952,8 @@ function exportarEmAberto() {
   if (!dados) return;
   baixarCSV(
     `reunioes_em_aberto_${new Date().toISOString().slice(0, 10)}.csv`,
-    ["ID", "Nome", "Telefone", "Campanha", "Agendada em", "Dias aguardando"],
-    daCampanha(dados.listas.reunioesEmAberto).map((l) => [l.id, l.nome, l.telefone, l.campanha, dataLocal(l.agendadoEm), l.diasAguardando]),
+    ["ID", "Nome", "Telefone", "Campanha", "Agendada em", "Dias aguardando", "Data da reunião"],
+    daCampanha(dados.listas.reunioesEmAberto).map((l) => [l.id, l.nome, l.telefone, l.campanha, dataLocal(l.agendadoEm), l.diasAguardando, l.dataDaReuniao ? new Date(l.dataDaReuniao).toLocaleString("pt-BR", { timeZone: "America/Recife", dateStyle: "short", timeStyle: "short" }) : ""]),
   );
 }
 
