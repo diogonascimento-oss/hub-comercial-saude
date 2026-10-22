@@ -281,12 +281,10 @@ async function salvarAlteracao() {
     const resposta = (r.headers.get("Content-Type") || "").includes("application/json") ? await r.json() : { error: "A sessão expirou. Recarregue a página para entrar novamente." };
     if (r.status === 409) {
       // Alguém mudou o lead no Kommo: recarrega a ficha com os valores atuais.
-      await abrirFichaDoLead(leadId);
-      const aviso = $("statusFicha");
-      if (aviso) {
-        aviso.className = "text-[11px] text-negativo";
-        aviso.textContent = resposta.error;
-      }
+      await atualizarFichaNoLugar(leadId);
+      await abrirAlteracao(leadId);
+      $("statusAlteracao").className = "text-[11px] text-negativo";
+      $("statusAlteracao").textContent = resposta.error;
       return;
     }
     if (!r.ok) throw new Error(resposta.error || `O servidor respondeu com o código ${r.status}.`);
@@ -294,9 +292,11 @@ async function salvarAlteracao() {
       status.textContent = "Nada mudou.";
       return;
     }
-    await abrirFichaDoLead(leadId);
-    const aviso = $("statusFicha");
-    if (aviso) aviso.textContent = `Salvo no Kommo: ${resposta.mudancas.join("; ")}. Os números do painel se atualizam na próxima consulta.`;
+    // A ficha continua aberta, com os dados novos e o formulário à vista.
+    await atualizarFichaNoLugar(leadId);
+    await abrirAlteracao(leadId);
+    $("statusAlteracao").className = "text-[11px] text-positivo";
+    $("statusAlteracao").textContent = `Salvo no Kommo: ${resposta.mudancas.join("; ")}.`;
   } catch (erro) {
     status.className = "text-[11px] text-negativo";
     status.textContent = erro.message;
@@ -586,6 +586,20 @@ function renderizarFicha(l) {
       }
     </section>` +
     (l.linkNoKommo ? `<p><a href="${esc(l.linkNoKommo)}" target="_blank" rel="noopener" class="underline decoration-dotted underline-offset-2 text-goldbright hover:text-ink">Abrir este lead no Kommo</a></p>` : "");
+}
+
+// Recarrega a ficha aberta sem fechá-la nem voltar ao topo: usada depois de
+// salvar uma alteração, para mostrar os dados atualizados do Kommo.
+async function atualizarFichaNoLugar(leadId) {
+  const corpo = $("corpoFicha");
+  const rolagem = corpo.scrollTop;
+  const dados = await chamarApi(`/leads/${encodeURIComponent(leadId)}`);
+  descricaoAberta = null;
+  anexosDoLead = null;
+  edicaoAberta = null;
+  renderizarFicha(dados);
+  corpo.scrollTop = rolagem;
+  carregarAnexos(leadId);
 }
 
 async function abrirFichaDoLead(leadId) {
