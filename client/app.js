@@ -810,7 +810,7 @@ function renderizarMetas() {
 
 // Colunas exibidas para cada papel.
 const COLUNAS_POR_PAPEL = {
-  sdr: [["Leads", "leadsRecebidos"], ["Qualif.", "qualificados"], ["Reuniões marcadas", "reunioesMarcadas"]],
+  sdr: [["Leads", "leadsRecebidos"], ["Qualif.", "qualificados"], ["Em agend.", "emAgendamento"], ["Marcadas", "reunioesMarcadas"], ["Realizadas", "reunioesRealizadas"], ["Não realiz.", "naoRealizadas"], ["Fechados", "fechados"], ["Comparec.", "comparecimento", "%"]],
   closer: [["Realizadas", "reunioesRealizadas"], ["Não realizadas", "naoRealizadas"], ["Fechados", "fechados"]],
   farmer: [["Realizadas", "reunioesRealizadas"], ["Fechados", "fechados"]],
 };
@@ -822,20 +822,22 @@ function renderizarPorPessoa() {
       const pessoas = porPessoa[papel.chave] || [];
       const colunas = COLUNAS_POR_PAPEL[papel.chave];
       const corpo = pessoas.length
-        ? `<table class="w-full text-xs">
+        ? `<div class="overflow-x-auto"><table class="w-full text-xs ${colunas.length > 4 ? "min-w-[640px]" : ""}">
             <thead><tr class="text-inkfaint text-[10px] text-left"><th class="font-normal pb-1.5">Nome</th>${colunas.map(([rotulo]) => `<th class="font-normal pb-1.5 text-right">${rotulo}</th>`).join("")}</tr></thead>
             <tbody>${pessoas
               .map((pessoa) => `<tr class="border-t border-line"><td class="py-1.5 truncate max-w-[140px]"><button type="button" data-papel="${esc(papel.chave)}" data-pessoa="${esc(pessoa.nome)}" title="Ver todos os leads de ${esc(pessoa.nome)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(pessoa.nome)}</button></td>${colunas
-                .map(([, chave]) =>
-                  pessoa[chave] > 0 && pessoa.ids
+                .map(([, chave, formato]) =>
+                  formato === "%"
+                    ? `<td class="py-1.5 text-right tabular ${classeDaTaxa(pessoa[chave])}">${percentual(pessoa[chave])}</td>`
+                    : pessoa[chave] > 0 && pessoa.ids
                     ? `<td class="py-1.5 text-right tabular"><button type="button" data-papel="${esc(papel.chave)}" data-indicador-pessoa="${chave}" data-nome="${esc(pessoa.nome)}" title="Ver os leads e a regra de cálculo" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2">${numero(pessoa[chave])}</button></td>`
                     : `<td class="py-1.5 text-right tabular text-ink">${numero(pessoa[chave])}</td>`,
                 )
                 .join("")}</tr>`)
               .join("")}</tbody>
-          </table>`
+          </table></div>`
         : `<p class="text-xs text-inkdim">Campo "${esc(papel.rotulo)} responsável" ainda não preenchido nos leads.</p>`;
-      return `<div class="bg-bg p-5"><p class="rotulo mb-3">${esc(papel.rotulo)}</p>${corpo}</div>`;
+      return `<div class="bg-bg p-5 min-w-0 ${papel.chave === "sdr" ? "lg:col-span-2" : ""}"><p class="rotulo mb-3">${esc(papel.rotulo)}</p>${corpo}</div>`;
     })
     .join("");
 }
@@ -1309,10 +1311,14 @@ function abrirIndicadorDaPessoa(papel, nome, indicador) {
   const pessoa = (escopo().porPessoa?.[papel] || []).find((p) => p.nome === nome);
   if (!pessoa) return;
   const rotulo = (dados.papeis || []).find((p) => p.chave === papel)?.rotulo || papel.toUpperCase();
-  const [titulo, regra] = REGRAS_DOS_INDICADORES[indicador];
+  const [titulo, regra] =
+    indicador === "emAgendamento"
+      ? ["Entraram em Em Agendamento", "Leads que entraram na coluna Em Agendamento dentro do período."]
+      : REGRAS_DOS_INDICADORES[indicador];
   const ids = new Set(pessoa.ids.map(String));
-  const leads = daCampanha(dados.listas.leadsPorIndicador)
-    .filter((l) => ids.has(String(l.id)) && l.indicadores.includes(indicador))
+  const leads = (indicador === "emAgendamento"
+    ? daCampanha(dados.listas.leadsPorEtapa).filter((l) => ids.has(String(l.id)) && l.etapas.includes("EM_AGENDAMENTO"))
+    : daCampanha(dados.listas.leadsPorIndicador).filter((l) => ids.has(String(l.id)) && l.indicadores.includes(indicador)))
     .map((l) => ({ leadId: l.id, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: `${l.campanha} · hoje em ${nomeEtapa(l.etapaAtual)}` }));
   abrirLeadsDoGrupo(`${titulo} · ${rotulo} ${nome}`, leads, `${regra} Aqui, só os leads com "${nome}" no campo "${rotulo} responsável".`);
 }
