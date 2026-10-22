@@ -131,6 +131,21 @@ export const CAMPOS = {
   substatusFarmer: 1127429,
 };
 
+// Nome oficial de cada responsável. O campo no Kommo é texto livre, então o
+// mesmo nome pode chegar escrito de jeitos diferentes. O painel junta as
+// variações sem diferenciar maiúsculas, acentos e títulos (Dr., Dra.); aceita
+// só o primeiro nome quando ele não se repete na lista; e aceita as grafias
+// listadas em "variacoes". Nomes fora da lista aparecem como foram gravados.
+export const RESPONSAVEIS = {
+  sdr: [],
+  closer: [
+    { nome: "Fabianna Arnaud", variacoes: ["Fabiana Arnaud"] },
+    { nome: "Maria Vasconcelos", variacoes: ["Maria Vasconselos"] },
+    { nome: "Paula Caldas", variacoes: [] },
+  ],
+  farmer: [],
+};
+
 // Metas do mês corrente, somadas as três campanhas.
 //
 // A meta de contratos (25) foi definida em outubro de 2026. As de reuniões

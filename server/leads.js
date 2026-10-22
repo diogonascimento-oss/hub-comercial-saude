@@ -1,7 +1,7 @@
 // Converte os registros brutos do Kommo (leads, contatos e eventos) para o
 // formato usado pelos cálculos.
 
-import { CAMPOS } from "./config.js";
+import { CAMPOS, RESPONSAVEIS } from "./config.js";
 import { resolverEtapa } from "./mapeamento.js";
 
 const PALAVRAS_CHAVE_TELEFONE = ["telefone", "celular", "fone", "whatsapp", "phone", "tel.", "tel "];
@@ -86,6 +86,32 @@ function dataDaReuniao(lead) {
   return Number.isFinite(valor) && valor > 0 ? valor : null;
 }
 
+// Chave de comparação de um nome: sem acentos, sem diferença de maiúsculas,
+// sem título (Dr., Dra., Doutor, Doutora) e sem pontuação solta.
+function chaveDoNome(nome) {
+  return String(nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[.,;]/g, " ")
+    .replace(/^\s*(dr|dra|doutor|doutora)\s+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Nome oficial do responsável, conforme RESPONSAVEIS em config.js.
+export function nomeOficialDoResponsavel(papel, gravado) {
+  const texto = String(gravado || "").trim();
+  if (!texto) return "";
+  const lista = RESPONSAVEIS[papel] || [];
+  const chave = chaveDoNome(texto);
+  const exato = lista.find((r) => [r.nome, ...(r.variacoes || [])].some((n) => chaveDoNome(n) === chave));
+  if (exato) return exato.nome;
+  const primeiroNome = (n) => chaveDoNome(n).split(" ")[0];
+  const peloPrimeiroNome = lista.filter((r) => primeiroNome(r.nome) === chave);
+  return peloPrimeiroNome.length === 1 ? peloPrimeiroNome[0].nome : texto;
+}
+
 function motivoDePerda(lead, etapa) {
   const doCampo = valorDoCampo(lead.custom_fields_values, CAMPOS.motivoDesqualificacao);
   if (doCampo) return doCampo;
@@ -132,9 +158,9 @@ export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento) {
         anuncio: valorDoCampo(lead.custom_fields_values, CAMPOS.anuncio) || valorDoRastreamento(lead.custom_fields_values, "UTM_CONTENT"),
       },
       responsaveis: {
-        sdr: valorDoCampo(lead.custom_fields_values, CAMPOS.sdrResponsavel),
-        closer: valorDoCampo(lead.custom_fields_values, CAMPOS.closerResponsavel),
-        farmer: valorDoCampo(lead.custom_fields_values, CAMPOS.farmerResponsavel),
+        sdr: nomeOficialDoResponsavel("sdr", valorDoCampo(lead.custom_fields_values, CAMPOS.sdrResponsavel)),
+        closer: nomeOficialDoResponsavel("closer", valorDoCampo(lead.custom_fields_values, CAMPOS.closerResponsavel)),
+        farmer: nomeOficialDoResponsavel("farmer", valorDoCampo(lead.custom_fields_values, CAMPOS.farmerResponsavel)),
       },
       situacaoDaReuniao: valorDoCampo(lead.custom_fields_values, CAMPOS.situacaoDaReuniao),
       substatusFarmer: valorDoCampo(lead.custom_fields_values, CAMPOS.substatusFarmer),
