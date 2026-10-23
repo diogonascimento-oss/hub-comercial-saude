@@ -193,7 +193,7 @@ function blocoDeAlteracao() {
     <section id="blocoAlteracao" class="border border-gold/40 bg-gold/[0.04] px-3 py-2.5">
       <div class="flex items-center justify-between gap-3">
         <p class="rotulo text-goldbright">Alterar no Kommo</p>
-        <button type="button" id="btnAbrirAlteracao" class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink">Mudar etapa ou responsáveis</button>
+        <button type="button" id="btnAbrirAlteracao" class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink">Mudar etapa, data da reunião ou responsáveis</button>
       </div>
       <div id="formAlteracao" class="hidden mt-3 space-y-3"></div>
     </section>`;
@@ -226,6 +226,13 @@ function montarFormularioDeAlteracao(o) {
         ${o.motivosDePerda.map((m) => `<option value="${m.id}" ${m.id === o.motivoDePerdaAtual ? "selected" : ""}>${esc(m.nome)}</option>`).join("")}
       </select>
     </label>
+    ${
+      o.dataDaReuniao
+        ? `<label class="block"><span class="text-[11px] text-inkdim">${esc(o.dataDaReuniao.nome)} (horário de Recife)</span>
+            <input id="alteracaoData" type="${o.dataDaReuniao.comHora ? "datetime-local" : "date"}" value="${paraCampoDeRecife(o.dataDaReuniao.atual, o.dataDaReuniao.comHora)}" class="w-full sm:w-64 bg-surface2 border border-line px-2 py-1.5 text-ink text-xs [color-scheme:dark]">
+          </label>`
+        : ""
+    }
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${o.responsaveis.map(campoDoResponsavel).join("")}</div>
     <div class="flex flex-wrap items-center gap-2">
       <button type="button" id="btnSalvarAlteracao" class="bg-gold hover:bg-goldbright text-bg text-[11px] font-semibold px-3 py-1.5">Salvar no Kommo</button>
@@ -233,6 +240,18 @@ function montarFormularioDeAlteracao(o) {
       <span id="statusAlteracao" class="text-[11px] text-inkdim"></span>
     </div>
     <p class="text-[10px] text-inkfaint">Mudar a etapa aqui é o mesmo que mover o lead no Kommo: as automações da coluna rodam normalmente. A alteração fica registrada numa nota do lead, com o seu e-mail.</p>`;
+}
+
+// Datas da reunião sempre no horário do escritório (UTC-3, sem horário de verão).
+function paraCampoDeRecife(ts, comHora) {
+  if (!ts) return "";
+  const iso = new Date((ts - 3 * 3600) * 1000).toISOString();
+  return comHora ? iso.slice(0, 16) : iso.slice(0, 10);
+}
+function deCampoDeRecife(valor, comHora) {
+  if (!valor) return null;
+  const ms = Date.parse(comHora ? `${valor}:00-03:00` : `${valor}T00:00:00-03:00`);
+  return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
 }
 
 async function abrirAlteracao(leadId) {
@@ -271,6 +290,9 @@ async function salvarAlteracao() {
   const corpo = {
     etapa: { statusId, statusAnterior: opcoes.statusAtual, motivoPerdaId },
     responsaveis: Object.fromEntries(opcoes.responsaveis.map((r) => [r.papel, { valor: $(`alteracao-${r.papel}`).value.trim(), anterior: r.atual }])),
+    ...(opcoes.dataDaReuniao
+      ? { dataDaReuniao: { valor: deCampoDeRecife($("alteracaoData").value, opcoes.dataDaReuniao.comHora), anterior: opcoes.dataDaReuniao.atual } }
+      : {}),
   };
   const botao = $("btnSalvarAlteracao");
   botao.disabled = true;

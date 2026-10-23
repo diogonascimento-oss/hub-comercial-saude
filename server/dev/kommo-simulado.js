@@ -219,7 +219,7 @@ app.get("/api/v4/leads/pipelines", (req, res) =>
 );
 
 app.get("/api/v4/leads/custom_fields", (req, res) =>
-  res.json({ _embedded: { custom_fields: [{ id: 7001, name: "Motivo de desqualificação", code: null, type: "select" }, { id: 7002, name: "Descrição", code: null, type: "textarea" }] } }),
+  res.json({ _embedded: { custom_fields: [{ id: 7001, name: "Motivo de desqualificação", code: null, type: "select" }, { id: 7002, name: "Descrição", code: null, type: "textarea" }, { id: 7003, name: "Data da Reunião", code: null, type: "date_time" }] } }),
 );
 
 app.get("/api/v4/leads", (req, res) => {
@@ -243,7 +243,7 @@ app.patch("/api/v4/leads/:id", (req, res) => {
     const campos = (lead.custom_fields_values ||= []);
     const i = campos.findIndex((c) => c.field_id === novo.field_id);
     if (i >= 0) campos.splice(i, 1);
-    if (novo.values) campos.push({ field_id: novo.field_id, field_name: novo.field_id === 7002 ? "Descrição" : `Campo ${novo.field_id}`, values: novo.values });
+    if (novo.values) campos.push({ field_id: novo.field_id, ...(novo.field_id === 7003 ? { field_type: "date_time" } : {}), field_name: { 7002: "Descrição", 7003: "Data da Reunião" }[novo.field_id] || `Campo ${novo.field_id}`, values: novo.values });
   }
   if (req.body?.status_id) {
     const agora = Math.floor(Date.now() / 1000);

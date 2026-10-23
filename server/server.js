@@ -915,7 +915,13 @@ async function opcoesDeEdicao(leadId) {
         atual: valorDoCampoBruto(bruto, campoId),
       };
     });
-  return { bruto, campanha, colunas, statusAtual: Number(bruto.status_id), responsaveis };
+  // Campo "Data da reunião" do Kommo, localizado pelo nome.
+  const defData = campos.find((c) => /^data da reuni[aã]o$/i.test(String(c.name || "").trim()));
+  const valorData = defData ? Number((bruto.custom_fields_values || []).find((c) => Number(c.field_id) === Number(defData.id))?.values?.[0]?.value) : NaN;
+  const dataDaReuniao = defData
+    ? { campoId: Number(defData.id), nome: defData.name, comHora: defData.type !== "date", atual: Number.isFinite(valorData) && valorData > 0 ? valorData : null }
+    : null;
+  return { bruto, campanha, colunas, statusAtual: Number(bruto.status_id), responsaveis, dataDaReuniao };
 }
 
 app.get("/api/leads/:id/edicao", async (req, res) => {
@@ -988,6 +994,23 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
         novosCampos.push({ field_id: r.campoId, values: novo ? [{ value: novo }] : null });
       }
       mudancas.push(`${r.rotulo}: ${r.atual || "vazio"} → ${novo || "vazio"}`);
+    }
+    // Data e hora da reunião, em segundos (horário do escritório no navegador).
+    const pedidoData = corpo.dataDaReuniao;
+    if (pedidoData && opcoes.dataDaReuniao) {
+      const d = opcoes.dataDaReuniao;
+      const novo = pedidoData.valor ? Math.floor(Number(pedidoData.valor)) : null;
+      const anterior = pedidoData.anterior ? Math.floor(Number(pedidoData.anterior)) : null;
+      if (novo !== d.atual) {
+        if (anterior !== d.atual) {
+          return res.status(409).json({ error: "A data da reunião mudou no Kommo enquanto a ficha estava aberta. A ficha foi recarregada; confira antes de salvar." });
+        }
+        if (novo !== null && (!Number.isFinite(novo) || novo < 946684800 || novo > 4102444800)) return res.status(400).json({ error: "Data da reunião inválida." });
+        novosCampos.push({ field_id: d.campoId, values: novo ? [{ value: novo }] : null });
+        const legivel = (ts) =>
+          ts ? new Date(ts * 1000).toLocaleString("pt-BR", { timeZone: "America/Recife", dateStyle: "short", ...(d.comHora ? { timeStyle: "short" } : {}) }) : "vazio";
+        mudancas.push(`${d.nome}: ${legivel(d.atual)} → ${legivel(novo)}`);
+      }
     }
     if (novosCampos.length) dados.custom_fields_values = novosCampos;
 
