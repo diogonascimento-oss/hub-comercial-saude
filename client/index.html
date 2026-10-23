@@ -323,8 +323,25 @@
       <p id="avisoSemOrigem" class="hidden mt-3 border border-gold/25 bg-gold/5 text-goldbright text-xs px-4 py-2.5"></p>
     </section>
 
+    <section aria-labelledby="tResumoNucleo">
+      <div class="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
+        <h3 id="tResumoNucleo" class="titulo-secao">2. Resumo para o núcleo</h3>
+        <div class="flex items-center gap-2">
+          <button type="button" id="btnCopiarResumo" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Copiar para planilha</button>
+          <button type="button" id="btnImagemResumo" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Baixar imagem</button>
+        </div>
+      </div>
+      <div class="border border-line bg-bg p-5 space-y-2">
+        <p class="text-[11px] text-inkdim leading-relaxed">Um quadro por campanha do núcleo, com as campanhas do Meta lado a lado, no período do filtro. Mostra as três campanhas, independente da campanha escolhida acima. Clique em um número para ver os leads.</p>
+        <p id="notaResumoNucleo" class="text-[11px] text-goldbright leading-relaxed"></p>
+        <p id="notaValorResumo" class="text-[10px] text-inkfaint leading-relaxed"></p>
+        <div id="resumoNucleo" class="space-y-6 pt-2"></div>
+        <p id="statusResumo" class="text-[11px] text-inkdim"></p>
+      </div>
+    </section>
+
     <section aria-labelledby="tTrafegoCruzamentos">
-      <h3 id="tTrafegoCruzamentos" class="titulo-secao mb-3">2. Campanha, conjunto de anúncios, anúncio e região</h3>
+      <h3 id="tTrafegoCruzamentos" class="titulo-secao mb-3">3. Campanha, conjunto de anúncios, anúncio e região</h3>
       <div class="border border-line bg-bg p-5 mb-px">
         <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 mb-3">
           <p class="rotulo">Por campanha do Meta</p>
@@ -373,7 +390,7 @@
     <section aria-labelledby="tSemanas">
       <div class="border border-line p-5">
         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
-          <h3 id="tSemanas" class="titulo-secao">3. Histórico semanal salvo</h3>
+          <h3 id="tSemanas" class="titulo-secao">4. Histórico semanal salvo</h3>
           <button id="btnSalvarSemana" class="bg-gold hover:bg-goldbright text-bg font-bold px-4 py-1.5 text-xs uppercase tracking-wide">Salvar período como semana</button>
         </div>
         <p class="text-[11px] text-inkdim mb-3">Salva o período selecionado no filtro. Em uma semana salva é possível registrar o orçamento, decisões e observações, e comparar com a semana anterior.</p>
@@ -383,7 +400,7 @@
     </section>
 
     <section aria-labelledby="tDistribuicao">
-      <h3 id="tDistribuicao" class="titulo-secao mb-3">4. Distribuição e engajamento</h3>
+      <h3 id="tDistribuicao" class="titulo-secao mb-3">5. Distribuição e engajamento</h3>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-px bg-line border border-line">
         <div class="bg-bg p-5">
           <p class="rotulo mb-3">Distribuição por conjunto de anúncios</p>
@@ -615,6 +632,7 @@
   <script src="mapa-brasil.js"></script>
   <script src="relatorio-semanal.js"></script>
   <script src="trafego.js"></script>
+  <script src="resumo-nucleo.js"></script>
   <script src="lead.js"></script>
   <script src="acontecimentos.js"></script>
   <script src="metas.js"></script>

@@ -146,3 +146,16 @@ export async function gravarEventoDaAgenda(leadId, evento) {
   else delete todos[String(leadId)];
   await gravar(CHAVE_EVENTOS, todos);
 }
+
+// Valores investidos digitados no "Resumo para o núcleo", por período:
+// { "2026-10-01|2026-10-15": { "IR-Q": { "Campanha 01": 149.34 } } }.
+const CHAVE_VALORES_DO_RESUMO = "hubsaude:valores-resumo";
+export const lerValoresDoResumo = async () => (await lerRegistro(CHAVE_VALORES_DO_RESUMO)) || {};
+export async function gravarValorDoResumo(periodo, campanha, grupo, valor) {
+  const todos = await lerValoresDoResumo();
+  const doPeriodo = (todos[periodo] ||= {});
+  const daCampanha = (doPeriodo[campanha] ||= {});
+  if (valor === null) delete daCampanha[grupo];
+  else daCampanha[grupo] = valor;
+  await gravar(CHAVE_VALORES_DO_RESUMO, todos);
+}

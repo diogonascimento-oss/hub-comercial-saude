@@ -408,6 +408,7 @@ async function atualizarTrafego(forcar = false) {
     renderizarTrafego();
     atualizarGraficoDeCusto();
     carregarSemanas();
+    if (typeof carregarResumoDoNucleo === "function") carregarResumoDoNucleo();
   } catch (erro) {
     mostrarErro(erro.message);
   }

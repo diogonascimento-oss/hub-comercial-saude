@@ -1613,6 +1613,77 @@ async function comAnaliseAtual(registros) {
   });
 }
 
+// Resumo para o núcleo: um quadro por campanha do núcleo, com as campanhas
+// do Meta lado a lado, no formato da planilha da coordenação. O valor
+// investido vem do Meta quando o token está configurado; sem ele, vale o valor
+// digitado no próprio resumo para aquele período.
+app.get("/api/trafego/resumo-nucleo", async (req, res) => {
+  const periodo = lerPeriodo(req);
+  if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
+  const apenasNovos = req.query.apenasNovos === "true";
+  try {
+    const hoje = dataLocal(Math.floor(Date.now() / 1000));
+    const periodoDosEventos = apenasNovos && periodo.fim < hoje ? lerPeriodo({ query: { inicio: periodo.inicio, fim: hoje } }) : periodo;
+    const [{ leads, eventosPorLead }, valores] = await Promise.all([prepararPeriodo(periodoDosEventos), armazenamento.lerValoresDoResumo().catch(() => ({}))]);
+    const meta = { configurado: metaConfigurado(), erro: null };
+    let linhasDoMeta = null;
+    if (meta.configurado) {
+      try {
+        linhasDoMeta = await buscarGastoDoMeta(periodo.inicio, periodo.fim);
+      } catch (erro) {
+        meta.erro = erro.message || "Falha ao consultar o Meta.";
+      }
+    }
+    const chaveDoPeriodo = `${periodo.inicio}|${periodo.fim}`;
+    const blocos = CAMPANHAS.map((c) => {
+      const analise = analisarTrafego({ leads: leads.filter((l) => l.campanha === c.codigo), eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
+      const grupos = linhasDoMeta ? associarInvestimentoPorCampanha(analise.porCampanhaMeta, linhasDoMeta) : analise.porCampanhaMeta;
+      const digitados = valores[chaveDoPeriodo]?.[c.codigo] || {};
+      const campanhas = [...grupos]
+        .sort((a, b) => String(a.grupo).localeCompare(String(b.grupo), "pt-BR", { numeric: true }))
+        .map((g) => {
+          const doMeta = g.investido ?? null;
+          const digitado = digitados[g.grupo] ?? null;
+          return {
+            grupo: g.grupo,
+            valor: doMeta ?? digitado,
+            origemDoValor: doMeta !== null ? "meta" : digitado !== null ? "digitado" : null,
+            leads: g.totalLeads,
+            qualificados: g.qualificados,
+            reunioesMarcadas: g.reuniao,
+            reunioesRealizadas: g.realizadas,
+            contratosFechados: g.contratoFechado,
+            listas: { leads: g.leads, qualificados: g.leadsQualificados, reunioesMarcadas: g.leadsReuniao, reunioesRealizadas: g.leadsRealizadas, contratosFechados: g.leadsFechados },
+          };
+        });
+      return { codigo: c.codigo, titulo: c.tituloNoResumo || c.nome || c.codigo, campanhas };
+    });
+    res.json({ inicio: periodo.inicio, fim: periodo.fim, apenasNovos, meta, blocos });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao montar o resumo para o núcleo");
+  }
+});
+
+app.put("/api/trafego/resumo-nucleo/valor", async (req, res) => {
+  const { inicio, fim, campanha, grupo } = req.body || {};
+  const periodo = lerPeriodo({ query: { inicio, fim } });
+  if (!periodo || !CAMPANHAS.some((c) => c.codigo === campanha) || !grupo || String(grupo).length > 300) {
+    return res.status(400).json({ error: "Dados inválidos." });
+  }
+  const bruto = req.body.valor;
+  const valor = bruto === null || bruto === "" ? null : Math.round(Number(bruto) * 100) / 100;
+  if (valor !== null && (!Number.isFinite(valor) || valor < 0 || valor > 10_000_000)) return res.status(400).json({ error: "Valor inválido." });
+  try {
+    await armazenamento.gravarValorDoResumo(`${periodo.inicio}|${periodo.fim}`, campanha, String(grupo), valor);
+    await registrarAlteracao(req, "Valor investido digitado no resumo do núcleo", {
+      detalhe: `${campanha} · ${grupo} · ${periodo.inicio} a ${periodo.fim}: ${valor === null ? "apagado" : valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+    });
+    res.json({ ok: true, valor });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao gravar o valor");
+  }
+});
+
 app.get("/api/analise-trafego", async (req, res) => {
   const periodo = lerPeriodo(req);
   if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });

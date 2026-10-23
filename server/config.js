@@ -54,6 +54,8 @@ export const ETAPAS = [
 export const CAMPANHAS = [
   {
     codigo: "IR-Q",
+    // Título do quadro no "Resumo para o núcleo" da aba de tráfego.
+    tituloNoResumo: "IR",
     nome: "Tema 324/TNU — Questionário",
     aliases: ["IR-Q", "IRQ"],
     pipelineId: 14334820,
@@ -73,6 +75,8 @@ export const CAMPANHAS = [
   },
   {
     codigo: "IR-W",
+    // Título do quadro no "Resumo para o núcleo" da aba de tráfego.
+    tituloNoResumo: "IR - WhatsApp (Novo Número)",
     nome: "Tema 324/TNU — WhatsApp",
     aliases: ["IR-W", "IRW"],
     pipelineId: 14334824,
@@ -92,6 +96,8 @@ export const CAMPANHAS = [
   },
   {
     codigo: "REA-Q",
+    // Título do quadro no "Resumo para o núcleo" da aba de tráfego.
+    tituloNoResumo: "Reajuste",
     nome: "Reajuste abusivo — Questionário",
     aliases: ["REA-Q", "REAQ"],
     pipelineId: 14334420,
