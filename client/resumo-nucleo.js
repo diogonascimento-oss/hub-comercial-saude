@@ -201,13 +201,9 @@ function tabelasDoResumo() {
     }));
 }
 
-$("btnCopiarResumo").addEventListener("click", async () => {
-  if (!resumoDoNucleo) return;
-  const tabelas = tabelasDoResumo();
-  const texto = tabelas
-    .map((t) => [t.titulo, ...t.cabecalhos.map((h) => h.join("\t")), ...t.linhas.map((l, i) => l.map((v, j) => (j && i === 0 ? reaisDoResumo(v) : v ?? "")).join("\t"))].join("\n"))
-    .join("\n\n");
-  const html = tabelas
+// Tabelas do resumo em HTML, no estilo da planilha da coordenação.
+function htmlDasTabelas(tabelas) {
+  return tabelas
     .map(
       (t) => `<table border="1" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11pt">
         <tr><th colspan="${t.cabecalhos[0].length}" style="background:#1f5597;color:#fff;text-align:right">${esc(t.titulo)}</th></tr>
@@ -236,19 +232,35 @@ $("btnCopiarResumo").addEventListener("click", async () => {
       </table>`,
     )
     .join("<br>");
-  const status = $("statusResumo");
-  try {
-    if (window.ClipboardItem) {
-      await navigator.clipboard.write([new ClipboardItem({ "text/plain": new Blob([texto], { type: "text/plain" }), "text/html": new Blob([html], { type: "text/html" }) })]);
-    } else {
-      await navigator.clipboard.writeText(texto);
-    }
-    status.className = "text-[11px] text-inkdim";
-    status.textContent = "Copiado. Cole na planilha (Ctrl+V) na célula onde o primeiro quadro deve começar.";
-  } catch {
-    status.className = "text-[11px] text-negativo";
-    status.textContent = "O navegador não deixou copiar. Tente de novo clicando no botão.";
+}
+
+function descricaoDoPeriodo() {
+  const r = resumoDoNucleo;
+  const br = (iso) => iso.split("-").reverse().join("/");
+  return `Período: ${br(r.inicio)} a ${br(r.fim)} · ${r.apenasNovos ? "leads que chegaram no período, acompanhados até hoje" : "tudo o que aconteceu no período"}`;
+}
+const nomeDoArquivoDoResumo = (extensao) => `resumo-nucleo_${resumoDoNucleo.inicio}_a_${resumoDoNucleo.fim}_${resumoDoNucleo.nivel}.${extensao}`;
+
+// CSV com ponto e vírgula, que o Excel em português abre direto nas colunas.
+$("btnCsvResumo").addEventListener("click", () => {
+  if (!resumoDoNucleo) return;
+  const celula = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const linhas = [[descricaoDoPeriodo()], []];
+  for (const t of tabelasDoResumo()) {
+    linhas.push([t.titulo], ...t.cabecalhos);
+    t.linhas.forEach((l, i) => linhas.push(l.map((v, j) => (j && i === 0 ? reaisSemSimbolo(v) : v))));
+    linhas.push([]);
   }
+  baixarArquivo(nomeDoArquivoDoResumo("csv"), "\ufeff" + linhas.map((l) => l.map(celula).join(";")).join("\r\n"), "text/csv;charset=utf-8");
+});
+
+// HTML autocontido, para abrir no navegador, imprimir ou anexar.
+$("btnHtmlResumo").addEventListener("click", () => {
+  if (!resumoDoNucleo) return;
+  const documento = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Resumo para o núcleo</title>
+<style>body{font-family:Calibri,Arial,sans-serif;margin:24px;color:#222}h1{font-size:18px;margin:0 0 4px}p{font-size:12px;color:#555;margin:0 0 16px}table{margin-bottom:24px}td,th{padding:4px 10px;border:1px solid #fff}@media print{body{margin:0}}</style></head>
+<body><h1>Resumo para o núcleo</h1><p>${esc(descricaoDoPeriodo())}</p>${htmlDasTabelas(tabelasDoResumo())}</body></html>`;
+  baixarArquivo(nomeDoArquivoDoResumo("html"), documento, "text/html;charset=utf-8");
 });
 
 // --- Imagem (PNG) no estilo da planilha ------------------------------------------------------
