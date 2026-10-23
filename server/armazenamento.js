@@ -135,3 +135,14 @@ export async function gravarAutoriaDoAnexo(uuid, autoria) {
   else delete todas[String(uuid)];
   await gravar(CHAVE_ANEXOS, todas);
 }
+
+// Evento do Google Agenda criado pelo painel para cada lead:
+// { "<leadId>": { email, eventoId, link, meet, online, local, duracaoMin, inicio } }.
+const CHAVE_EVENTOS = "hubsaude:eventos";
+export const lerEventosDaAgenda = async () => (await lerRegistro(CHAVE_EVENTOS)) || {};
+export async function gravarEventoDaAgenda(leadId, evento) {
+  const todos = await lerEventosDaAgenda();
+  if (evento) todos[String(leadId)] = evento;
+  else delete todos[String(leadId)];
+  await gravar(CHAVE_EVENTOS, todos);
+}

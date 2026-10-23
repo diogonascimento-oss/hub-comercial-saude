@@ -192,6 +192,7 @@ const app = express();
 app.use(express.json());
 
 app.use((req, res, next) => {
+  if (req.path === "/google/token" || req.path === "/google/eventos") return next();
   if (!req.get("authorization")) return res.status(401).json({ title: "Unauthorized" });
   next();
 });
@@ -320,6 +321,33 @@ app.delete("/api/v4/leads/:id/files", (req, res) => {
   arquivosPorLead.set(req.params.id, (arquivosPorLead.get(req.params.id) || []).filter((f) => !tirar.has(f.file_uuid)));
   res.status(202).end();
 });
+
+// Google (token e Agenda), para testar a integração da ficha.
+const eventosGoogle = new Map();
+app.post("/google/token", express.urlencoded({ extended: false }), (req, res) => {
+  const corpo = JSON.parse(Buffer.from(String(req.body.assertion).split(".")[1], "base64url").toString());
+  res.json({ access_token: `tok-${corpo.sub}`, expires_in: 3600 });
+});
+app.post("/google/calendar/v3/calendars/:cal/events", (req, res) => {
+  const id = `ev${Date.now().toString(36)}`;
+  const ev = { ...req.body, id, organizer: { email: req.params.cal }, htmlLink: `https://calendar.google.com/event?eid=${id}` };
+  if (req.body.conferenceData?.createRequest) ev.hangoutLink = `https://meet.google.com/sim-${id}`;
+  eventosGoogle.set(id, ev);
+  res.json(ev);
+});
+app.patch("/google/calendar/v3/calendars/:cal/events/:id", (req, res) => {
+  const ev = eventosGoogle.get(req.params.id);
+  if (!ev) return res.status(404).json({ error: { message: "Not Found" } });
+  Object.assign(ev, req.body);
+  if (req.body.conferenceData === null) delete ev.hangoutLink;
+  if (req.body.conferenceData?.createRequest) ev.hangoutLink = `https://meet.google.com/sim-${ev.id}`;
+  res.json(ev);
+});
+app.delete("/google/calendar/v3/calendars/:cal/events/:id", (req, res) => {
+  eventosGoogle.delete(req.params.id);
+  res.status(204).end();
+});
+app.get("/google/eventos", (req, res) => res.json([...eventosGoogle.values()]));
 
 app.get("/api/v4/contacts", (req, res) => {
   const ids = valoresDoFiltro(req.query.filter?.id);

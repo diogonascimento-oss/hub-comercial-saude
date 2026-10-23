@@ -138,10 +138,12 @@ export const CAMPOS = {
 // listadas em "variacoes". Nomes fora da lista aparecem como foram gravados.
 export const RESPONSAVEIS = {
   sdr: [],
+  // "email" é a conta do Google Workspace da closer: a agenda onde o painel
+  // cria o evento da reunião. Sem e-mail, a reunião só é gravada no Kommo.
   closer: [
-    { nome: "Fabianna Arnaud", variacoes: ["Fabiana Arnaud"] },
-    { nome: "Maria Vasconcelos", variacoes: ["Maria Vasconselos"] },
-    { nome: "Paula Caldas", variacoes: [] },
+    { nome: "Fabianna Arnaud", variacoes: ["Fabiana Arnaud"], email: null },
+    { nome: "Maria Vasconcelos", variacoes: ["Maria Vasconselos"], email: null },
+    { nome: "Paula Caldas", variacoes: [], email: null },
   ],
   farmer: [],
 };
@@ -166,6 +168,15 @@ export const MOTIVOS_SEM_INTERESSE = [
   "Preferiu não ajuizar",
   "Opt-out/bloqueio",
 ];
+
+// Evento da reunião no Google Agenda da closer, criado pela ficha do lead.
+export const AGENDA = {
+  duracaoPadraoMin: 60,
+  // Endereço sugerido para reuniões presenciais (pode ser editado na ficha).
+  enderecoDoEscritorio: "",
+  // Endereço do painel, para os links do lead e dos anexos dentro do evento.
+  enderecoDoPainel: "https://saude.rmadv.workers.dev",
+};
 
 // Metas do mês corrente, somadas as três campanhas.
 //

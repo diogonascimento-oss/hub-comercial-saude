@@ -228,12 +228,13 @@ function montarFormularioDeAlteracao(o) {
     </label>
     ${
       o.dataDaReuniao
-        ? `<label class="block"><span class="text-[11px] text-inkdim">${esc(o.dataDaReuniao.nome)} (horário de Recife)</span>
+        ? `<label class="block"><span class="block text-[11px] text-inkdim">${esc(o.dataDaReuniao.nome)} (horário de Recife)</span>
             <input id="alteracaoData" type="${o.dataDaReuniao.comHora ? "datetime-local" : "date"}" value="${paraCampoDeRecife(o.dataDaReuniao.atual, o.dataDaReuniao.comHora)}" class="w-full sm:w-64 bg-surface2 border border-line px-2 py-1.5 text-ink text-xs [color-scheme:dark]">
           </label>`
         : ""
     }
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${o.responsaveis.map(campoDoResponsavel).join("")}</div>
+    ${blocoDaAgenda(o)}
     <div class="flex flex-wrap items-center gap-2">
       <button type="button" id="btnSalvarAlteracao" class="bg-gold hover:bg-goldbright text-bg text-[11px] font-semibold px-3 py-1.5">Salvar no Kommo</button>
       <button type="button" id="btnCancelarAlteracao" class="border border-line hover:border-inkdim text-inkdim text-[11px] px-3 py-1.5">Cancelar</button>
@@ -252,6 +253,37 @@ function deCampoDeRecife(valor, comHora) {
   if (!valor) return null;
   const ms = Date.parse(comHora ? `${valor}:00-03:00` : `${valor}T00:00:00-03:00`);
   return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+}
+
+// Evento no Google Agenda da closer, quando a integração está configurada.
+function blocoDaAgenda(o) {
+  const a = o.agenda;
+  if (!a?.configurado || !o.dataDaReuniao) return "";
+  const ev = a.evento;
+  const online = ev ? ev.online : true;
+  const duracao = ev?.duracaoMin || a.duracaoPadraoMin;
+  const duracoes = [30, 45, 60, 90, 120].includes(duracao) ? [30, 45, 60, 90, 120] : [30, 45, 60, 90, 120, duracao].sort((x, y) => x - y);
+  return `
+    <fieldset class="border border-line px-3 py-2.5 space-y-2">
+      <legend class="text-[11px] text-inkdim px-1">Google Agenda da closer</legend>
+      ${
+        ev
+          ? `<p class="text-[11px] text-ink">Evento na agenda de ${esc(ev.closer || ev.email)}${ev.link ? ` · <a href="${esc(ev.link)}" target="_blank" rel="noopener" class="text-goldbright underline decoration-dotted underline-offset-2">abrir no Google Agenda</a>` : ""}${ev.meet ? ` · <a href="${esc(ev.meet)}" target="_blank" rel="noopener" class="text-goldbright underline decoration-dotted underline-offset-2">link do Meet</a>` : ""}</p>`
+          : `<p class="text-[11px] text-inkdim">Closers com agenda ligada ao painel: ${a.closersComAgenda.length ? esc(a.closersComAgenda.join(", ")) : "nenhuma ainda"}.</p>`
+      }
+      <label class="flex items-center gap-2 text-[11px] text-ink"><input type="checkbox" id="agendaSincronizar" ${ev || a.closersComAgenda.length ? "checked" : ""}> ${ev ? "Manter o evento atualizado com a data, a closer e a descrição" : "Criar o evento na agenda da closer ao salvar"}</label>
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-ink">
+        <label class="flex items-center gap-1.5"><input type="radio" name="agendaModo" value="online" ${online ? "checked" : ""}> Online (Google Meet)</label>
+        <label class="flex items-center gap-1.5"><input type="radio" name="agendaModo" value="presencial" ${online ? "" : "checked"}> Presencial</label>
+        <label class="flex items-center gap-1.5">Duração
+          <select id="agendaDuracao" class="bg-surface2 border border-line px-1.5 py-1 text-ink text-[11px]">${duracoes.map((d) => `<option value="${d}" ${d === duracao ? "selected" : ""}>${d} min</option>`).join("")}</select>
+        </label>
+      </div>
+      <label id="linhaLocal" class="block ${online ? "hidden" : ""}"><span class="text-[11px] text-inkdim">Local</span>
+        <input id="agendaLocal" value="${esc(ev?.local || a.enderecoPadrao || "")}" maxlength="300" class="w-full bg-surface2 border border-line px-2 py-1.5 text-ink text-xs">
+      </label>
+      <p class="text-[10px] text-inkfaint">O evento leva a descrição do lead, os links dos anexos e o link do lead no Kommo. Se o lead for para Venda perdida ou a data for apagada, o evento sai da agenda.</p>
+    </fieldset>`;
 }
 
 async function abrirAlteracao(leadId) {
@@ -293,6 +325,16 @@ async function salvarAlteracao() {
     ...(opcoes.dataDaReuniao
       ? { dataDaReuniao: { valor: deCampoDeRecife($("alteracaoData").value, opcoes.dataDaReuniao.comHora), anterior: opcoes.dataDaReuniao.atual } }
       : {}),
+    ...($("agendaSincronizar")
+      ? {
+          agenda: {
+            sincronizar: $("agendaSincronizar").checked,
+            online: document.querySelector('input[name="agendaModo"]:checked')?.value !== "presencial",
+            duracaoMin: Number($("agendaDuracao").value),
+            local: $("agendaLocal").value.trim(),
+          },
+        }
+      : {}),
   };
   const botao = $("btnSalvarAlteracao");
   botao.disabled = true;
@@ -311,14 +353,18 @@ async function salvarAlteracao() {
     }
     if (!r.ok) throw new Error(resposta.error || `O servidor respondeu com o código ${r.status}.`);
     if (resposta.semMudanca) {
-      status.textContent = "Nada mudou.";
+      status.textContent = resposta.agenda?.aviso || "Nada mudou.";
+      if (resposta.agenda?.aviso) status.className = "text-[11px] text-negativo";
       return;
     }
     // A ficha continua aberta, com os dados novos e o formulário à vista.
     await atualizarFichaNoLugar(leadId);
     await abrirAlteracao(leadId);
     $("statusAlteracao").className = "text-[11px] text-positivo";
-    $("statusAlteracao").textContent = `Salvo no Kommo: ${resposta.mudancas.join("; ")}.`;
+    $("statusAlteracao").textContent = `Salvo: ${resposta.mudancas.join("; ")}.`;
+    if (resposta.agenda && resposta.agenda.ok === false) {
+      $("statusAlteracao").insertAdjacentHTML("afterend", `<span class="block w-full text-[11px] text-negativo">${esc(resposta.agenda.aviso)}</span>`);
+    }
   } catch (erro) {
     status.className = "text-[11px] text-negativo";
     status.textContent = erro.message;
@@ -328,6 +374,7 @@ async function salvarAlteracao() {
 }
 
 $("corpoFicha").addEventListener("change", (e) => {
+  if (e.target.name === "agendaModo") $("linhaLocal").classList.toggle("hidden", e.target.value !== "presencial");
   if (e.target.id === "alteracaoEtapa" && edicaoAberta) {
     const destino = edicaoAberta.opcoes.colunas.find((c) => c.id === Number(e.target.value));
     $("linhaMotivoPerda").classList.toggle("hidden", !destino?.perdido);

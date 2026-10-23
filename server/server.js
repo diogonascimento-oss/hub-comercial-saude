@@ -24,10 +24,12 @@ import {
   MOTIVOS_SEM_INTERESSE,
   CAMPOS,
   RESPONSAVEIS,
+  AGENDA,
 } from "./config.js";
 import * as kommo from "./kommo.js";
+import * as google from "./google.js";
 import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
-import { normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
+import { nomeOficialDoResponsavel, normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
 import { diasDeCalendario, calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
 import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
@@ -836,6 +838,7 @@ app.put("/api/leads/:id/descricao", async (req, res) => {
       kommo.anotarNoLead(leadId, `Descrição ${texto ? "editada" : "apagada"} pelo painel por ${usuario} em ${quando}.`).catch((e) => console.error("Falha ao anotar no Kommo:", e.message)),
       registrarAlteracao(req, texto ? "Descrição do lead editada" : "Descrição do lead apagada", { leadId }),
     ]);
+    atualizarEventoDoLead(leadId);
     res.json({ texto, edicao });
   } catch (erro) {
     if (erro.response?.status === 404 || erro.response?.status === 204) return res.status(404).json({ error: "Lead não encontrado no Kommo." });
@@ -924,6 +927,130 @@ async function opcoesDeEdicao(leadId) {
   return { bruto, campanha, colunas, statusAtual: Number(bruto.status_id), responsaveis, dataDaReuniao };
 }
 
+// E-mail da agenda de cada closer: o de config.js ou, se faltar, o da
+// variável AGENDAS_DAS_CLOSERS ({"Nome oficial": "email"}).
+function emailDaAgenda(nomeOficial) {
+  const daConfig = (RESPONSAVEIS.closer || []).find((c) => c.nome === nomeOficial)?.email;
+  if (daConfig) return daConfig;
+  try {
+    return JSON.parse(process.env.AGENDAS_DAS_CLOSERS || "{}")[nomeOficial] || null;
+  } catch {
+    return null;
+  }
+}
+
+// Cria, atualiza ou cancela o evento da reunião na agenda da closer. Uma
+// falha no Google não desfaz o que já foi gravado no Kommo: volta como aviso.
+async function sincronizarAgenda({ leadId, bruto, lead, campanha, closer, inicio, cancelar, pedido }) {
+  if (!google.googleConfigurado()) return null;
+  const eventos = await armazenamento.lerEventosDaAgenda();
+  const existente = eventos[leadId] || null;
+  try {
+    if (cancelar) {
+      if (!existente) return null;
+      await google.apagarEvento(existente.email, existente.eventoId);
+      await armazenamento.gravarEventoDaAgenda(leadId, null);
+      return { ok: true, cancelado: true, mudanca: "evento removido do Google Agenda" };
+    }
+    if (!inicio) return null;
+    const nomeOficial = nomeOficialDoResponsavel("closer", closer);
+    const email = emailDaAgenda(nomeOficial);
+    if (!email) {
+      // A reunião saiu da closer que tinha o evento: ele não fica na agenda dela.
+      let removido = "";
+      if (existente) {
+        await google.apagarEvento(existente.email, existente.eventoId);
+        await armazenamento.gravarEventoDaAgenda(leadId, null);
+        removido = `evento removido da agenda de ${existente.closer || existente.email}`;
+      }
+      return {
+        ok: false,
+        mudanca: removido || undefined,
+        aviso: closer ? `A closer "${closer}" não tem agenda ligada ao painel; a reunião ficou só no Kommo.` : "Escolha a closer para criar o evento no Google Agenda.",
+      };
+    }
+    const online = pedido.online ?? existente?.online ?? true;
+    const duracaoMin = Math.min(Math.max(Number(pedido.duracaoMin) || existente?.duracaoMin || AGENDA.duracaoPadraoMin, 15), 480);
+    const local = String(pedido.local ?? existente?.local ?? AGENDA.enderecoDoEscritorio).slice(0, 300);
+
+    // Descrição do evento: dados do lead, descrição do Kommo e links.
+    const campoDescricao = await campoDeDescricao().catch(() => null);
+    const descricaoKommo = campoDescricao ? textoDoCampo(bruto, campoDescricao.id) : "";
+    let anexos = [];
+    try {
+      anexos = await kommo.detalharArquivos(await kommo.listarUuidsDosArquivosDoLead(leadId));
+    } catch {
+      anexos = [];
+    }
+    const painel = AGENDA.enderecoDoPainel.replace(/\/+$/, "");
+    const linhas = [
+      `Lead: ${lead?.nome || bruto.name || leadId}`,
+      lead?.telefone ? `Telefone: ${lead.telefone}` : "",
+      `Campanha: ${campanha}`,
+      descricaoKommo ? `\nDescrição:\n${descricaoKommo}` : "",
+      anexos.length ? `\nAnexos (abrem pelo painel, com login):\n${anexos.map((a) => `- ${a.name}: ${painel}/api/leads/${leadId}/anexos/${a.uuid}`).join("\n")}` : "",
+      process.env.KOMMO_SUBDOMAIN ? `\nLead no Kommo: https://${process.env.KOMMO_SUBDOMAIN}.kommo.com/leads/detail/${leadId}` : "",
+    ].filter(Boolean);
+    const evento = google.montarEvento({
+      titulo: `Reunião ${campanha} · ${lead?.nome || bruto.name || `lead ${leadId}`}`,
+      descricao: linhas.join("\n"),
+      inicio,
+      duracaoMin,
+      online,
+      local,
+      leadId,
+      idDaReuniao: `painel-${leadId}-${Date.now()}`,
+    });
+
+    let criado;
+    if (existente && existente.email === email) {
+      if (existente.meet && online) delete evento.conferenceData;
+      if (!online) evento.conferenceData = null;
+      criado = await google.atualizarEvento(email, existente.eventoId, evento);
+    } else {
+      if (existente) await google.apagarEvento(existente.email, existente.eventoId).catch(() => {});
+      criado = await google.criarEvento(email, evento);
+    }
+    const meet = criado.hangoutLink || criado.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video")?.uri || null;
+    const registro = { email, closer: nomeOficial, eventoId: criado.id, link: criado.htmlLink || null, meet, online, local, duracaoMin, inicio };
+    await armazenamento.gravarEventoDaAgenda(leadId, registro);
+    const quando = new Date(inicio * 1000).toLocaleString("pt-BR", { timeZone: "America/Recife", dateStyle: "short", timeStyle: "short" });
+    return {
+      ok: true,
+      ...registro,
+      mudanca: `evento ${existente && existente.email === email ? "atualizado" : "criado"} no Google Agenda de ${nomeOficial} para ${quando}${online ? meet ? ` (Meet: ${meet})` : " (online)" : local ? ` (presencial: ${local})` : " (presencial)"}`,
+    };
+  } catch (erro) {
+    console.error("Falha no Google Agenda:", erro.response?.status, JSON.stringify(erro.response?.data || erro.message).slice(0, 400));
+    return { ok: false, aviso: google.explicarErroDoGoogle(erro) };
+  }
+}
+
+// Depois de mudar a descrição ou os anexos, o evento já criado na agenda é
+// refeito com o texto e os links novos. Falhas ficam só no log.
+async function atualizarEventoDoLead(leadId) {
+  if (!google.googleConfigurado()) return;
+  try {
+    const existente = (await armazenamento.lerEventosDaAgenda())[leadId];
+    if (!existente) return;
+    const [{ valor: mapeamento }, bruto, { leads }] = await Promise.all([obterMapeamento(), kommo.buscarLead(leadId), obterLeads()]);
+    const campanha = mapeamento.campanhaPorFunil.get(Number(bruto.pipeline_id));
+    if (!campanha) return;
+    await sincronizarAgenda({
+      leadId,
+      bruto,
+      lead: leads.find((l) => String(l.id) === leadId),
+      campanha,
+      closer: existente.closer,
+      inicio: existente.inicio,
+      cancelar: false,
+      pedido: {},
+    });
+  } catch (erro) {
+    console.error("Falha ao atualizar o evento do lead:", erro.message);
+  }
+}
+
 app.get("/api/leads/:id/edicao", async (req, res) => {
   const leadId = String(req.params.id);
   if (!/^\d+$/.test(leadId)) return res.status(400).json({ error: "ID de lead inválido." });
@@ -931,8 +1058,16 @@ app.get("/api/leads/:id/edicao", async (req, res) => {
     const [opcoes, motivos] = await Promise.all([opcoesDeEdicao(leadId), kommo.listarMotivosDePerda().catch(() => [])]);
     if (!opcoes) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
     const { bruto, ...resto } = opcoes;
+    const eventos = google.googleConfigurado() ? await armazenamento.lerEventosDaAgenda().catch(() => ({})) : {};
     res.json({
       ...resto,
+      agenda: {
+        configurado: google.googleConfigurado(),
+        closersComAgenda: (RESPONSAVEIS.closer || []).filter((c) => emailDaAgenda(c.nome)).map((c) => c.nome),
+        evento: eventos[leadId] || null,
+        duracaoPadraoMin: AGENDA.duracaoPadraoMin,
+        enderecoPadrao: AGENDA.enderecoDoEscritorio,
+      },
       motivoDePerdaAtual: bruto.loss_reason_id ? Number(bruto.loss_reason_id) : null,
       motivosDePerda: motivos.map((m) => ({ id: Number(m.id), nome: m.name })),
     });
@@ -981,7 +1116,9 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
     for (const r of responsaveis) {
       const pedido = corpo.responsaveis?.[r.papel];
       if (!pedido) continue;
-      const novo = String(pedido.valor ?? "").trim().slice(0, 120);
+      // Nome digitado que corresponde a um nome oficial é gravado no formato oficial.
+      const digitado = String(pedido.valor ?? "").trim().slice(0, 120);
+      const novo = r.tipo === "texto" ? nomeOficialDoResponsavel(r.papel, digitado) : digitado;
       if (novo === r.atual) continue;
       if (String(pedido.anterior ?? "").trim() !== r.atual) {
         return res.status(409).json({ error: `O campo ${r.rotulo} mudou no Kommo enquanto a ficha estava aberta. A ficha foi recarregada; confira antes de salvar.` });
@@ -1014,15 +1151,49 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
     }
     if (novosCampos.length) dados.custom_fields_values = novosCampos;
 
-    if (!mudancas.length) return res.json({ ok: true, semMudanca: true });
-    await kommo.atualizarLead(leadId, dados);
-    esquecerDadosEmCache();
+    const pedidoAgenda = corpo.agenda && google.googleConfigurado() ? corpo.agenda : null;
+    if (!mudancas.length && !pedidoAgenda) return res.json({ ok: true, semMudanca: true });
+
+    // Situação final do lead, depois desta alteração, para a agenda.
+    const closerFinal = (() => {
+      const r = responsaveis.find((x) => x.papel === "closer");
+      const pedido = corpo.responsaveis?.closer;
+      return pedido ? nomeOficialDoResponsavel("closer", String(pedido.valor ?? "").trim()) : r?.atual || "";
+    })();
+    const inicioFinal = opcoes.dataDaReuniao
+      ? corpo.dataDaReuniao ? (corpo.dataDaReuniao.valor ? Math.floor(Number(corpo.dataDaReuniao.valor)) : null) : opcoes.dataDaReuniao.atual
+      : null;
+    const destinoPerdido = dados.status_id ? Boolean(colunas.find((c) => c.id === dados.status_id)?.perdido) : false;
+    const { leads } = await obterLeads();
+    const leadNormalizado = leads.find((l) => String(l.id) === leadId);
+
+    if (mudancas.length) {
+      await kommo.atualizarLead(leadId, dados);
+      esquecerDadosEmCache();
+    }
+
+    let agenda = null;
+    if (pedidoAgenda || destinoPerdido || (corpo.dataDaReuniao && !inicioFinal)) {
+      agenda = await sincronizarAgenda({
+        leadId,
+        bruto,
+        lead: leadNormalizado,
+        campanha: opcoes.campanha,
+        closer: closerFinal,
+        inicio: inicioFinal,
+        cancelar: destinoPerdido || !inicioFinal || pedidoAgenda?.sincronizar === false,
+        pedido: pedidoAgenda || {},
+      });
+      if (agenda?.mudanca) mudancas.push(agenda.mudanca);
+    }
+    if (!mudancas.length) return res.json({ ok: true, semMudanca: true, agenda });
+
     const quando = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Recife" });
     await Promise.all([
       kommo.anotarNoLead(leadId, `Alterado pelo painel por ${usuario} em ${quando}: ${mudancas.join("; ")}.`).catch((e) => console.error("Falha ao anotar no Kommo:", e.message)),
       registrarAlteracao(req, "Lead alterado pela ficha", { leadId, detalhe: mudancas.join("; ") }),
     ]);
-    res.json({ ok: true, mudancas });
+    res.json({ ok: true, mudancas, agenda });
   } catch (erro) {
     if (erro.response?.status === 400) {
       console.error("Kommo recusou a alteração:", JSON.stringify(erro.response.data || {}).slice(0, 500));
@@ -1110,6 +1281,7 @@ app.post("/api/leads/:id/anexos", express.raw({ type: () => true, limit: TAMANHO
       kommo.anotarNoLead(leadId, `Arquivo "${nome}" anexado pelo painel por ${usuario} em ${quando}.`).catch((e) => console.error("Falha ao anotar no Kommo:", e.message)),
       registrarAlteracao(req, "Arquivo anexado ao lead", { leadId, detalhe: nome }),
     ]);
+    atualizarEventoDoLead(leadId);
     res.json({ arquivo: arquivoParaPainel({ ...arquivo, metadata: arquivo.metadata || { mime_type: tipo } }, autoria) });
   } catch (erro) {
     erroDeArquivos(res, erro, "Falha ao enviar o arquivo ao Kommo");
@@ -1170,6 +1342,7 @@ app.delete("/api/leads/:id/anexos/:uuid", async (req, res) => {
       kommo.anotarNoLead(leadId, `Arquivo "${nome}" apagado pelo painel por ${usuario} em ${quando}.`).catch((e) => console.error("Falha ao anotar no Kommo:", e.message)),
       registrarAlteracao(req, "Arquivo do lead apagado", { leadId, detalhe: nome }),
     ]);
+    atualizarEventoDoLead(leadId);
     res.json({ ok: true, naLixeira });
   } catch (erro) {
     erroDeArquivos(res, erro, "Falha ao apagar o arquivo no Kommo");

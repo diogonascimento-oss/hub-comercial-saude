@@ -215,6 +215,8 @@ O modelo está em `server/.env.exemplo`.
 | `API_TOKEN` | Token exigido em todas as rotas `/api` |
 | `UPSTASH_REDIS_REST_URL` | Endereço do banco no Upstash |
 | `UPSTASH_REDIS_REST_TOKEN` | Token do banco no Upstash |
+| `GOOGLE_CONTA_DE_SERVICO` | Opcional. Chave JSON da conta de serviço do Google Cloud, com delegação em todo o domínio no Workspace (escopo `https://www.googleapis.com/auth/calendar.events`). Liga a criação do evento da reunião na agenda da closer |
+| `AGENDAS_DAS_CLOSERS` | Opcional. E-mails das agendas das closers, em JSON (`{"Nome oficial": "email"}`), quando não estiverem em `RESPONSAVEIS` no `config.js` |
 
 O arquivo `.env` não deve ser enviado ao repositório.
 
