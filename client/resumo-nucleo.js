@@ -17,8 +17,32 @@ const LINHAS_DO_RESUMO = [
 
 const reaisDoResumo = (v) => (v === null || v === undefined ? "" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 const reaisSemSimbolo = (v) => (v === null || v === undefined ? "" : v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-const nomeDaColuna = (g) => g || "(não informado)";
+const nomeDaColuna = (c) => (c.partes ? c.partes.join(" · ") : c.grupo || "(não informado)");
 const ROTULO_DO_NIVEL = { campanha: "Campanha do Meta", conjunto: "Conjunto de anúncios", anuncio: "Anúncio" };
+
+// Linhas do cabeçalho de um quadro (cada uma com rótulo, colunas e TOTAL).
+// No modo "todos", três linhas: campanha, conjunto e anúncio.
+function cabecalhoDoBloco(b, nivel) {
+  if (nivel === "todos") {
+    return ["Campanha do Meta", "Conjunto de anúncios", "Anúncio"].map((rotulo, k) => [rotulo, ...b.campanhas.map((c) => c.partes?.[k] || "(não informado)"), k === 0 ? "TOTAL" : ""]);
+  }
+  return [[ROTULO_DO_NIVEL[nivel] || "", ...b.campanhas.map((c) => nomeDaColuna(c)), "TOTAL"]];
+}
+
+// Junta células vizinhas iguais de uma linha do cabeçalho (só entre as
+// colunas de dados, e só quando as linhas de cima também são iguais).
+function mesclarCabecalho(linhas, k) {
+  const n = linhas[k].length;
+  const chave = (j) => linhas.slice(0, k + 1).map((l) => l[j]).join("\u241f");
+  const segmentos = [{ texto: linhas[k][0], inicio: 0, span: 1 }];
+  for (let j = 1; j < n - 1; j++) {
+    const ultimo = segmentos.at(-1);
+    if (ultimo.inicio > 0 && chave(ultimo.inicio) === chave(j)) ultimo.span++;
+    else segmentos.push({ texto: linhas[k][j], inicio: j, span: 1 });
+  }
+  segmentos.push({ texto: linhas[k][n - 1], inicio: n - 1, span: 1, total: true });
+  return segmentos;
+}
 
 function totalDoBloco(bloco, campo) {
   return bloco.campanhas.reduce((t, c) => t + (c[campo] || 0), 0);
@@ -53,7 +77,7 @@ function renderizarResumoDoNucleo() {
     ? "Contando só os leads que chegaram no período, acompanhados até hoje: um lead que chegou no período e fechou depois aparece como fechado aqui. É a leitura certa para comparar com o valor investido no período."
     : "Contando tudo o que aconteceu no período, inclusive com leads que chegaram antes dele: as reuniões e os contratos podem ser de leads de outras semanas, e os números não se comparam diretamente com o valor investido no período.";
   $("notaValorResumo").textContent = r.nivel !== "campanha"
-    ? `Valor: digite o valor investido em cada ${r.nivel === "anuncio" ? "anúncio" : "conjunto"}. Ele fica salvo para este período exato e para esta forma de colunas; o valor lido do Meta vale só nas colunas por campanha.`
+    ? `Valor: digite o valor investido em cada ${{ anuncio: "anúncio", conjunto: "conjunto", todos: "coluna (campanha, conjunto e anúncio)" }[r.nivel]}. Ele fica salvo para este período exato e para esta forma de colunas; o valor lido do Meta vale só nas colunas por campanha.`
     : r.meta.configurado && !r.meta.erro
     ? "Valor: investido em cada campanha no período, lido do Meta. Campanhas sem gasto encontrado no Meta podem receber um valor digitado."
     : `Valor: ${r.meta.erro ? `o Meta não respondeu (${r.meta.erro}); ` : ""}digite o valor investido em cada campanha. Ele fica salvo para este período exato (mesmas datas de início e fim).`;
@@ -76,11 +100,24 @@ function renderizarResumoDoNucleo() {
         <table class="w-full text-xs border border-line min-w-[480px]">
           <thead>
             <tr><th colspan="${b.campanhas.length + 2}" class="bg-gold/15 text-goldbright text-right font-semibold px-3 py-1.5">${esc(b.titulo)}</th></tr>
-            <tr class="text-inkdim">
-              <th class="px-3 py-1.5 font-normal text-[10px] uppercase tracking-wide text-inkfaint">${esc(ROTULO_DO_NIVEL[r.nivel] || "")}</th>
-              ${b.campanhas.map((c) => `<th class="px-3 py-1.5 font-normal italic text-center">${esc(nomeDaColuna(c.grupo))}</th>`).join("")}
-              <th class="px-3 py-1.5 font-semibold text-center text-ink bg-surface2">TOTAL</th>
-            </tr>
+            ${(() => {
+              const linhas = cabecalhoDoBloco(b, r.nivel);
+              return linhas
+                .map(
+                  (_, k) => `<tr class="text-inkdim">${mesclarCabecalho(linhas, k)
+                    .map((seg) =>
+                      seg.inicio === 0
+                        ? `<th class="px-3 py-1.5 font-normal text-[10px] uppercase tracking-wide text-inkfaint text-left">${esc(seg.texto)}</th>`
+                        : seg.total
+                          ? k === 0
+                            ? `<th rowspan="${linhas.length}" class="px-3 py-1.5 font-semibold text-center text-ink bg-surface2">TOTAL</th>`
+                            : ""
+                          : `<th colspan="${seg.span}" class="px-3 py-1.5 font-normal italic text-center ${linhas.length > 1 && k < linhas.length - 1 ? "border-b border-line" : ""}">${esc(seg.texto)}</th>`,
+                    )
+                    .join("")}</tr>`,
+                )
+                .join("");
+            })()}
           </thead>
           <tbody>
             <tr class="border-t border-line">
@@ -109,7 +146,7 @@ $("resumoNucleo").addEventListener("click", (e) => {
   const linha = LINHAS_DO_RESUMO.find((l) => l.campo === botao.dataset.campo);
   const colunas = botao.dataset.coluna === "total" ? bloco.campanhas : [bloco.campanhas[Number(botao.dataset.coluna)]];
   const leads = colunas.flatMap((c) => c.listas[linha.campo] || []);
-  const nome = botao.dataset.coluna === "total" ? "total" : nomeDaColuna(colunas[0].grupo);
+  const nome = botao.dataset.coluna === "total" ? "total" : nomeDaColuna(colunas[0]);
   abrirLeadsDoGrupo(`${bloco.titulo} · ${nome}: ${linha.rotulo.toLowerCase()}`, leads);
 });
 
@@ -156,7 +193,7 @@ function tabelasDoResumo() {
     .filter((b) => b.campanhas.length)
     .map((b) => ({
       titulo: b.titulo,
-      cabecalho: [ROTULO_DO_NIVEL[resumoDoNucleo.nivel] || "", ...b.campanhas.map((c) => nomeDaColuna(c.grupo)), "TOTAL"],
+      cabecalhos: cabecalhoDoBloco(b, resumoDoNucleo.nivel),
       linhas: [
         ["Valor", ...b.campanhas.map((c) => c.valor), valorTotalDoBloco(b)],
         ...LINHAS_DO_RESUMO.map((l) => [l.rotulo, ...b.campanhas.map((c) => c[l.campo] || 0), totalDoBloco(b, l.campo)]),
@@ -168,13 +205,26 @@ $("btnCopiarResumo").addEventListener("click", async () => {
   if (!resumoDoNucleo) return;
   const tabelas = tabelasDoResumo();
   const texto = tabelas
-    .map((t) => [t.titulo, t.cabecalho.join("\t"), ...t.linhas.map((l, i) => l.map((v, j) => (j && i === 0 ? reaisDoResumo(v) : v ?? "")).join("\t"))].join("\n"))
+    .map((t) => [t.titulo, ...t.cabecalhos.map((h) => h.join("\t")), ...t.linhas.map((l, i) => l.map((v, j) => (j && i === 0 ? reaisDoResumo(v) : v ?? "")).join("\t"))].join("\n"))
     .join("\n\n");
   const html = tabelas
     .map(
       (t) => `<table border="1" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11pt">
-        <tr><th colspan="${t.cabecalho.length}" style="background:#1f5597;color:#fff;text-align:right">${esc(t.titulo)}</th></tr>
-        <tr>${t.cabecalho.map((h, j) => `<th style="background:${j === t.cabecalho.length - 1 ? "#a9c4eb" : "#d9d9d9"};font-style:${j && j < t.cabecalho.length - 1 ? "italic" : "normal"};font-weight:${j === t.cabecalho.length - 1 ? "bold" : "normal"}">${esc(h)}</th>`).join("")}</tr>
+        <tr><th colspan="${t.cabecalhos[0].length}" style="background:#1f5597;color:#fff;text-align:right">${esc(t.titulo)}</th></tr>
+        ${t.cabecalhos
+          .map(
+            (_, k) =>
+              `<tr>${mesclarCabecalho(t.cabecalhos, k)
+                .map((seg) =>
+                  seg.total
+                    ? k === 0
+                      ? `<th rowspan="${t.cabecalhos.length}" style="background:#a9c4eb;font-weight:bold">TOTAL</th>`
+                      : ""
+                    : `<th colspan="${seg.span}" style="background:#d9d9d9;font-style:${seg.inicio ? "italic" : "normal"};font-weight:normal">${esc(seg.texto)}</th>`,
+                )
+                .join("")}</tr>`,
+          )
+          .join("")}
         ${t.linhas
           .map(
             (l, i) =>
@@ -212,8 +262,8 @@ $("btnImagemResumo").addEventListener("click", () => {
   const larguraColuna = 160;
   const alturaLinha = 26;
   const espaco = 28;
-  const largura = Math.max(...tabelas.map((t) => larguraRotulo + (t.cabecalho.length - 1) * larguraColuna)) + 40;
-  const alturaDoBloco = (t) => alturaLinha * (2 + t.linhas.length);
+  const largura = Math.max(...tabelas.map((t) => larguraRotulo + (t.cabecalhos[0].length - 1) * larguraColuna)) + 40;
+  const alturaDoBloco = (t) => alturaLinha * (1 + t.cabecalhos.length + t.linhas.length);
   const altura = 50 + tabelas.reduce((h, t) => h + alturaDoBloco(t) + espaco, 0);
   const canvas = document.createElement("canvas");
   canvas.width = largura * escala;
@@ -232,7 +282,7 @@ $("btnImagemResumo").addEventListener("click", () => {
   );
   let y = 50;
   for (const t of tabelas) {
-    const n = t.cabecalho.length;
+    const n = t.cabecalhos[0].length;
     const larguraTabela = larguraRotulo + (n - 1) * larguraColuna;
     const x0 = 20;
     const xDaColuna = (j) => (j === 0 ? x0 : x0 + larguraRotulo + (j - 1) * larguraColuna);
@@ -245,17 +295,27 @@ $("btnImagemResumo").addEventListener("click", () => {
     ctx.textAlign = "right";
     ctx.fillText(t.titulo, x0 + larguraTabela - 10, y + 18);
     y += alturaLinha;
-    // Cabeçalho
-    for (let j = 0; j < n; j++) {
-      ctx.fillStyle = j === n - 1 ? "#a9c4eb" : "#d9d9d9";
-      ctx.fillRect(xDaColuna(j), y, larguraDaColuna(j), alturaLinha);
-      ctx.fillStyle = "#222222";
-      ctx.font = j === n - 1 ? "bold 13px Arial, sans-serif" : "italic 13px Arial, sans-serif";
-      ctx.textAlign = "center";
-      const texto = t.cabecalho[j];
-      ctx.fillText(texto.length > 22 ? `${texto.slice(0, 21)}…` : texto, xDaColuna(j) + larguraDaColuna(j) / 2, y + 17);
-    }
-    y += alturaLinha;
+    // Cabeçalho (uma ou três linhas, com células iguais mescladas)
+    const alturaDoCabecalho = alturaLinha * t.cabecalhos.length;
+    t.cabecalhos.forEach((_, k) => {
+      for (const seg of mesclarCabecalho(t.cabecalhos, k)) {
+        if (seg.total && k > 0) continue;
+        const x = xDaColuna(seg.inicio);
+        const w = seg.total || seg.inicio === 0 ? larguraDaColuna(seg.inicio) : larguraColuna * seg.span;
+        const h = seg.total ? alturaDoCabecalho : alturaLinha;
+        ctx.fillStyle = seg.total ? "#a9c4eb" : "#d9d9d9";
+        ctx.fillRect(x, y + k * alturaLinha, w, h);
+        ctx.strokeStyle = "#ffffff";
+        ctx.strokeRect(x, y + k * alturaLinha, w, h);
+        ctx.fillStyle = "#222222";
+        ctx.font = seg.total ? "bold 13px Arial, sans-serif" : seg.inicio === 0 ? "12px Arial, sans-serif" : "italic 13px Arial, sans-serif";
+        ctx.textAlign = "center";
+        const limite = Math.max(8, Math.floor(w / 7.5));
+        const texto = String(seg.texto || "");
+        ctx.fillText(texto.length > limite ? `${texto.slice(0, limite - 1)}…` : texto, x + w / 2, y + k * alturaLinha + (seg.total ? h / 2 + 5 : 17));
+      }
+    });
+    y += alturaDoCabecalho;
     // Linhas
     t.linhas.forEach((linha, i) => {
       for (let j = 0; j < n; j++) {

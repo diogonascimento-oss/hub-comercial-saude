@@ -32,7 +32,7 @@ import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
 import { nomeOficialDoResponsavel, normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
 import { diasDeCalendario, calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
-import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
+import { analisarTrafego, consolidarLeads, agruparEComputar, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
 import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
 import { getLocalizacao } from "./localizacao.js";
 
@@ -1622,7 +1622,9 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
   if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
   const apenasNovos = req.query.apenasNovos === "true";
   // Colunas de cada quadro: campanha do Meta, conjunto de anúncios ou anúncio.
-  const nivel = ["conjunto", "anuncio"].includes(req.query.colunas) ? req.query.colunas : "campanha";
+  // "todos": uma coluna por combinação campanha + conjunto + anúncio.
+  const nivel = ["conjunto", "anuncio", "todos"].includes(req.query.colunas) ? req.query.colunas : "campanha";
+  const SEPARADOR = "\u241f";
   try {
     const hoje = dataLocal(Math.floor(Date.now() / 1000));
     const periodoDosEventos = apenasNovos && periodo.fim < hoje ? lerPeriodo({ query: { inicio: periodo.inicio, fim: hoje } }) : periodo;
@@ -1639,7 +1641,13 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
     const chaveDoPeriodo = `${periodo.inicio}|${periodo.fim}`;
     const blocos = CAMPANHAS.map((c) => {
       const analise = analisarTrafego({ leads: leads.filter((l) => l.campanha === c.codigo), eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
-      const doNivel = { campanha: analise.porCampanhaMeta, conjunto: analise.porConjunto, anuncio: analise.porAnuncio }[nivel];
+      const doNivel =
+        nivel === "todos"
+          ? agruparEComputar(
+              consolidarLeads({ leads: leads.filter((l) => l.campanha === c.codigo), eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos }),
+              (l) => [l.campanhaMeta, l.conjunto, l.anuncio].map((x) => x || "(não informado)").join(SEPARADOR),
+            )
+          : { campanha: analise.porCampanhaMeta, conjunto: analise.porConjunto, anuncio: analise.porAnuncio }[nivel];
       // O gasto do Meta só é associado por campanha; nos outros níveis, o valor é digitado.
       const grupos = linhasDoMeta && nivel === "campanha" ? associarInvestimentoPorCampanha(doNivel, linhasDoMeta) : doNivel;
       const digitados = valores[chaveDoPeriodo]?.[c.codigo] || {};
@@ -1650,6 +1658,7 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
           const digitado = digitados[nivel === "campanha" ? g.grupo : `${nivel}:${g.grupo}`] ?? null;
           return {
             grupo: g.grupo,
+            ...(nivel === "todos" ? { partes: String(g.grupo).split(SEPARADOR) } : {}),
             valor: doMeta ?? digitado,
             origemDoValor: doMeta !== null ? "meta" : digitado !== null ? "digitado" : null,
             leads: g.totalLeads,
@@ -1670,7 +1679,7 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
 
 app.put("/api/trafego/resumo-nucleo/valor", async (req, res) => {
   const { inicio, fim, campanha } = req.body || {};
-  const nivelDoValor = ["conjunto", "anuncio"].includes(req.body?.nivel) ? req.body.nivel : "campanha";
+  const nivelDoValor = ["conjunto", "anuncio", "todos"].includes(req.body?.nivel) ? req.body.nivel : "campanha";
   const grupo = req.body?.grupo && nivelDoValor !== "campanha" ? `${nivelDoValor}:${req.body.grupo}` : req.body?.grupo;
   const periodo = lerPeriodo({ query: { inicio, fim } });
   if (!periodo || !CAMPANHAS.some((c) => c.codigo === campanha) || !grupo || String(grupo).length > 300) {

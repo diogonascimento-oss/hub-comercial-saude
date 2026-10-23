@@ -97,7 +97,7 @@ function agrupar(leads, chaveDoGrupo) {
   return grupos;
 }
 
-function agruparEComputar(leads, chaveDoGrupo) {
+export function agruparEComputar(leads, chaveDoGrupo) {
   const resultado = [];
   for (const [grupo, doGrupo] of agrupar(leads, chaveDoGrupo)) {
     const passou = (chave) => doGrupo.filter((l) => l.etapasVisitadas.has(chave));
