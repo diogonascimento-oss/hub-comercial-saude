@@ -997,6 +997,7 @@ async function sincronizarAgenda({ leadId, bruto, lead, campanha, closer, inicio
       lead?.telefone ? `Telefone: ${lead.telefone}` : "",
       `Campanha: ${campanha}`,
       descricaoKommo ? `\nDescrição:\n${descricaoKommo}` : "",
+      `\nFicha do lead no painel (descrição, anexos e histórico): ${painel}/?lead=${leadId}`,
       anexos.length ? `\nAnexos (abrem pelo painel, com login):\n${anexos.map((a) => `- ${a.name}: ${painel}/api/leads/${leadId}/anexos/${a.uuid}`).join("\n")}` : "",
       process.env.KOMMO_SUBDOMAIN ? `\nLead no Kommo: https://${process.env.KOMMO_SUBDOMAIN}.kommo.com/leads/detail/${leadId}` : "",
     ].filter(Boolean);

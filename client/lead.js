@@ -706,7 +706,14 @@ async function atualizarFichaNoLugar(leadId) {
   carregarAnexos(leadId);
 }
 
+// Endereço direto da ficha: o painel abre já com a ficha deste lead.
+// Com "#anexos", a ficha rola até os anexos.
+const linkDaFicha = (leadId, parte = "") => `${location.origin}/?lead=${encodeURIComponent(leadId)}${parte ? `#${parte}` : ""}`;
+
 async function abrirFichaDoLead(leadId) {
+  $("btnCopiarLinkFicha").classList.remove("hidden");
+  $("btnCopiarLinkFicha").dataset.lead = leadId;
+  $("btnCopiarLinkFicha").textContent = "Copiar link";
   $("tituloFicha").textContent = "Ficha do lead";
   $("subtituloFicha").textContent = `Lead ${leadId}`;
   descricaoAberta = null;
@@ -726,8 +733,35 @@ async function abrirFichaDoLead(leadId) {
 function fecharFichaDoLead() {
   if ($("modalFicha").classList.contains("hidden")) return false;
   fecharDialogo("modalFicha");
+  // Ao fechar uma ficha aberta pelo link, o endereço volta ao do painel.
+  if (new URLSearchParams(location.search).has("lead")) history.replaceState(null, "", location.pathname);
   return true;
 }
 
 $("btnFecharFicha").addEventListener("click", fecharFichaDoLead);
 $("modalFicha").addEventListener("click", (e) => e.target === $("modalFicha") && fecharFichaDoLead());
+
+$("btnCopiarLinkFicha").addEventListener("click", async () => {
+  const botao = $("btnCopiarLinkFicha");
+  const link = linkDaFicha(botao.dataset.lead);
+  try {
+    await navigator.clipboard.writeText(link);
+    botao.textContent = "Link copiado";
+  } catch {
+    // Sem acesso à área de transferência: mostra o link para copiar à mão.
+    botao.textContent = link;
+  }
+  setTimeout(() => botao.isConnected && (botao.textContent = "Copiar link"), 2500);
+});
+
+// Painel aberto pelo link de uma ficha (?lead=ID): abre a ficha direto.
+(async function abrirFichaDoEndereco() {
+  const leadId = new URLSearchParams(location.search).get("lead");
+  if (!/^\d{1,15}$/.test(leadId || "")) return;
+  await abrirFichaDoLead(leadId);
+  if (location.hash === "#anexos") {
+    const ir = () => $("blocoAnexos")?.scrollIntoView({ block: "start" });
+    ir();
+    setTimeout(ir, 1200);
+  }
+})();

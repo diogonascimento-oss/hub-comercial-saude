@@ -588,7 +588,10 @@
           <h3 id="tituloFicha" class="font-serif text-base font-semibold text-ink truncate">Ficha do lead</h3>
           <p id="subtituloFicha" class="text-[11px] text-inkdim mt-0.5"></p>
         </div>
-        <button id="btnFecharFicha" class="text-inkdim hover:text-ink text-sm border border-line px-2 py-0.5 shrink-0">Fechar</button>
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="btnCopiarLinkFicha" type="button" class="hidden text-inkdim hover:text-ink text-[11px] border border-line px-2 py-1" title="Copiar o endereço desta ficha, para colar no agendamento ou mandar para a equipe">Copiar link</button>
+          <button id="btnFecharFicha" class="text-inkdim hover:text-ink text-sm border border-line px-2 py-0.5">Fechar</button>
+        </div>
       </div>
       <div id="corpoFicha" class="p-4 rolagem text-xs space-y-5"></div>
     </div>
