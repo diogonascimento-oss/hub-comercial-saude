@@ -217,13 +217,32 @@ function quadrosDoNucleo(resumo) {
   return blocos
     .map(
       (b) => `<h3>${esc(b.titulo)}</h3>
-    <table>
-      <thead><tr><th></th>${b.campanhas.map((c) => `<th class="num">${esc(c.grupo || "(não informado)")}</th>`).join("")}<th class="num">Total</th></tr></thead>
+    <div style="overflow-x:auto"><table style="font-size:11px">
+      <thead>${(() => {
+        // Com as colunas por campanha, conjunto e anúncio, o cabeçalho tem
+        // três linhas, com as células iguais mescladas (funções de resumo-nucleo.js).
+        const linhasDoCabecalho = cabecalhoDoBloco(b, resumo.nivel);
+        return linhasDoCabecalho
+          .map(
+            (_, k) => `<tr>${mesclarCabecalho(linhasDoCabecalho, k)
+              .map((seg) =>
+                seg.inicio === 0
+                  ? `<th style="font-weight:normal;color:#c9d3e3;white-space:nowrap">${esc(seg.texto)}</th>`
+                  : seg.total
+                    ? k === 0
+                      ? `<th class="num" rowspan="${linhasDoCabecalho.length}">Total</th>`
+                      : ""
+                    : `<th colspan="${seg.span}" style="text-align:center;font-weight:${k === linhasDoCabecalho.length - 1 ? "600" : "normal"}">${esc(seg.texto)}</th>`,
+              )
+              .join("")}</tr>`,
+          )
+          .join("");
+      })()}</thead>
       <tbody>
         <tr><td>Valor investido</td>${b.campanhas.map((c) => `<td class="num">${reais(c.valor)}</td>`).join("")}<td class="num"><strong>${reais(valorTotal(b))}</strong></td></tr>
         ${linhas.map(([rotulo, campo]) => `<tr><td>${rotulo}</td>${b.campanhas.map((c) => `<td class="num">${c[campo] || 0}</td>`).join("")}<td class="num"><strong>${soma(b, campo)}</strong></td></tr>`).join("")}
       </tbody>
-    </table>`,
+    </table></div>`,
     )
     .join("");
 }
@@ -235,16 +254,7 @@ function relatorioSemanalHTML(contexto) {
   const v = funil?.volume || {};
   const t = funil?.taxas || {};
   const corpo = `
-  <h2>1. Distribuição e engajamento dos leads</h2>
-  <p class="nota">Somente os leads que chegaram no período, acompanhados até a data em que este relatório foi gerado.</p>
-  <h3>Distribuição por estado</h3>
-  ${distribuicaoPorEstado(analise?.porEstado)}
-  <h3>Engajamento por etapa: conjunto de anúncios (quantidade de leads)</h3>
-  ${engajamentoEstatico(analise?.engajamentoPorConjunto)}
-  <h3>Engajamento por etapa: estados (quantidade de leads)</h3>
-  ${engajamentoEstatico(analise?.engajamentoPorEstado)}
-
-  <h2>2. Atividade da equipe no período</h2>
+  <h2>1. Atividade da equipe no período</h2>
   <p class="nota">Tudo o que aconteceu entre as datas do relatório, com qualquer lead, inclusive os que chegaram antes.</p>
   <div class="kpis">
     ${kpi(numero(v.leadsRecebidos), "Leads recebidos")}
@@ -259,11 +269,20 @@ function relatorioSemanalHTML(contexto) {
     ${kpi(numero(v.semInteresse ?? 0), "Sem interesse")}
   </div>
 
+  <h2>2. Distribuição e engajamento dos leads</h2>
+  <p class="nota">Somente os leads que chegaram no período, acompanhados até a data em que este relatório foi gerado.</p>
+  <h3>Distribuição por estado</h3>
+  ${distribuicaoPorEstado(analise?.porEstado)}
+  <h3>Engajamento por etapa: conjunto de anúncios (quantidade de leads)</h3>
+  ${engajamentoEstatico(analise?.engajamentoPorConjunto)}
+  <h3>Engajamento por etapa: estados (quantidade de leads)</h3>
+  ${engajamentoEstatico(analise?.engajamentoPorEstado)}
+
   <h2>3. Comparação com a semana anterior</h2>
   ${tabelaDeComparacao(comparacao)}
 
   <h2>4. Resultado por campanha</h2>
-  <p class="nota">Leads que chegaram no período, acompanhados até hoje, por campanha do núcleo e campanha do Meta. O valor investido vem do Meta ou do valor digitado no Resumo para o núcleo do painel.</p>
+  <p class="nota">Leads que chegaram no período, acompanhados até hoje, por campanha do núcleo, com cada anúncio numa coluna, agrupado pela campanha e pelo conjunto do Meta. O valor investido vem do Meta ou do valor digitado no Resumo para o núcleo do painel.</p>
   ${quadrosDoNucleo(resumo)}
 
   <h2>5. Conjuntos de anúncios e anúncios</h2>

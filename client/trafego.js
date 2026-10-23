@@ -479,7 +479,7 @@ async function exportarRelatorioDaSemana(inicio, fim) {
       chamarApi(`/trafego/semana?${consulta}`),
       chamarApi(`/trafego/analise-com-custo?${consulta}`),
       chamarApi(`/trafego/comparar-semana-anterior?${consulta}`),
-      chamarApi(`/trafego/resumo-nucleo?${consulta}&apenasNovos=true&colunas=campanha`).catch(() => null),
+      chamarApi(`/trafego/resumo-nucleo?${consulta}&apenasNovos=true&colunas=todos`).catch(() => null),
     ]);
     const html = relatorioSemanalHTML({ inicio, fim, funil: metricas.escopos.TODAS, analise, registro, analiseComCusto, comparacao, resumo });
     baixarArquivo(`relatorio_semanal_${inicio}_${fim}.html`, html, "text/html;charset=utf-8;");
