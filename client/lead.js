@@ -410,7 +410,7 @@ function blocoDosAnexos(l) {
       </div>
       <p id="statusAnexos" class="text-[11px] text-inkdim"></p>
       <ul id="listaAnexos" class="divide-y divide-line"><li class="text-inkdim py-1">Carregando.</li></ul>
-      <p class="text-[10px] text-inkfaint mt-1.5">Os arquivos ficam no Kommo, na aba de mídia do lead. Até 20 MB por arquivo. Fotos e PDF abrem no navegador; os demais são baixados.</p>
+      <p class="text-[10px] text-inkfaint mt-1.5">Para anexar um print, tecle Ctrl+V com a ficha aberta; também dá para arrastar arquivos para cá. Os arquivos ficam no Kommo, na aba de mídia do lead. Até 20 MB por arquivo. Fotos e PDF abrem no navegador; os demais são baixados.</p>
     </section>`;
 }
 
@@ -509,6 +509,41 @@ async function apagarAnexo(botao) {
     $("statusAnexos").textContent = erro.message;
   }
 }
+
+// Ctrl+V com um print (ou arquivo copiado) com a ficha aberta: vira anexo.
+// Texto colado continua indo para o campo onde está o cursor.
+document.addEventListener("paste", (e) => {
+  if ($("modalFicha").classList.contains("hidden") || !anexosDoLead || !$("blocoAnexos")) return;
+  const arquivos = [...(e.clipboardData?.items || [])].filter((i) => i.kind === "file").map((i) => i.getAsFile()).filter(Boolean);
+  if (!arquivos.length) return;
+  e.preventDefault();
+  const carimbo = new Date().toLocaleString("sv-SE", { timeZone: "America/Recife" }).replace(/[: ]/g, "-");
+  const nomeados = arquivos.map((f, i) => {
+    // Prints chegam como "image.png"; ganham um nome com data e hora.
+    if (f.name && f.name !== "image.png") return f;
+    const extensao = (f.type.split("/")[1] || "png").replace("jpeg", "jpg");
+    return new File([f], `print-${carimbo}${arquivos.length > 1 ? `-${i + 1}` : ""}.${extensao}`, { type: f.type });
+  });
+  $("blocoAnexos").scrollIntoView({ block: "nearest", behavior: "smooth" });
+  enviarAnexos(nomeados);
+});
+
+// Arrastar arquivos para o bloco de anexos também anexa.
+$("corpoFicha").addEventListener("dragover", (e) => {
+  if (e.target.closest?.("#blocoAnexos") && e.dataTransfer?.types?.includes("Files")) {
+    e.preventDefault();
+    $("blocoAnexos").classList.add("ring-1", "ring-gold");
+  }
+});
+$("corpoFicha").addEventListener("dragleave", (e) => {
+  if (e.target.id === "blocoAnexos") $("blocoAnexos").classList.remove("ring-1", "ring-gold");
+});
+$("corpoFicha").addEventListener("drop", (e) => {
+  if (!e.target.closest?.("#blocoAnexos")) return;
+  e.preventDefault();
+  $("blocoAnexos").classList.remove("ring-1", "ring-gold");
+  enviarAnexos([...(e.dataTransfer?.files || [])]);
+});
 
 $("corpoFicha").addEventListener("change", (e) => {
   if (e.target.id === "campoAnexo") {
