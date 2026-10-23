@@ -64,6 +64,36 @@ function tabelaDeGrupos(titulo, lista, nota = "") {
 
 const CORES_DO_RELATORIO = ["#0f1b2d", "#9c6a1f", "#2e6b44", "#8a3324", "#5b8aa6", "#7a5aa0"];
 
+// Mapa de calor do Brasil, estático, em tons claros para leitura e impressão.
+// Usa os contornos de mapa-brasil.js (MAPA_ESTADOS_BRASIL).
+function mapaEstatico(lista) {
+  if (!lista?.length || typeof MAPA_ESTADOS_BRASIL === "undefined") return "";
+  const porSigla = new Map(lista.map((g) => [g.grupo, g.totalLeads]));
+  const maximo = Math.max(...lista.filter((g) => MAPA_ESTADOS_BRASIL[g.grupo]).map((g) => g.totalLeads), 1);
+  const estados = Object.entries(MAPA_ESTADOS_BRASIL)
+    .map(([sigla, info]) => {
+      const total = porSigla.get(sigla) || 0;
+      const cor = total > 0 ? interpolarCor("#dbe6f5", "#1f5597", Math.sqrt(total / maximo)) : "#f1f1f1";
+      const escuro = total > 0 && Math.sqrt(total / maximo) > 0.55;
+      return `<g><title>${info.nome}: ${total} lead(s)</title><path d="${info.d}" fill="${cor}" stroke="#ffffff" stroke-width="1.2"/>
+        <text x="${info.labelX}" y="${info.labelY}" font-family="Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="${escuro ? "#ffffff" : "#555555"}">${sigla}</text>
+        ${total > 0 ? `<text x="${info.labelX}" y="${info.labelY + 11}" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="${escuro ? "#ffffff" : "#333333"}">${total}</text>` : ""}</g>`;
+    })
+    .join("");
+  return `<svg viewBox="0 0 450 460" role="img" aria-label="Mapa de calor dos leads por estado" style="width:100%;max-width:380px;height:auto">${estados}</svg>
+    <p class="nota" style="text-align:center">Tom mais escuro indica mais leads. Cinza: nenhum lead.</p>`;
+}
+
+// Barras e mapa lado a lado (um embaixo do outro em tela estreita).
+function distribuicaoPorEstado(lista) {
+  const mapa = mapaEstatico(lista);
+  if (!mapa) return barrasEstaticas(lista);
+  return `<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+    <div style="flex:1 1 420px;min-width:0">${barrasEstaticas(lista)}</div>
+    <div style="flex:0 1 380px;text-align:center">${mapa}</div>
+  </div>`;
+}
+
 function barrasEstaticas(lista) {
   if (!lista?.length) return '<p class="vazio">Sem dados neste período.</p>';
   const maximo = Math.max(...lista.map((g) => g.totalLeads), 1);
@@ -170,14 +200,51 @@ function documentoHTML(titulo, subtitulo, corpo) {
 </html>`;
 }
 
+// Quadros do "Resumo para o núcleo": um por campanha do núcleo, com as
+// campanhas do Meta nas colunas, no formato da planilha da coordenação.
+function quadrosDoNucleo(resumo) {
+  const blocos = (resumo?.blocos || []).filter((b) => b.campanhas.length);
+  if (!blocos.length) return '<p class="vazio">Sem leads neste período.</p>';
+  const linhas = [
+    ["Leads", "leads"],
+    ["Qualificados", "qualificados"],
+    ["Reuniões marcadas", "reunioesMarcadas"],
+    ["Reuniões realizadas", "reunioesRealizadas"],
+    ["Contratos fechados", "contratosFechados"],
+  ];
+  const soma = (b, campo) => b.campanhas.reduce((t, c) => t + (c[campo] || 0), 0);
+  const valorTotal = (b) => (b.campanhas.some((c) => c.valor !== null && c.valor !== undefined) ? b.campanhas.reduce((t, c) => t + (c.valor || 0), 0) : null);
+  return blocos
+    .map(
+      (b) => `<h3>${esc(b.titulo)}</h3>
+    <table>
+      <thead><tr><th></th>${b.campanhas.map((c) => `<th class="num">${esc(c.grupo || "(não informado)")}</th>`).join("")}<th class="num">Total</th></tr></thead>
+      <tbody>
+        <tr><td>Valor investido</td>${b.campanhas.map((c) => `<td class="num">${reais(c.valor)}</td>`).join("")}<td class="num"><strong>${reais(valorTotal(b))}</strong></td></tr>
+        ${linhas.map(([rotulo, campo]) => `<tr><td>${rotulo}</td>${b.campanhas.map((c) => `<td class="num">${c[campo] || 0}</td>`).join("")}<td class="num"><strong>${soma(b, campo)}</strong></td></tr>`).join("")}
+      </tbody>
+    </table>`,
+    )
+    .join("");
+}
+
 // contexto: { inicio, fim, funil (escopo geral de /api/metrics), analise,
 // analiseComCusto, registro, comparacao }
 function relatorioSemanalHTML(contexto) {
-  const { inicio, fim, funil, analise, analiseComCusto, registro, comparacao } = contexto;
+  const { inicio, fim, funil, analise, analiseComCusto, registro, comparacao, resumo } = contexto;
   const v = funil?.volume || {};
   const t = funil?.taxas || {};
   const corpo = `
-  <h2>1. Atividade da equipe no período</h2>
+  <h2>1. Distribuição e engajamento dos leads</h2>
+  <p class="nota">Somente os leads que chegaram no período, acompanhados até a data em que este relatório foi gerado.</p>
+  <h3>Distribuição por estado</h3>
+  ${distribuicaoPorEstado(analise?.porEstado)}
+  <h3>Engajamento por etapa: conjunto de anúncios (quantidade de leads)</h3>
+  ${engajamentoEstatico(analise?.engajamentoPorConjunto)}
+  <h3>Engajamento por etapa: estados (quantidade de leads)</h3>
+  ${engajamentoEstatico(analise?.engajamentoPorEstado)}
+
+  <h2>2. Atividade da equipe no período</h2>
   <p class="nota">Tudo o que aconteceu entre as datas do relatório, com qualquer lead, inclusive os que chegaram antes.</p>
   <div class="kpis">
     ${kpi(numero(v.leadsRecebidos), "Leads recebidos")}
@@ -188,32 +255,26 @@ function relatorioSemanalHTML(contexto) {
     ${kpi(numero(v.naoRealizadas), "Não realizadas")}
     ${kpi(numero(v.fechados), "Contratos fechados")}
     ${kpi(numero(v.reunioesEmAberto), "Reuniões em aberto")}
+    ${kpi(numero(v.desqualificados), "Desqualificados")}
+    ${kpi(numero(v.semInteresse ?? 0), "Sem interesse")}
   </div>
 
-  <h2>2. Comparação com a semana anterior</h2>
+  <h2>3. Comparação com a semana anterior</h2>
   ${tabelaDeComparacao(comparacao)}
 
-  <h2>3. Origem dos leads</h2>
-  <p class="nota">Somente os leads que chegaram no período, acompanhados até a data em que este relatório foi gerado.</p>
-  <h3>Por campanha do Meta</h3>
-  ${tabelaPorCampanhaMeta(analise?.porCampanhaMeta)}
-  ${tabelaDeGrupos("Por campanha do núcleo (IR-Q, IR-W, REA-Q)", analise?.porCampanha)}
+  <h2>4. Resultado por campanha</h2>
+  <p class="nota">Leads que chegaram no período, acompanhados até hoje, por campanha do núcleo e campanha do Meta. O valor investido vem do Meta ou do valor digitado no Resumo para o núcleo do painel.</p>
+  ${quadrosDoNucleo(resumo)}
+
+  <h2>5. Conjuntos de anúncios e anúncios</h2>
   ${tabelaDeGrupos("Por conjunto de anúncios", analise?.porConjunto)}
   ${tabelaDeGrupos("Por anúncio", analise?.porAnuncio)}
-  ${tabelaDeGrupos("Por região (DDD do telefone)", analise?.porRegiao)}
   ${tabelaDeGrupos("Conjunto de anúncios por região", analise?.conjuntoPorRegiao, "Cruza o público visado pelo conjunto com a região de quem chegou.")}
 
-  <h3>Distribuição por estado</h3>
-  ${barrasEstaticas(analise?.porEstado)}
-  <h3>Engajamento por etapa: conjunto de anúncios (quantidade de leads)</h3>
-  ${engajamentoEstatico(analise?.engajamentoPorConjunto)}
-  <h3>Engajamento por etapa: estados (quantidade de leads)</h3>
-  ${engajamentoEstatico(analise?.engajamentoPorEstado)}
-
-  <h2>4. Custo de tráfego</h2>
+  <h2>6. Custo de tráfego</h2>
   ${tabelaDeCusto(analiseComCusto?.porAnuncioEConjunto)}
 
-  <h2>5. Decisões e observações</h2>
+  <h2>7. Decisões e observações</h2>
   ${listaDeAnotacoes(registro)}`;
   return documentoHTML("Relatório semanal de tráfego e funil", `Período: ${inicio} a ${fim}`, corpo);
 }

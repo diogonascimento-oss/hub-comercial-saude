@@ -473,14 +473,15 @@ async function salvarSemanaDoFiltro() {
 async function exportarRelatorioDaSemana(inicio, fim) {
   try {
     const consulta = `inicio=${inicio}&fim=${fim}`;
-    const [metricas, analise, registro, analiseComCusto, comparacao] = await Promise.all([
+    const [metricas, analise, registro, analiseComCusto, comparacao, resumo] = await Promise.all([
       chamarApi(`/metrics?${consulta}`),
       chamarApi(`/analise-trafego?${consulta}&apenasNovos=true`),
       chamarApi(`/trafego/semana?${consulta}`),
       chamarApi(`/trafego/analise-com-custo?${consulta}`),
       chamarApi(`/trafego/comparar-semana-anterior?${consulta}`),
+      chamarApi(`/trafego/resumo-nucleo?${consulta}&apenasNovos=true&colunas=campanha`).catch(() => null),
     ]);
-    const html = relatorioSemanalHTML({ inicio, fim, funil: metricas.escopos.TODAS, analise, registro, analiseComCusto, comparacao });
+    const html = relatorioSemanalHTML({ inicio, fim, funil: metricas.escopos.TODAS, analise, registro, analiseComCusto, comparacao, resumo });
     baixarArquivo(`relatorio_semanal_${inicio}_${fim}.html`, html, "text/html;charset=utf-8;");
   } catch (erro) {
     alert(`Não foi possível exportar o relatório. ${erro.message}`);
