@@ -939,6 +939,14 @@ function emailDaAgenda(nomeOficial) {
   }
 }
 
+async function gravarLinkDaReuniao(leadId, bruto, link) {
+  const campo = (await camposDaConta()).find((c) => /^link da reuni[aã]o$/i.test(String(c.name || "").trim()));
+  if (!campo) return;
+  const atual = valorDoCampoBruto(bruto, campo.id);
+  if ((link || "") === atual) return;
+  await kommo.atualizarLead(leadId, { custom_fields_values: [{ field_id: Number(campo.id), values: link ? [{ value: link }] : null }] });
+}
+
 // Cria, atualiza ou cancela o evento da reunião na agenda da closer. Uma
 // falha no Google não desfaz o que já foi gravado no Kommo: volta como aviso.
 async function sincronizarAgenda({ leadId, bruto, lead, campanha, closer, inicio, cancelar, pedido }) {
@@ -950,6 +958,7 @@ async function sincronizarAgenda({ leadId, bruto, lead, campanha, closer, inicio
       if (!existente) return null;
       await google.apagarEvento(existente.email, existente.eventoId);
       await armazenamento.gravarEventoDaAgenda(leadId, null);
+      if (existente.meet) await gravarLinkDaReuniao(leadId, bruto, "").catch(() => {});
       return { ok: true, cancelado: true, mudanca: "evento removido do Google Agenda" };
     }
     if (!inicio) return null;
@@ -1012,6 +1021,9 @@ async function sincronizarAgenda({ leadId, bruto, lead, campanha, closer, inicio
       criado = await google.criarEvento(email, evento);
     }
     const meet = criado.hangoutLink || criado.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video")?.uri || null;
+    // O link do Meet vai também para o campo "Link da Reunião" do lead, que é
+    // o que o lembrete automático do Kommo envia ao cliente.
+    await gravarLinkDaReuniao(leadId, bruto, online ? meet : "").catch((e) => console.error("Falha ao gravar o link da reunião:", e.message));
     const registro = { email, closer: nomeOficial, eventoId: criado.id, link: criado.htmlLink || null, meet, online, local, duracaoMin, inicio };
     await armazenamento.gravarEventoDaAgenda(leadId, registro);
     const quando = new Date(inicio * 1000).toLocaleString("pt-BR", { timeZone: "America/Recife", dateStyle: "short", timeStyle: "short" });
