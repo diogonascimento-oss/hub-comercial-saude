@@ -326,7 +326,14 @@
     <section aria-labelledby="tResumoNucleo">
       <div class="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
         <h3 id="tResumoNucleo" class="titulo-secao">2. Resumo para o núcleo</h3>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-[11px] text-inkdim flex items-center gap-1.5">Colunas por
+            <select id="colunasResumo" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">
+              <option value="campanha">Campanha do Meta</option>
+              <option value="conjunto">Conjunto de anúncios</option>
+              <option value="anuncio">Anúncio</option>
+            </select>
+          </label>
           <button type="button" id="btnCopiarResumo" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Copiar para planilha</button>
           <button type="button" id="btnImagemResumo" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Baixar imagem</button>
         </div>

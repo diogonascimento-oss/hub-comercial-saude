@@ -1621,6 +1621,8 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
   const periodo = lerPeriodo(req);
   if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
   const apenasNovos = req.query.apenasNovos === "true";
+  // Colunas de cada quadro: campanha do Meta, conjunto de anúncios ou anúncio.
+  const nivel = ["conjunto", "anuncio"].includes(req.query.colunas) ? req.query.colunas : "campanha";
   try {
     const hoje = dataLocal(Math.floor(Date.now() / 1000));
     const periodoDosEventos = apenasNovos && periodo.fim < hoje ? lerPeriodo({ query: { inicio: periodo.inicio, fim: hoje } }) : periodo;
@@ -1637,13 +1639,15 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
     const chaveDoPeriodo = `${periodo.inicio}|${periodo.fim}`;
     const blocos = CAMPANHAS.map((c) => {
       const analise = analisarTrafego({ leads: leads.filter((l) => l.campanha === c.codigo), eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
-      const grupos = linhasDoMeta ? associarInvestimentoPorCampanha(analise.porCampanhaMeta, linhasDoMeta) : analise.porCampanhaMeta;
+      const doNivel = { campanha: analise.porCampanhaMeta, conjunto: analise.porConjunto, anuncio: analise.porAnuncio }[nivel];
+      // O gasto do Meta só é associado por campanha; nos outros níveis, o valor é digitado.
+      const grupos = linhasDoMeta && nivel === "campanha" ? associarInvestimentoPorCampanha(doNivel, linhasDoMeta) : doNivel;
       const digitados = valores[chaveDoPeriodo]?.[c.codigo] || {};
       const campanhas = [...grupos]
         .sort((a, b) => String(a.grupo).localeCompare(String(b.grupo), "pt-BR", { numeric: true }))
         .map((g) => {
           const doMeta = g.investido ?? null;
-          const digitado = digitados[g.grupo] ?? null;
+          const digitado = digitados[nivel === "campanha" ? g.grupo : `${nivel}:${g.grupo}`] ?? null;
           return {
             grupo: g.grupo,
             valor: doMeta ?? digitado,
@@ -1658,14 +1662,16 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
         });
       return { codigo: c.codigo, titulo: c.tituloNoResumo || c.nome || c.codigo, campanhas };
     });
-    res.json({ inicio: periodo.inicio, fim: periodo.fim, apenasNovos, meta, blocos });
+    res.json({ inicio: periodo.inicio, fim: periodo.fim, apenasNovos, nivel, meta, blocos });
   } catch (erro) {
     responderErro(res, erro, "Falha ao montar o resumo para o núcleo");
   }
 });
 
 app.put("/api/trafego/resumo-nucleo/valor", async (req, res) => {
-  const { inicio, fim, campanha, grupo } = req.body || {};
+  const { inicio, fim, campanha } = req.body || {};
+  const nivelDoValor = ["conjunto", "anuncio"].includes(req.body?.nivel) ? req.body.nivel : "campanha";
+  const grupo = req.body?.grupo && nivelDoValor !== "campanha" ? `${nivelDoValor}:${req.body.grupo}` : req.body?.grupo;
   const periodo = lerPeriodo({ query: { inicio, fim } });
   if (!periodo || !CAMPANHAS.some((c) => c.codigo === campanha) || !grupo || String(grupo).length > 300) {
     return res.status(400).json({ error: "Dados inválidos." });

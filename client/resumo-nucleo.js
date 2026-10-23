@@ -17,7 +17,8 @@ const LINHAS_DO_RESUMO = [
 
 const reaisDoResumo = (v) => (v === null || v === undefined ? "" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 const reaisSemSimbolo = (v) => (v === null || v === undefined ? "" : v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-const nomeDaColuna = (g) => g || "(sem campanha)";
+const nomeDaColuna = (g) => g || "(não informado)";
+const ROTULO_DO_NIVEL = { campanha: "Campanha do Meta", conjunto: "Conjunto de anúncios", anuncio: "Anúncio" };
 
 function totalDoBloco(bloco, campo) {
   return bloco.campanhas.reduce((t, c) => t + (c[campo] || 0), 0);
@@ -31,12 +32,13 @@ async function carregarResumoDoNucleo(forcar = false) {
   const { inicio, fim } = periodoDoFiltro();
   if (!inicio || !fim) return;
   const apenasNovos = $("apenasNovos").checked;
-  const chave = `${inicio}|${fim}|${apenasNovos}|${dados?.geradoEm || ""}`;
+  const nivel = $("colunasResumo").value;
+  const chave = `${inicio}|${fim}|${apenasNovos}|${nivel}|${dados?.geradoEm || ""}`;
   if (!forcar && chave === chaveDoResumo) return;
   chaveDoResumo = chave;
   $("resumoNucleo").innerHTML = '<p class="text-xs text-inkdim">Carregando.</p>';
   try {
-    resumoDoNucleo = await chamarApi(`/trafego/resumo-nucleo?inicio=${inicio}&fim=${fim}&apenasNovos=${apenasNovos}`);
+    resumoDoNucleo = await chamarApi(`/trafego/resumo-nucleo?inicio=${inicio}&fim=${fim}&apenasNovos=${apenasNovos}&colunas=${nivel}`);
     renderizarResumoDoNucleo();
   } catch (erro) {
     chaveDoResumo = "";
@@ -50,7 +52,9 @@ function renderizarResumoDoNucleo() {
   $("notaResumoNucleo").textContent = r.apenasNovos
     ? "Contando só os leads que chegaram no período, acompanhados até hoje: um lead que chegou no período e fechou depois aparece como fechado aqui. É a leitura certa para comparar com o valor investido no período."
     : "Contando tudo o que aconteceu no período, inclusive com leads que chegaram antes dele: as reuniões e os contratos podem ser de leads de outras semanas, e os números não se comparam diretamente com o valor investido no período.";
-  $("notaValorResumo").textContent = r.meta.configurado && !r.meta.erro
+  $("notaValorResumo").textContent = r.nivel !== "campanha"
+    ? `Valor: digite o valor investido em cada ${r.nivel === "anuncio" ? "anúncio" : "conjunto"}. Ele fica salvo para este período exato e para esta forma de colunas; o valor lido do Meta vale só nas colunas por campanha.`
+    : r.meta.configurado && !r.meta.erro
     ? "Valor: investido em cada campanha no período, lido do Meta. Campanhas sem gasto encontrado no Meta podem receber um valor digitado."
     : `Valor: ${r.meta.erro ? `o Meta não respondeu (${r.meta.erro}); ` : ""}digite o valor investido em cada campanha. Ele fica salvo para este período exato (mesmas datas de início e fim).`;
 
@@ -73,7 +77,7 @@ function renderizarResumoDoNucleo() {
           <thead>
             <tr><th colspan="${b.campanhas.length + 2}" class="bg-gold/15 text-goldbright text-right font-semibold px-3 py-1.5">${esc(b.titulo)}</th></tr>
             <tr class="text-inkdim">
-              <th class="px-3 py-1.5"></th>
+              <th class="px-3 py-1.5 font-normal text-[10px] uppercase tracking-wide text-inkfaint">${esc(ROTULO_DO_NIVEL[r.nivel] || "")}</th>
               ${b.campanhas.map((c) => `<th class="px-3 py-1.5 font-normal italic text-center">${esc(nomeDaColuna(c.grupo))}</th>`).join("")}
               <th class="px-3 py-1.5 font-semibold text-center text-ink bg-surface2">TOTAL</th>
             </tr>
@@ -127,7 +131,7 @@ $("resumoNucleo").addEventListener("change", async (e) => {
     const r = await chamarApi("/trafego/resumo-nucleo/valor", {
       method: "PUT",
       headers: JSON_HEADERS,
-      body: JSON.stringify({ inicio: resumoDoNucleo.inicio, fim: resumoDoNucleo.fim, campanha: bloco.codigo, grupo: coluna.grupo, valor }),
+      body: JSON.stringify({ inicio: resumoDoNucleo.inicio, fim: resumoDoNucleo.fim, campanha: bloco.codigo, nivel: resumoDoNucleo.nivel, grupo: coluna.grupo, valor }),
     });
     coluna.valor = r.valor;
     coluna.origemDoValor = r.valor === null ? null : "digitado";
@@ -152,7 +156,7 @@ function tabelasDoResumo() {
     .filter((b) => b.campanhas.length)
     .map((b) => ({
       titulo: b.titulo,
-      cabecalho: ["", ...b.campanhas.map((c) => nomeDaColuna(c.grupo)), "TOTAL"],
+      cabecalho: [ROTULO_DO_NIVEL[resumoDoNucleo.nivel] || "", ...b.campanhas.map((c) => nomeDaColuna(c.grupo)), "TOTAL"],
       linhas: [
         ["Valor", ...b.campanhas.map((c) => c.valor), valorTotalDoBloco(b)],
         ...LINHAS_DO_RESUMO.map((l) => [l.rotulo, ...b.campanhas.map((c) => c[l.campo] || 0), totalDoBloco(b, l.campo)]),
@@ -276,3 +280,5 @@ $("btnImagemResumo").addEventListener("click", () => {
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }, "image/png");
 });
+
+$("colunasResumo").addEventListener("change", () => carregarResumoDoNucleo());
