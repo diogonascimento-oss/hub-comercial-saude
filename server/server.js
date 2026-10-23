@@ -25,6 +25,7 @@ import {
   CAMPOS,
   RESPONSAVEIS,
   AGENDA,
+  FUNIS_VIGIADOS,
 } from "./config.js";
 import * as kommo from "./kommo.js";
 import * as google from "./google.js";
@@ -1983,6 +1984,66 @@ app.post("/api/trafego/rollup", async (req, res) => {
 
 // Funis e colunas da conta, com os IDs e a etapa do painel a que cada coluna
 // foi associada.
+// Leads que chegaram em funis da conta fora das três campanhas (por exemplo,
+// o "Funil de vendas" padrão do Kommo). Serve para investigar por onde eles
+// entraram: quem criou, etiquetas, UTMs e campos preenchidos, e se a mesma
+// pessoa também está num dos funis do núcleo.
+app.get("/api/fora-dos-funis", async (req, res) => {
+  const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 180);
+  try {
+    const { valor: mapeamento, funis } = await obterMapeamento();
+    const acompanhados = new Set(mapeamento.idsDosFunis.map(Number));
+    // Só os funis vigiados (config.js); a conta pode ter funis de outros núcleos.
+    const semAcentoNome = (n) => String(n || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const vigiados = new Set(FUNIS_VIGIADOS.map(semAcentoNome));
+    const foraDoNucleo = funis.filter((f) => !acompanhados.has(Number(f.id)));
+    const outros = foraDoNucleo.filter((f) => vigiados.has(semAcentoNome(f.name)));
+    if (!outros.length) return res.json({ dias, funis: [], funisDaConta: foraDoNucleo.map((f) => f.name), total: 0, leads: [] });
+    const desde = Math.floor(Date.now() / 1000) - dias * 86400;
+    const [brutos, { leads: doNucleo }] = await Promise.all([kommo.listarLeadsCriadosDesde(outros.map((f) => f.id), desde), obterLeads()]);
+    const idsDeContatos = brutos.map((l) => l._embedded?.contacts?.[0]?.id).filter(Boolean);
+    const contatos = idsDeContatos.length ? await kommo.listarContatosPorIds(idsDeContatos) : new Map();
+    const porTelefone = new Map();
+    for (const l of doNucleo) if (l.telefone) porTelefone.set(l.telefone, l);
+    const nomeDaColuna = (funil, statusId) => funil?._embedded?.statuses?.find((c) => Number(c.id) === Number(statusId))?.name || `Coluna ${statusId}`;
+    const usuarios = await kommo.listarUsuarios().catch(() => new Map());
+    const leads = brutos
+      .sort((a, b) => b.created_at - a.created_at)
+      .map((l) => {
+        const funil = outros.find((f) => Number(f.id) === Number(l.pipeline_id));
+        const contato = contatos.get(l._embedded?.contacts?.[0]?.id) || null;
+        const telefone = extrairTelefone(l, contato) || "";
+        const noNucleo = telefone ? porTelefone.get(telefone) : null;
+        const campos = (l.custom_fields_values || [])
+          .map((c) => ({ nome: c.field_name || c.field_code || `Campo ${c.field_id}`, valor: (c.values || []).map((v) => v.value).filter((v) => v !== null && v !== undefined).join("; ") }))
+          .filter((c) => c.valor !== "" && !/^\s*[{[]/.test(String(c.valor)));
+        const utm = (codigo) => campos.find((c) => c.nome.toUpperCase().replace(/\s+/g, "_") === codigo)?.valor || "";
+        return {
+          id: l.id,
+          nome: extrairNome(l, contato) || l.name || `Lead ${l.id}`,
+          telefone,
+          funil: funil?.name || `Funil ${l.pipeline_id}`,
+          etapa: nomeDaColuna(funil, l.status_id),
+          criadoEm: iso(l.created_at),
+          criadoPor:
+            l.created_by === undefined || l.created_by === null
+              ? "não informado"
+              : Number(l.created_by) === 0
+                ? "robô ou integração (formulário, WhatsApp, Make)"
+                : usuarios.get(Number(l.created_by)) || `usuário ${l.created_by}`,
+          etiquetas: (l._embedded?.tags || []).map((t) => t.name),
+          utm: { campanha: utm("UTM_CAMPAIGN"), origem: utm("UTM_SOURCE"), conteudo: utm("UTM_CONTENT"), termo: utm("UTM_TERM") },
+          campos: campos.slice(0, 15),
+          noNucleo: noNucleo ? { id: noNucleo.id, campanha: noNucleo.campanha, etapa: noNucleo.etapaNome } : null,
+          linkNoKommo: process.env.KOMMO_SUBDOMAIN ? `https://${process.env.KOMMO_SUBDOMAIN}.kommo.com/leads/detail/${l.id}` : null,
+        };
+      });
+    res.json({ dias, funis: outros.map((f) => f.name), total: leads.length, leads });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao procurar leads fora dos funis");
+  }
+});
+
 app.get("/api/diagnostico/funis", async (req, res) => {
   try {
     cacheMapeamento = null;

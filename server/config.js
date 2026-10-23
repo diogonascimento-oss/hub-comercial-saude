@@ -184,6 +184,11 @@ export const AGENDA = {
   enderecoDoPainel: "https://saude.rmadv.workers.dev",
 };
 
+// Funis da conta fora das três campanhas onde leads do núcleo podem cair por
+// engano. O painel lista os leads novos que aparecem neles (Pendências), para
+// investigar a origem. A comparação ignora maiúsculas e acentos.
+export const FUNIS_VIGIADOS = ["Funil de vendas"];
+
 // Metas do mês corrente, somadas as três campanhas.
 //
 // A meta de contratos (25) foi definida em outubro de 2026. As de reuniões

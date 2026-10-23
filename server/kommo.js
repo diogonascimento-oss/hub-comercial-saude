@@ -262,3 +262,18 @@ export async function listarMotivosDePerda() {
 export function atualizarLead(leadId, dados) {
   return escrever("patch", `/leads/${leadId}`, dados);
 }
+
+// Leads criados a partir de uma data nos funis informados (com o contato).
+export function listarLeadsCriadosDesde(idsDosFunis, desdeTs) {
+  const params = { with: "contacts", "filter[created_at][from]": desdeTs };
+  idsDosFunis.forEach((id, i) => {
+    params[`filter[pipeline_id][${i}]`] = id;
+  });
+  return listarTudo("/leads", "leads", params);
+}
+
+// Nomes dos usuários da conta, por ID (para mostrar quem criou um lead).
+export async function listarUsuarios() {
+  const usuarios = await listarTudo("/users", "users");
+  return new Map(usuarios.map((u) => [Number(u.id), u.name]));
+}

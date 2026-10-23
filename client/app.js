@@ -881,6 +881,7 @@ function renderizarEscopo() {
   renderizarConversao();
   renderizarPerdas();
   renderizarPendencias();
+  if (typeof carregarForaDosFunis === "function") carregarForaDosFunis();
   renderizarLeads();
   renderizarAcontecimentos();
 }

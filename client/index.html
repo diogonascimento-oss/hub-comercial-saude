@@ -191,6 +191,21 @@
           <p class="text-[11px] text-inkfaint mb-3">Não inclui Fechado, Desqualificado e Reaquecimento.</p>
           <div id="listaParados" class="rolagem max-h-72 pr-1 text-xs"></div>
         </div>
+        <div class="bg-bg p-5 border-t border-line">
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
+            <p class="rotulo">Leads que chegaram fora dos funis do núcleo <span id="totalForaDosFunis" class="text-goldbright ml-1">0</span></p>
+            <div class="flex items-center gap-2">
+              <select id="diasForaDosFunis" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">
+                <option value="7">Últimos 7 dias</option>
+                <option value="30" selected>Últimos 30 dias</option>
+                <option value="90">Últimos 90 dias</option>
+              </select>
+              <button id="btnExportarForaDosFunis" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">CSV</button>
+            </div>
+          </div>
+          <p id="notaForaDosFunis" class="text-[11px] text-inkfaint mb-3"></p>
+          <div id="listaForaDosFunis" class="rolagem max-h-96 pr-1 text-xs"></div>
+        </div>
       </div>
     </section>
 
@@ -646,5 +661,6 @@
   <script src="acontecimentos.js"></script>
   <script src="metas.js"></script>
   <script src="transicoes.js"></script>
+  <script src="fora-dos-funis.js"></script>
 </body>
 </html>

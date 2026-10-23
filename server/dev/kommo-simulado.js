@@ -44,6 +44,8 @@ const funis = [
   ...CAMPANHAS.map((c, i) => montarFunil(c.pipelineId || 9001 + i, `[${c.codigo}]`, c.etapas)),
   // Funil de outro núcleo, que o painel deve ignorar.
   montarFunil(9099, "Núcleo de Autismo"),
+  // Funil padrão do Kommo, onde alguns leads caem por engano.
+  montarFunil(9098, "Funil de vendas"),
 ];
 
 const PRIMEIROS = ["Ana", "Bruno", "Carla", "Daniel", "Elisa", "Fábio", "Gisele", "Heitor", "Ingrid", "Jonas", "Karen", "Lucas", "Marta", "Nelson", "Olívia", "Paulo"];
@@ -57,13 +59,14 @@ const CLOSERS = ["Dra. Helena", "Dr. Marcos"];
 const FARMERS = ["Tatiane"];
 const SUBSTATUS = ["Proposta enviada", "Dúvida/objeção", "Assinatura pendente", "Pagamento pendente"];
 const MOTIVOS = ["Sem interesse", "Sem resposta após cadência", "Considerou os honorários elevados", "Fechou com concorrente", "Sem aderência jurídica preliminar"];
-const VOLUMES = [120, 70, 160, 40];
+const VOLUMES = [120, 70, 160, 40, 6];
 // Chance de avançar em cada passo, por funil.
 const PERFIS = [
   { responde: 0.75, qualifica: 0.8, agenda: 0.4, comparece: 0.55, fecha: 0.2 },
   { responde: 0.85, qualifica: 0.7, agenda: 0.45, comparece: 0.5, fecha: 0.15 },
   { responde: 0.7, qualifica: 0.65, agenda: 0.3, comparece: 0.4, fecha: 0.4 },
   { responde: 0.8, qualifica: 0.7, agenda: 0.5, comparece: 0.6, fecha: 0.3 },
+  { responde: 0.3, qualifica: 0.2, agenda: 0.1, comparece: 0.5, fecha: 0.1 },
 ];
 
 const leads = [];
@@ -348,6 +351,8 @@ app.delete("/google/calendar/v3/calendars/:cal/events/:id", (req, res) => {
   res.status(204).end();
 });
 app.get("/google/eventos", (req, res) => res.json([...eventosGoogle.values()]));
+
+app.get("/api/v4/users", (req, res) => res.json({ _embedded: { users: [{ id: 11, name: "Atendente Simulada" }] } }));
 
 app.get("/api/v4/contacts", (req, res) => {
   const ids = valoresDoFiltro(req.query.filter?.id);
