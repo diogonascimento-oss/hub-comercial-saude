@@ -140,6 +140,11 @@ export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento) {
       id: Number(lead.id),
       titulo: String(lead.name || ""),
       contatoId: lead._embedded?.contacts?.[0]?.id ? Number(lead._embedded.contacts[0].id) : null,
+      // Todos os campos preenchidos no Kommo, por ID do campo, para a aba
+      // "Base de leads" (filtros como numa planilha).
+      campos: Object.fromEntries(
+        (lead.custom_fields_values || []).map((c) => [String(c.field_id), (c.values || []).map((v) => v.value).filter((v) => v !== null && v !== undefined && v !== "").join("; ")]),
+      ),
       nome: nome || `Sem nome (${telefone || "sem telefone"})`,
       semNome: !nome,
       telefone,
@@ -216,4 +221,17 @@ export function aplicarCorrecoes(eventos, correcoesPorId) {
       _corrigido: true,
     };
   });
+}
+
+// Número contido num texto digitado ("R$ 1.500,00", "1500", "850,5").
+export function numeroDoTexto(texto) {
+  const bruto = String(texto ?? "").replace(/[R$\s]/gi, "");
+  const m = /-?\d[\d.,]*/.exec(bruto);
+  if (!m) return null;
+  let t = m[0];
+  if (t.includes(",") && t.includes(".")) t = t.replace(/\./g, "").replace(",", ".");
+  else if (t.includes(",")) t = t.replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
 }

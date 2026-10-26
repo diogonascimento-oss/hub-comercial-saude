@@ -178,6 +178,8 @@ for (const [indice, funil] of funis.entries()) {
             { field_id: CAMPOS.campanhaMeta, field_name: "Campanha Meta", values: [{ value: CAMPANHAS_META[indice === 2 ? 1 : 0] }] },
             { field_id: CAMPOS.conjunto, field_name: "Conjunto de anúncios", values: [{ value: escolher(CONJUNTOS) }] },
             { field_id: CAMPOS.anuncio, field_name: "Anúncio / Criativo", values: [{ value: escolher(ANUNCIOS) }] },
+            ...(chance(0.7) ? [{ field_id: 7010, field_name: "Mensalidade da escola", values: [{ value: escolher(["R$ 1.500", "1200", "850,00", "R$ 2.300,00", "980", "3.100"]) }] }] : []),
+            ...(chance(0.8) ? [{ field_id: 7011, field_name: "Tipo de escola", values: [{ value: escolher(["Particular", "Pública", "Particular", "Filantrópica"]) }] }] : []),
           ]
         : null,
       _embedded: {
@@ -244,7 +246,7 @@ app.get("/api/v4/leads/pipelines", (req, res) =>
 );
 
 app.get("/api/v4/leads/custom_fields", (req, res) =>
-  res.json({ _embedded: { custom_fields: [{ id: 7001, name: "Motivo de desqualificação", code: null, type: "select" }, { id: 7002, name: "Descrição", code: null, type: "textarea" }, { id: 7003, name: "Data da Reunião", code: null, type: "date_time" }] } }),
+  res.json({ _embedded: { custom_fields: [{ id: 7001, name: "Motivo de desqualificação", code: null, type: "select" }, { id: 7002, name: "Descrição", code: null, type: "textarea" }, { id: 7003, name: "Data da Reunião", code: null, type: "date_time" }, { id: 7010, name: "Mensalidade da escola", code: null, type: "text" }, { id: 7011, name: "Tipo de escola", code: null, type: "select" }] } }),
 );
 
 app.get("/api/v4/leads", (req, res) => {

@@ -31,7 +31,7 @@ import * as kommo from "./kommo.js";
 import * as google from "./google.js";
 import { mensagensDosEventos, resumirMensagens } from "./mensagens.js";
 import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
-import { nomeOficialDoResponsavel, normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
+import { nomeOficialDoResponsavel, numeroDoTexto, normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
 import { diasDeCalendario, calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
 import { analisarTrafego, consolidarLeads, agruparEComputar, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
@@ -2007,6 +2007,72 @@ app.post("/api/trafego/rollup", async (req, res) => {
 // o "Funil de vendas" padrão do Kommo). Serve para investigar por onde eles
 // entraram: quem criou, etiquetas, UTMs e campos preenchidos, e se a mesma
 // pessoa também está num dos funis do núcleo.
+// --- Base de leads: todos os leads com os campos do Kommo, para filtrar ------
+
+// Tipo de cada campo, para os filtros: número, data, lista ou texto. Campos de
+// texto em que quase todos os valores são números (por exemplo, mensalidade
+// digitada no formulário) são tratados como número.
+const TIPOS_DE_DATA = new Set(["date", "date_time", "birthday"]);
+const TIPOS_DE_LISTA = new Set(["select", "multiselect", "radiobutton", "checkbox", "category"]);
+const TIPOS_DE_NUMERO = new Set(["numeric", "price", "monetary"]);
+
+
+app.get("/api/base-de-leads", async (req, res) => {
+  try {
+    const [{ leads }, definicoes] = await Promise.all([obterLeads(), camposDaConta().catch(() => [])]);
+    const porId = new Map(definicoes.map((d) => [String(d.id), d]));
+    const usados = new Map(); // id -> valores
+    for (const l of leads) for (const [id, v] of Object.entries(l.campos || {})) if (v) (usados.get(id) || usados.set(id, []).get(id)).push(v);
+    const campos = [];
+    for (const [id, valores] of usados) {
+      const def = porId.get(id);
+      const nome = def?.name || `Campo ${id}`;
+      // Fora da base: controles internos das automações (JSON, cadência).
+      if (/^cad[êe]ncia/i.test(nome) || valores.every((v) => /^\s*[{[]/.test(String(v)))) continue;
+      let tipo = "texto";
+      if (TIPOS_DE_DATA.has(def?.type)) tipo = "data";
+      else if (TIPOS_DE_NUMERO.has(def?.type)) tipo = "numero";
+      else if (TIPOS_DE_LISTA.has(def?.type)) tipo = "lista";
+      else if (valores.filter((v) => numeroDoTexto(v) !== null).length >= valores.length * 0.8 && !/telefone|phone|cpf|cep|whats/i.test(nome)) tipo = "numero";
+      else if (new Set(valores).size <= 15 && valores.length >= 5) tipo = "lista";
+      campos.push({ chave: `c${id}`, nome, tipo, preenchidos: valores.length });
+    }
+    campos.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    const tipoDe = new Map(campos.map((c) => [c.chave, c.tipo]));
+    res.json({
+      geradoEm: new Date().toISOString(),
+      campos,
+      leads: leads.map((l) => {
+        const valores = {};
+        for (const [id, v] of Object.entries(l.campos || {})) {
+          const chave = `c${id}`;
+          const tipo = tipoDe.get(chave);
+          if (!tipo || !v) continue;
+          if (tipo === "data") valores[chave] = /^\d{9,11}$/.test(String(v)) ? iso(Number(v)) : String(v);
+          else if (tipo === "numero") valores[chave] = numeroDoTexto(v);
+          else valores[chave] = String(v);
+        }
+        return {
+          id: l.id,
+          nome: l.nome,
+          telefone: l.telefone,
+          campanha: l.campanha,
+          etapa: l.etapaNome,
+          criadoEm: iso(l.criadoEm),
+          atualizadoEm: iso(l.atualizadoEm),
+          sdr: l.responsaveis?.sdr || "",
+          closer: l.responsaveis?.closer || "",
+          farmer: l.responsaveis?.farmer || "",
+          etiquetas: l.tags,
+          valores,
+        };
+      }),
+    });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao montar a base de leads");
+  }
+});
+
 // --- Mensagens de chat (sem o texto) ----------------------------------------
 
 let usuariosEmCache = { valor: null, ate: 0 };

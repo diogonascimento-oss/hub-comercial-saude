@@ -1398,17 +1398,20 @@ $("btnHistoricoHTML").addEventListener("click", () => {
 let abaAtiva = "funil";
 function mostrarAba(aba) {
   abaAtiva = aba;
-  const trafego = aba === "trafego";
-  $("abaFunil").classList.toggle("hidden", trafego);
-  $("abaTrafego").classList.toggle("hidden", !trafego);
-  for (const [id, ativa] of [["abaBotaoFunil", !trafego], ["abaBotaoTrafego", trafego]]) {
+  $("abaFunil").classList.toggle("hidden", aba !== "funil");
+  $("abaTrafego").classList.toggle("hidden", aba !== "trafego");
+  $("abaBase").classList.toggle("hidden", aba !== "base");
+  for (const [id, chave] of [["abaBotaoFunil", "funil"], ["abaBotaoTrafego", "trafego"], ["abaBotaoBase", "base"]]) {
+    const ativa = aba === chave;
     $(id).setAttribute("aria-selected", String(ativa));
     $(id).className = `px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 ${ativa ? "aba-ativa" : "border-transparent text-inkdim hover:text-ink"}`;
   }
-  if (trafego) atualizarTrafego();
+  if (aba === "trafego") atualizarTrafego();
+  if (aba === "base" && typeof carregarBaseDeLeads === "function") carregarBaseDeLeads();
 }
 $("abaBotaoFunil").addEventListener("click", () => mostrarAba("funil"));
 $("abaBotaoTrafego").addEventListener("click", () => mostrarAba("trafego"));
+$("abaBotaoBase").addEventListener("click", () => mostrarAba("base"));
 
 $("btnAbrirCorrecao").addEventListener("click", abrirModal);
 $("btnAbrirRegistro").addEventListener("click", abrirRegistroDeAlteracoes);

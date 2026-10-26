@@ -100,6 +100,7 @@
   <div class="max-w-[1400px] mx-auto px-5 md:px-10 mt-6 flex gap-1 border-b border-line" role="tablist">
     <button id="abaBotaoFunil" role="tab" aria-selected="true" class="px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 aba-ativa">Funil de leads</button>
     <button id="abaBotaoTrafego" role="tab" aria-selected="false" class="px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 border-transparent text-inkdim hover:text-ink">Tráfego e campanhas</button>
+    <button id="abaBotaoBase" role="tab" aria-selected="false" class="px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 border-transparent text-inkdim hover:text-ink">Base de leads</button>
     <!-- Busca de lead -->
     <div class="relative ml-auto self-center w-full max-w-[280px] mb-1.5">
       <label class="sr-only" for="buscaLead">Buscar lead</label>
@@ -324,6 +325,30 @@
       </details>
     </section>
 
+   </div>
+
+   <div id="abaBase" class="hidden space-y-4">
+    <section aria-labelledby="tBase">
+      <div class="flex items-baseline justify-between gap-3 flex-wrap mb-2">
+        <h3 id="tBase" class="titulo-secao">Base de leads <span id="totalBase" class="text-inkdim ml-1"></span></h3>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button type="button" id="btnColunasBase" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Colunas</button>
+          <button type="button" id="btnCsvBase" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">CSV</button>
+        </div>
+      </div>
+      <p class="text-[11px] text-inkfaint mb-3">Todos os leads dos três funis, como estão agora no Kommo, com os campos preenchidos. Filtre por qualquer campo, como numa planilha: os filtros se somam. Clique no cabeçalho para ordenar e no nome para abrir a ficha.</p>
+      <div class="border border-line bg-bg p-4 space-y-2">
+        <div id="filtrosBase" class="space-y-2"></div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <button type="button" id="btnAdicionarFiltro" class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink">+ Adicionar filtro</button>
+          <button type="button" id="btnLimparFiltros" class="text-[11px] text-inkdim hover:text-ink">Limpar filtros</button>
+          <input id="buscaBase" type="search" placeholder="Buscar em todos os campos" class="ml-auto bg-surface2 border border-line px-2 py-1 text-ink text-[11px] w-56">
+        </div>
+      </div>
+      <div id="painelColunasBase" class="hidden border border-line bg-bg p-4 mt-2 text-[11px]"></div>
+      <div class="border border-line mt-3 overflow-x-auto"><table id="tabelaBase" class="w-full text-xs"></table></div>
+      <p id="rodapeBase" class="text-[10px] text-inkfaint mt-2"></p>
+    </section>
    </div>
 
    <div id="abaTrafego" class="hidden space-y-10">
@@ -680,5 +705,6 @@
   <script src="transicoes.js"></script>
   <script src="fora-dos-funis.js"></script>
   <script src="sem-resposta.js"></script>
+  <script src="base-de-leads.js"></script>
 </body>
 </html>
