@@ -104,9 +104,9 @@ function blocoDaDescricao(l) {
   if (!l.descricao) return "";
   descricaoAberta = { leadId: l.id, texto: l.descricao.texto };
   return `
-    <section id="blocoDescricao">
+    <section id="blocoDescricao" class="border-l-2 border-gold/60 bg-gold/[0.04] pl-3 pr-3 py-2.5">
       <div class="flex items-baseline justify-between gap-3 mb-2">
-        <p class="rotulo">${esc(l.descricao.nome)}</p>
+        <p class="rotulo text-goldbright">${esc(l.descricao.nome)}</p>
         <button type="button" id="btnEditarDescricao" class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink">Editar</button>
       </div>
       <div id="leituraDescricao">
@@ -470,9 +470,9 @@ function tamanhoLegivel(bytes) {
 
 function blocoDosAnexos(l) {
   return `
-    <section id="blocoAnexos">
+    <section id="blocoAnexos" class="border-l-2 border-gold/60 bg-gold/[0.04] pl-3 pr-3 py-2.5">
       <div class="flex items-baseline justify-between gap-3 mb-2">
-        <p class="rotulo">Anexos <span id="totalAnexos" class="text-inkfaint"></span></p>
+        <p class="rotulo text-goldbright">Anexos <span id="totalAnexos" class="text-inkfaint"></span></p>
         <label class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink cursor-pointer">
           Anexar arquivo<input type="file" id="campoAnexo" multiple class="sr-only">
         </label>
@@ -709,6 +709,10 @@ function renderizarFicha(l) {
       ["Título no Kommo", texto(l.titulo)],
       ...l.camposDoContato.filter((c) => c.valor.replace(/\D/g, "") !== l.telefone).map((c) => [c.nome, esc(c.valor)]),
     ]) +
+    // Descrição e anexos logo depois da identificação, com um destaque leve,
+    // para o closer achar rápido antes da reunião.
+    blocoDaDescricao(l) +
+    blocoDosAnexos(l) +
     blocoDaFicha("Situação no funil", [
       ["Campanha", esc(l.campanha)],
       ["Etapa atual", `${esc(l.etapa)}${l.diasNaEtapa !== null ? ` <span class="text-inkfaint">${l.diasNaEtapa === 0 ? "desde hoje" : `há ${numero(l.diasNaEtapa)} dia(s)`}</span>` : ""}`],
@@ -731,8 +735,6 @@ function renderizarFicha(l) {
       ["Closer", texto(l.responsaveis.closer)],
       ["Farmer", texto(l.responsaveis.farmer)],
     ]) +
-    blocoDaDescricao(l) +
-    blocoDosAnexos(l) +
     blocoDaFicha("Demais campos preenchidos no Kommo", outrosCampos.map((c) => [c.nome, esc(c.valor)])) +
     blocoDaCadencia(camposTecnicos) +
     (registrosInternos.length
