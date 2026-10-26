@@ -110,10 +110,13 @@ function blocoDaDescricao(l) {
         <button type="button" id="btnEditarDescricao" class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink">Editar</button>
       </div>
       <div id="leituraDescricao">
-        <p id="textoDescricao" class="text-ink whitespace-pre-wrap [overflow-wrap:anywhere]">${l.descricao.texto ? esc(l.descricao.texto) : '<span class="text-inkfaint">Sem descrição.</span>'}</p>
+        <div id="textoDescricao" class="text-ink [overflow-wrap:anywhere] leading-relaxed">${l.descricao.texto ? markdownSeguro(l.descricao.texto) : '<span class="text-inkfaint">Sem descrição.</span>'}</div>
       </div>
       <div id="edicaoDescricao" class="hidden">
-        <textarea id="campoDescricao" rows="5" maxlength="4000" class="w-full bg-surface2 border border-line px-3 py-2 text-ink text-xs leading-relaxed"></textarea>
+        <textarea id="campoDescricao" rows="7" maxlength="4000" class="w-full bg-surface2 border border-line px-3 py-2 text-ink text-xs leading-relaxed font-mono"></textarea>
+        <p class="text-[10px] text-inkfaint mt-1">Aceita Markdown: **negrito**, *itálico*, # título, - lista, 1. lista numerada, &gt; citação, --- linha e [texto](https://link).</p>
+        <p class="text-[10px] text-inkfaint mt-2 mb-1 uppercase tracking-wide">Prévia</p>
+        <div id="previaDescricao" class="text-ink [overflow-wrap:anywhere] leading-relaxed border border-line px-3 py-2 min-h-[2.5rem]"></div>
         <div class="flex flex-wrap items-center gap-2 mt-2">
           <button type="button" id="btnSalvarDescricao" class="bg-gold hover:bg-goldbright text-bg text-[11px] font-semibold px-3 py-1.5">Salvar no Kommo</button>
           <button type="button" id="btnCancelarDescricao" class="border border-line hover:border-inkdim text-inkdim text-[11px] px-3 py-1.5">Cancelar</button>
@@ -125,7 +128,7 @@ function blocoDaDescricao(l) {
 }
 
 function mostrarLeituraDaDescricao(texto) {
-  $("textoDescricao").innerHTML = texto ? esc(texto) : '<span class="text-inkfaint">Sem descrição.</span>';
+  $("textoDescricao").innerHTML = texto ? markdownSeguro(texto) : '<span class="text-inkfaint">Sem descrição.</span>';
   $("edicaoDescricao").classList.add("hidden");
   $("leituraDescricao").classList.remove("hidden");
   $("btnEditarDescricao").classList.remove("hidden");
@@ -172,6 +175,7 @@ $("corpoFicha").addEventListener("click", (e) => {
   if (!alvo || !descricaoAberta) return;
   if (alvo.id === "btnEditarDescricao") {
     $("campoDescricao").value = descricaoAberta.texto;
+    $("previaDescricao").innerHTML = markdownSeguro(descricaoAberta.texto);
     $("statusDescricao").textContent = "";
     $("leituraDescricao").classList.add("hidden");
     $("edicaoDescricao").classList.remove("hidden");
@@ -839,3 +843,8 @@ $("btnCopiarLinkFicha").addEventListener("click", async () => {
     setTimeout(ir, 1200);
   }
 })();
+
+// Prévia do Markdown enquanto a descrição é editada.
+$("corpoFicha").addEventListener("input", (e) => {
+  if (e.target.id === "campoDescricao") $("previaDescricao").innerHTML = markdownSeguro(e.target.value);
+});
