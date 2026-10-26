@@ -159,3 +159,14 @@ export async function gravarValorDoResumo(periodo, campanha, grupo, valor) {
   else daCampanha[grupo] = valor;
   await gravar(CHAVE_VALORES_DO_RESUMO, todos);
 }
+
+// Reunião marcada pelo painel, guardada só aqui (não vai para o Kommo, para
+// não alimentar as automações de lá): { "<leadId>": { inicio, link, usuario, quando } }.
+const CHAVE_REUNIOES = "hubsaude:reunioes";
+export const lerReunioesDoPainel = async () => (await lerRegistro(CHAVE_REUNIOES)) || {};
+export async function gravarReuniaoDoPainel(leadId, reuniao) {
+  const todas = await lerReunioesDoPainel();
+  if (reuniao && (reuniao.inicio || reuniao.link)) todas[String(leadId)] = reuniao;
+  else delete todas[String(leadId)];
+  await gravar(CHAVE_REUNIOES, todas);
+}

@@ -599,6 +599,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
             // Data da reunião gravada no lead, quando a equipe preenche o campo.
             dataDaReuniao: l.dataDaReuniao ? new Date(l.dataDaReuniao * 1000).toISOString() : null,
             diasAteAReuniao: l.dataDaReuniao ? diasDeCalendario(agora, l.dataDaReuniao) : null,
+            linkDaReuniao: l.linkDaReuniao || "",
             diasAguardando: diasDeCalendario(ts, agora),
           };
         })

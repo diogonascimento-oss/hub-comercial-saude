@@ -96,8 +96,13 @@ function obterLeads() {
     if (!mapeamento.idsDosFunis.length) return { mapeamento, leads: [] };
     const leadsBrutos = await kommo.listarLeadsDosFunis(mapeamento.idsDosFunis);
     const idsDeContatos = leadsBrutos.map((l) => l._embedded?.contacts?.[0]?.id).filter(Boolean);
-    const contatosPorId = await kommo.listarContatosPorIds(idsDeContatos);
-    return { mapeamento, leads: normalizarLeads(leadsBrutos, contatosPorId, mapeamento) };
+    const [contatosPorId, reunioes] = await Promise.all([kommo.listarContatosPorIds(idsDeContatos), armazenamento.lerReunioesDoPainel().catch(() => ({}))]);
+    // A data marcada pelo painel vale sobre o campo do Kommo.
+    const leads = normalizarLeads(leadsBrutos, contatosPorId, mapeamento).map((l) => {
+      const r = reunioes[String(l.id)];
+      return r ? { ...l, dataDaReuniao: r.inicio || l.dataDaReuniao, linkDaReuniao: r.link || "" } : l;
+    });
+    return { mapeamento, leads };
   })();
   cacheLeads = { em: Date.now(), promessa };
   promessa.catch(() => (cacheLeads = null));
@@ -675,13 +680,14 @@ app.get("/api/leads/:id", async (req, res) => {
     if (!campanha) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
 
     const idContato = bruto._embedded?.contacts?.[0]?.id;
-    const [contato, eventosBrutos, exclusoes, correcoes, campoDescricao, edicoesDeDescricao] = await Promise.all([
+    const [contato, eventosBrutos, exclusoes, correcoes, campoDescricao, edicoesDeDescricao, reunioesDoPainel] = await Promise.all([
       idContato ? kommo.buscarContato(idContato) : null,
       kommo.listarMudancasDeEtapaDoLead(leadId),
       armazenamento.lerExclusoes(),
       armazenamento.lerCorrecoes(),
       campoDeDescricao().catch(() => null),
       armazenamento.lerEdicoesDeDescricao().catch(() => ({})),
+      armazenamento.lerReunioesDoPainel().catch(() => ({})),
     ]);
     const contatosPorId = new Map(contato ? [[contato.id, contato]] : []);
     const [lead] = normalizarLeads([bruto], contatosPorId, mapeamento);
@@ -777,6 +783,10 @@ app.get("/api/leads/:id", async (req, res) => {
       substatusFarmer: lead.substatusFarmer,
       reunioes,
       camposDoLead: camposPreenchidos(bruto.custom_fields_values).filter((c) => !campoDescricao || c.nome !== campoDescricao.nome),
+      // Reunião marcada pelo painel (data e link guardados só no painel).
+      reuniaoDoPainel: reunioesDoPainel[leadId]
+        ? { inicio: reunioesDoPainel[leadId].inicio ? iso(reunioesDoPainel[leadId].inicio) : null, link: reunioesDoPainel[leadId].link || "", usuario: reunioesDoPainel[leadId].usuario || null, quando: reunioesDoPainel[leadId].quando || null }
+        : null,
       // Descrição editável pelo painel, com a última edição feita por ele.
       descricao: campoDescricao
         ? { nome: campoDescricao.nome, texto: textoDoCampo(bruto, campoDescricao.id), edicao: edicoesDeDescricao[leadId] || null }
@@ -923,9 +933,11 @@ async function opcoesDeEdicao(leadId) {
   // Campo "Data da reunião" do Kommo, localizado pelo nome.
   const defData = campos.find((c) => /^data da reuni[aã]o$/i.test(String(c.name || "").trim()));
   const valorData = defData ? Number((bruto.custom_fields_values || []).find((c) => Number(c.field_id) === Number(defData.id))?.values?.[0]?.value) : NaN;
-  const dataDaReuniao = defData
-    ? { campoId: Number(defData.id), nome: defData.name, comHora: defData.type !== "date", atual: Number.isFinite(valorData) && valorData > 0 ? valorData : null }
-    : null;
+  // A data e o link da reunião ficam só no painel; o campo do Kommo serve
+  // apenas de valor inicial, enquanto o painel não tiver um registro próprio.
+  const doPainel = (await armazenamento.lerReunioesDoPainel().catch(() => ({})))[String(bruto.id)] || null;
+  const doKommo = Number.isFinite(valorData) && valorData > 0 ? valorData : null;
+  const dataDaReuniao = { nome: "Data da reunião", comHora: true, atual: doPainel?.inicio ?? doKommo, linkAtual: doPainel?.link || "", doPainel };
   return { bruto, campanha, colunas, statusAtual: Number(bruto.status_id), responsaveis, dataDaReuniao };
 }
 
@@ -941,13 +953,6 @@ function emailDaAgenda(nomeOficial) {
   }
 }
 
-async function gravarLinkDaReuniao(leadId, bruto, link) {
-  const campo = (await camposDaConta()).find((c) => /^link da reuni[aã]o$/i.test(String(c.name || "").trim()));
-  if (!campo) return;
-  const atual = valorDoCampoBruto(bruto, campo.id);
-  if ((link || "") === atual) return;
-  await kommo.atualizarLead(leadId, { custom_fields_values: [{ field_id: Number(campo.id), values: link ? [{ value: link }] : null }] });
-}
 
 // Cria, atualiza ou cancela o evento da reunião na agenda da closer. Uma
 // falha no Google não desfaz o que já foi gravado no Kommo: volta como aviso.
@@ -960,7 +965,7 @@ async function sincronizarAgenda({ leadId, bruto, lead, campanha, closer, inicio
       if (!existente) return null;
       await google.apagarEvento(existente.email, existente.eventoId);
       await armazenamento.gravarEventoDaAgenda(leadId, null);
-      if (existente.meet) await gravarLinkDaReuniao(leadId, bruto, "").catch(() => {});
+
       return { ok: true, cancelado: true, mudanca: "evento removido do Google Agenda" };
     }
     if (!inicio) return null;
@@ -1024,9 +1029,14 @@ async function sincronizarAgenda({ leadId, bruto, lead, campanha, closer, inicio
       criado = await google.criarEvento(email, evento);
     }
     const meet = criado.hangoutLink || criado.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video")?.uri || null;
-    // O link do Meet vai também para o campo "Link da Reunião" do lead, que é
-    // o que o lembrete automático do Kommo envia ao cliente.
-    await gravarLinkDaReuniao(leadId, bruto, online ? meet : "").catch((e) => console.error("Falha ao gravar o link da reunião:", e.message));
+    // O link do Meet fica como link da reunião no painel (não vai para o Kommo),
+    // a menos que alguém já tenha colado outro link na ficha.
+    if (online && meet) {
+      const atual = (await armazenamento.lerReunioesDoPainel().catch(() => ({})))[String(leadId)] || {};
+      if (!atual.link || atual.link === atual.meetAutomatico) {
+        await armazenamento.gravarReuniaoDoPainel(leadId, { ...atual, inicio: atual.inicio ?? inicio, link: meet, meetAutomatico: meet }).catch(() => {});
+      }
+    }
     const registro = { email, closer: nomeOficial, eventoId: criado.id, link: criado.htmlLink || null, meet, online, local, duracaoMin, inicio };
     await armazenamento.gravarEventoDaAgenda(leadId, registro);
     const quando = new Date(inicio * 1000).toLocaleString("pt-BR", { timeZone: "America/Recife", dateStyle: "short", timeStyle: "short" });
@@ -1147,27 +1157,32 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
       }
       mudancas.push(`${r.rotulo}: ${r.atual || "vazio"} → ${novo || "vazio"}`);
     }
-    // Data e hora da reunião, em segundos (horário do escritório no navegador).
+    // Data, hora e link da reunião: gravados só no painel. Não entram no
+    // Kommo nem na nota do lead, para não alimentar as automações de lá.
+    const mudancasDoPainel = [];
+    let reuniaoNova = null;
     const pedidoData = corpo.dataDaReuniao;
     if (pedidoData && opcoes.dataDaReuniao) {
       const d = opcoes.dataDaReuniao;
       const novo = pedidoData.valor ? Math.floor(Number(pedidoData.valor)) : null;
       const anterior = pedidoData.anterior ? Math.floor(Number(pedidoData.anterior)) : null;
-      if (novo !== d.atual) {
+      const linkNovo = String(pedidoData.link ?? d.linkAtual).trim().slice(0, 500);
+      if (linkNovo && !/^https?:\/\//i.test(linkNovo)) return res.status(400).json({ error: "O link da reunião precisa começar com https://." });
+      if (novo !== d.atual || linkNovo !== d.linkAtual) {
         if (anterior !== d.atual) {
-          return res.status(409).json({ error: "A data da reunião mudou no Kommo enquanto a ficha estava aberta. A ficha foi recarregada; confira antes de salvar." });
+          return res.status(409).json({ error: "A data da reunião mudou enquanto a ficha estava aberta. A ficha foi recarregada; confira antes de salvar." });
         }
         if (novo !== null && (!Number.isFinite(novo) || novo < 946684800 || novo > 4102444800)) return res.status(400).json({ error: "Data da reunião inválida." });
-        novosCampos.push({ field_id: d.campoId, values: novo ? [{ value: novo }] : null });
-        const legivel = (ts) =>
-          ts ? new Date(ts * 1000).toLocaleString("pt-BR", { timeZone: "America/Recife", dateStyle: "short", ...(d.comHora ? { timeStyle: "short" } : {}) }) : "vazio";
-        mudancas.push(`${d.nome}: ${legivel(d.atual)} → ${legivel(novo)}`);
+        reuniaoNova = { inicio: novo, link: linkNovo, usuario, quando: new Date().toISOString() };
+        const legivel = (ts) => (ts ? new Date(ts * 1000).toLocaleString("pt-BR", { timeZone: "America/Recife", dateStyle: "short", timeStyle: "short" }) : "vazio");
+        if (novo !== d.atual) mudancasDoPainel.push(`data da reunião: ${legivel(d.atual)} → ${legivel(novo)}`);
+        if (linkNovo !== d.linkAtual) mudancasDoPainel.push(`link da reunião: ${linkNovo ? "atualizado" : "apagado"}`);
       }
     }
     if (novosCampos.length) dados.custom_fields_values = novosCampos;
 
     const pedidoAgenda = corpo.agenda && google.googleConfigurado() ? corpo.agenda : null;
-    if (!mudancas.length && !pedidoAgenda) return res.json({ ok: true, semMudanca: true });
+    if (!mudancas.length && !mudancasDoPainel.length && !pedidoAgenda) return res.json({ ok: true, semMudanca: true });
 
     // Situação final do lead, depois desta alteração, para a agenda.
     const closerFinal = (() => {
@@ -1182,10 +1197,9 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
     const { leads } = await obterLeads();
     const leadNormalizado = leads.find((l) => String(l.id) === leadId);
 
-    if (mudancas.length) {
-      await kommo.atualizarLead(leadId, dados);
-      esquecerDadosEmCache();
-    }
+    if (mudancas.length) await kommo.atualizarLead(leadId, dados);
+    if (reuniaoNova) await armazenamento.gravarReuniaoDoPainel(leadId, reuniaoNova);
+    if (mudancas.length || reuniaoNova) esquecerDadosEmCache();
 
     let agenda = null;
     if (pedidoAgenda || destinoPerdido || (corpo.dataDaReuniao && !inicioFinal)) {
@@ -1199,16 +1213,20 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
         cancelar: destinoPerdido || !inicioFinal || pedidoAgenda?.sincronizar === false,
         pedido: pedidoAgenda || {},
       });
-      if (agenda?.mudanca) mudancas.push(agenda.mudanca);
+      if (agenda?.mudanca) mudancasDoPainel.push(agenda.mudanca);
     }
-    if (!mudancas.length) return res.json({ ok: true, semMudanca: true, agenda });
+    const todas = [...mudancas, ...mudancasDoPainel];
+    if (!todas.length) return res.json({ ok: true, semMudanca: true, agenda });
 
+    // A nota no Kommo só fala do que mudou no Kommo (etapa e responsáveis).
     const quando = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Recife" });
     await Promise.all([
-      kommo.anotarNoLead(leadId, `Alterado pelo painel por ${usuario} em ${quando}: ${mudancas.join("; ")}.`).catch((e) => console.error("Falha ao anotar no Kommo:", e.message)),
-      registrarAlteracao(req, "Lead alterado pela ficha", { leadId, detalhe: mudancas.join("; ") }),
+      mudancas.length
+        ? kommo.anotarNoLead(leadId, `Alterado pelo painel por ${usuario} em ${quando}: ${mudancas.join("; ")}.`).catch((e) => console.error("Falha ao anotar no Kommo:", e.message))
+        : null,
+      registrarAlteracao(req, "Lead alterado pela ficha", { leadId, detalhe: todas.join("; ") }),
     ]);
-    res.json({ ok: true, mudancas, agenda });
+    res.json({ ok: true, mudancas: todas, agenda });
   } catch (erro) {
     if (erro.response?.status === 400) {
       console.error("Kommo recusou a alteração:", JSON.stringify(erro.response.data || {}).slice(0, 500));

@@ -232,9 +232,15 @@ function montarFormularioDeAlteracao(o) {
     </label>
     ${
       o.dataDaReuniao
-        ? `<label class="block"><span class="block text-[11px] text-inkdim">${esc(o.dataDaReuniao.nome)} (horário de Recife)</span>
-            <input id="alteracaoData" type="${o.dataDaReuniao.comHora ? "datetime-local" : "date"}" value="${paraCampoDeRecife(o.dataDaReuniao.atual, o.dataDaReuniao.comHora)}" class="w-full sm:w-64 bg-surface2 border border-line px-2 py-1.5 text-ink text-xs [color-scheme:dark]">
-          </label>`
+        ? `<div class="grid grid-cols-1 sm:grid-cols-[16rem_minmax(0,1fr)] gap-2">
+            <label class="block"><span class="block text-[11px] text-inkdim">Data e hora da reunião (horário de Recife)</span>
+              <input id="alteracaoData" type="datetime-local" value="${paraCampoDeRecife(o.dataDaReuniao.atual, true)}" class="w-full bg-surface2 border border-line px-2 py-1.5 text-ink text-xs [color-scheme:dark]">
+            </label>
+            <label class="block"><span class="block text-[11px] text-inkdim">Link da reunião (Google Meet)</span>
+              <input id="alteracaoLink" type="url" value="${esc(o.dataDaReuniao.linkAtual || "")}" placeholder="https://meet.google.com/..." maxlength="500" class="w-full bg-surface2 border border-line px-2 py-1.5 text-ink text-xs">
+            </label>
+          </div>
+          <p class="text-[10px] text-inkfaint -mt-1">A data, a hora e o link ficam só no painel: não vão para o Kommo, para não disparar as automações de lá.</p>`
         : ""
     }
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${o.responsaveis.map(campoDoResponsavel).join("")}</div>
@@ -327,7 +333,7 @@ async function salvarAlteracao() {
     etapa: { statusId, statusAnterior: opcoes.statusAtual, motivoPerdaId },
     responsaveis: Object.fromEntries(opcoes.responsaveis.map((r) => [r.papel, { valor: $(`alteracao-${r.papel}`).value.trim(), anterior: r.atual }])),
     ...(opcoes.dataDaReuniao
-      ? { dataDaReuniao: { valor: deCampoDeRecife($("alteracaoData").value, opcoes.dataDaReuniao.comHora), anterior: opcoes.dataDaReuniao.atual } }
+      ? { dataDaReuniao: { valor: deCampoDeRecife($("alteracaoData").value, true), anterior: opcoes.dataDaReuniao.atual, link: $("alteracaoLink").value.trim() } }
       : {}),
     ...($("agendaSincronizar")
       ? {
@@ -722,6 +728,12 @@ function renderizarFicha(l) {
       ["Etapa atual", `${esc(l.etapa)}${l.diasNaEtapa !== null ? ` <span class="text-inkfaint">${l.diasNaEtapa === 0 ? "desde hoje" : `há ${numero(l.diasNaEtapa)} dia(s)`}</span>` : ""}`],
       ["Criado em", dataHoraBr(l.criadoEm)],
       ["Última atualização", dataHoraBr(l.atualizadoEm)],
+      [
+        "Reunião marcada",
+        l.reuniaoDoPainel?.inicio || l.reuniaoDoPainel?.link
+          ? `${l.reuniaoDoPainel.inicio ? esc(dataHoraBr(l.reuniaoDoPainel.inicio)) : "sem data"}${l.reuniaoDoPainel.link ? ` · <a href="${esc(l.reuniaoDoPainel.link)}" target="_blank" rel="noopener noreferrer" class="text-goldbright underline decoration-dotted underline-offset-2">entrar na reunião</a>` : ""}<br><span class="text-[10px] text-inkfaint">Registrada no painel${l.reuniaoDoPainel.usuario ? ` por ${esc(l.reuniaoDoPainel.usuario)}` : ""}${l.reuniaoDoPainel.quando ? ` em ${esc(dataHoraBr(l.reuniaoDoPainel.quando))}` : ""}.</span>`
+          : "",
+      ],
       ["Situação da reunião", texto(l.situacaoDaReuniao)],
       ["Substatus Farmer", texto(l.substatusFarmer)],
       ["Motivo de perda", texto(l.motivoPerda)],

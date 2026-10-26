@@ -754,7 +754,7 @@ function renderizarPendencias() {
       <div class="flex items-center justify-between gap-3 py-2 border-b border-gold/15 last:border-0">
         <div class="min-w-0">
           <button data-lead="${esc(l.id)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(l.nome)}</button>
-          <p class="text-[10px] text-inkfaint">${variasCampanhasNoPainel() ? `${esc(l.campanha)} · ` : ""}marcada em ${dataLocal(l.agendadoEm)}</p>
+          <p class="text-[10px] text-inkfaint">${variasCampanhasNoPainel() ? `${esc(l.campanha)} · ` : ""}marcada em ${dataLocal(l.agendadoEm)}${l.linkDaReuniao ? ` · <a href="${esc(l.linkDaReuniao)}" target="_blank" rel="noopener noreferrer" class="text-goldbright underline decoration-dotted underline-offset-2">entrar na reunião</a>` : ""}</p>
         </div>
         <span class="text-[11px] tabular shrink-0 font-semibold text-right ${atrasada ? "text-negativo" : "text-goldbright"}">${situacao}</span>
       </div>`;
