@@ -193,6 +193,22 @@
         </div>
         <div class="bg-bg p-5 border-t border-line">
           <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
+            <p class="rotulo">Clientes aguardando resposta no chat <span id="totalSemResposta" class="text-goldbright ml-1">0</span></p>
+            <div class="flex items-center gap-2">
+              <select id="horasSemResposta" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">
+                <option value="1">Há mais de 1 hora</option>
+                <option value="2" selected>Há mais de 2 horas</option>
+                <option value="4">Há mais de 4 horas</option>
+                <option value="24">Há mais de 1 dia</option>
+              </select>
+              <button id="btnExportarSemResposta" class="border border-line hover:border-gold/60 text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">CSV</button>
+            </div>
+          </div>
+          <p class="text-[11px] text-inkfaint mb-3">Leads ativos cuja última mensagem no chat é do cliente, sem resposta da equipe nem de automação. Considera as mensagens dos últimos 14 dias; não inclui Fechado e Desqualificado. Clique no nome para abrir a ficha.</p>
+          <div id="listaSemResposta" class="rolagem max-h-72 pr-1 text-xs"></div>
+        </div>
+        <div class="bg-bg p-5 border-t border-line">
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
             <p class="rotulo">Leads que chegaram fora dos funis do núcleo <span id="totalForaDosFunis" class="text-goldbright ml-1">0</span></p>
             <div class="flex items-center gap-2">
               <select id="diasForaDosFunis" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">
@@ -662,5 +678,6 @@
   <script src="metas.js"></script>
   <script src="transicoes.js"></script>
   <script src="fora-dos-funis.js"></script>
+  <script src="sem-resposta.js"></script>
 </body>
 </html>

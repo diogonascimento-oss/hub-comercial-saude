@@ -29,6 +29,7 @@ import {
 } from "./config.js";
 import * as kommo from "./kommo.js";
 import * as google from "./google.js";
+import { mensagensDosEventos, resumirMensagens } from "./mensagens.js";
 import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
 import { nomeOficialDoResponsavel, normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
 import { diasDeCalendario, calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
@@ -1988,6 +1989,81 @@ app.post("/api/trafego/rollup", async (req, res) => {
 // o "Funil de vendas" padrão do Kommo). Serve para investigar por onde eles
 // entraram: quem criou, etiquetas, UTMs e campos preenchidos, e se a mesma
 // pessoa também está num dos funis do núcleo.
+// --- Mensagens de chat (sem o texto) ----------------------------------------
+
+let usuariosEmCache = { valor: null, ate: 0 };
+async function nomesDosUsuarios() {
+  if (usuariosEmCache.ate > Date.now()) return usuariosEmCache.valor;
+  const valor = await kommo.listarUsuarios().catch(() => new Map());
+  usuariosEmCache = { valor, ate: Date.now() + 3600_000 };
+  return valor;
+}
+
+// Linha do tempo das mensagens de um lead: eventos do lead e do contato.
+app.get("/api/leads/:id/mensagens", async (req, res) => {
+  const leadId = String(req.params.id);
+  if (!/^\d+$/.test(leadId)) return res.status(400).json({ error: "ID de lead inválido." });
+  try {
+    const bruto = await kommo.buscarLead(leadId);
+    const contatoId = bruto._embedded?.contacts?.[0]?.id;
+    const [doLead, doContato, usuarios] = await Promise.all([
+      kommo.listarEventosDeMensagem("leads", { ids: [leadId] }),
+      contatoId ? kommo.listarEventosDeMensagem("contacts", { ids: [contatoId] }) : [],
+      nomesDosUsuarios(),
+    ]);
+    const mensagens = mensagensDosEventos([...doLead, ...doContato], usuarios);
+    const agora = Math.floor(Date.now() / 1000);
+    res.json({
+      resumo: resumirMensagens(mensagens, agora),
+      mensagens: mensagens.slice(-200).map((m) => ({ ...m, em: iso(m.ts) })),
+      total: mensagens.length,
+    });
+  } catch (erro) {
+    if (erro.response?.status === 404 || erro.response?.status === 204) return res.status(404).json({ error: "Lead não encontrado no Kommo." });
+    responderErro(res, erro, "Falha ao consultar as mensagens do lead");
+  }
+});
+
+// Leads ativos cuja última mensagem é do cliente, sem resposta há mais de
+// "horas" horas (eventos dos últimos 14 dias).
+app.get("/api/mensagens/sem-resposta", async (req, res) => {
+  const horas = Math.min(Math.max(Number(req.query.horas) || 2, 0), 720);
+  try {
+    const agora = Math.floor(Date.now() / 1000);
+    const desde = agora - 14 * 86400;
+    const [{ leads }, doLead, doContato] = await Promise.all([
+      obterLeads(),
+      kommo.listarEventosDeMensagem("leads", { desdeTs: desde }),
+      kommo.listarEventosDeMensagem("contacts", { desdeTs: desde }),
+    ]);
+    const porLead = new Map(leads.map((l) => [String(l.id), l]));
+    const leadDoContato = new Map();
+    for (const l of leads) if (l.contatoId && !leadDoContato.has(String(l.contatoId))) leadDoContato.set(String(l.contatoId), l);
+    const eventosPorLead = new Map();
+    const juntar = (lead, ev) => {
+      if (!lead) return;
+      if (!eventosPorLead.has(lead.id)) eventosPorLead.set(lead.id, []);
+      eventosPorLead.get(lead.id).push(ev);
+    };
+    for (const ev of doLead) juntar(porLead.get(String(ev.entity_id)), ev);
+    for (const ev of doContato) juntar(leadDoContato.get(String(ev.entity_id)), ev);
+    const ENCERRADOS = new Set(["FECHADO", "DESQUALIFICADO"]);
+    const aguardando = [];
+    for (const [id, eventos] of eventosPorLead) {
+      const lead = porLead.get(String(id));
+      if (!lead || ENCERRADOS.has(lead.etapa)) continue;
+      const r = resumirMensagens(mensagensDosEventos(eventos), agora);
+      if (r.aguardandoSeg !== null && r.aguardandoSeg >= horas * 3600) {
+        aguardando.push({ id: lead.id, nome: lead.nome, telefone: lead.telefone, campanha: lead.campanha, etapaAtual: lead.etapa, sdr: lead.responsaveis?.sdr || "", aguardandoDesde: iso(r.aguardandoDesde), aguardandoSeg: r.aguardandoSeg });
+      }
+    }
+    aguardando.sort((a, b) => b.aguardandoSeg - a.aguardandoSeg);
+    res.json({ horas, total: aguardando.length, leads: aguardando });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao verificar as mensagens sem resposta");
+  }
+});
+
 app.get("/api/fora-dos-funis", async (req, res) => {
   const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 180);
   try {

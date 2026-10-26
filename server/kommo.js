@@ -277,3 +277,15 @@ export async function listarUsuarios() {
   const usuarios = await listarTudo("/users", "users");
   return new Map(usuarios.map((u) => [Number(u.id), u.name]));
 }
+
+// Eventos de mensagem de chat (entrada e saída), sem o texto: o Kommo não
+// libera o conteúdo das conversas do WhatsApp pela API. entidade: "leads" ou
+// "contacts"; ids opcionais; desdeTs opcional.
+export function listarEventosDeMensagem(entidade, { ids = [], desdeTs = null } = {}) {
+  const params = { "filter[entity]": entidade, "filter[type]": "incoming_chat_message,outgoing_chat_message" };
+  ids.forEach((id, i) => {
+    params[`filter[entity_id][${i}]`] = id;
+  });
+  if (desdeTs) params["filter[created_at][from]"] = desdeTs;
+  return listarTudo("/events", "events", params);
+}

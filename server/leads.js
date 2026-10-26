@@ -139,6 +139,7 @@ export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento) {
     normalizados.push({
       id: Number(lead.id),
       titulo: String(lead.name || ""),
+      contatoId: lead._embedded?.contacts?.[0]?.id ? Number(lead._embedded.contacts[0].id) : null,
       nome: nome || `Sem nome (${telefone || "sem telefone"})`,
       semNome: !nome,
       telefone,

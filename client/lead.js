@@ -388,6 +388,75 @@ $("corpoFicha").addEventListener("click", (e) => {
   else if (alvo.id === "btnSalvarAlteracao") salvarAlteracao();
 });
 
+// Mensagens do chat: horários, direção e quem enviou. O texto fica só no
+// Kommo, que não o libera pela API.
+let mensagensDoLead = null; // leadId da ficha cujas mensagens estão na tela
+
+function duracaoCurta(seg) {
+  if (seg === null || seg === undefined) return "—";
+  if (seg < 60) return "menos de 1 min";
+  if (seg < 3600) return `${Math.round(seg / 60)} min`;
+  if (seg < 86400) {
+    const h = Math.floor(seg / 3600);
+    const m = Math.round((seg % 3600) / 60);
+    return m ? `${h} h ${m} min` : `${h} h`;
+  }
+  const d = Math.floor(seg / 86400);
+  const h = Math.round((seg % 86400) / 3600);
+  return h ? `${d} d ${h} h` : `${d} d`;
+}
+
+function blocoDeMensagens() {
+  return `
+    <section id="blocoMensagens">
+      <p class="rotulo mb-2">Mensagens do chat</p>
+      <div id="corpoMensagens"><p class="text-inkdim">Carregando.</p></div>
+    </section>`;
+}
+
+async function carregarMensagens(leadId) {
+  mensagensDoLead = leadId;
+  try {
+    const r = await chamarApi(`/leads/${encodeURIComponent(leadId)}/mensagens`);
+    if (mensagensDoLead !== leadId || !$("corpoMensagens")) return;
+    if (!r.total) {
+      $("corpoMensagens").innerHTML = '<p class="text-inkfaint">Nenhuma mensagem de chat registrada para este lead.</p>';
+      return;
+    }
+    const s = r.resumo;
+    const aguardando =
+      s.aguardandoSeg !== null
+        ? `<p class="text-[11px] ${s.aguardandoSeg >= 2 * 3600 ? "text-negativo" : "text-goldbright"} font-semibold mb-2">O cliente aguarda resposta há ${duracaoCurta(s.aguardandoSeg)} (desde ${dataHoraBr(new Date(s.aguardandoDesde * 1000).toISOString())}).</p>`
+        : "";
+    const itens = [...r.mensagens].reverse().slice(0, 40);
+    $("corpoMensagens").innerHTML = `
+      ${aguardando}
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-line border border-line mb-2">
+        <div class="bg-bg p-2"><p class="text-ink tabular font-semibold">${numero(s.recebidas)}</p><p class="text-[10px] text-inkfaint">recebidas do cliente</p></div>
+        <div class="bg-bg p-2"><p class="text-ink tabular font-semibold">${numero(s.enviadasPelaEquipe)}</p><p class="text-[10px] text-inkfaint">enviadas pela equipe</p></div>
+        <div class="bg-bg p-2"><p class="text-ink tabular font-semibold">${numero(s.enviadasPorRobo)}</p><p class="text-[10px] text-inkfaint">enviadas por robô ou automação</p></div>
+        <div class="bg-bg p-2"><p class="text-ink tabular font-semibold">${duracaoCurta(s.medianaRespostaSeg)}</p><p class="text-[10px] text-inkfaint">tempo típico de resposta${s.medianaRespostaUteisSeg !== null ? ` (${duracaoCurta(s.medianaRespostaUteisSeg)} em horas úteis)` : ""}</p></div>
+      </div>
+      <details>
+        <summary class="text-[11px] text-inkdim cursor-pointer">Linha do tempo (${numero(r.total)} mensagens${r.total > itens.length ? `, últimas ${itens.length}` : ""})</summary>
+        <ol class="mt-2 space-y-1">
+          ${itens
+            .map(
+              (m) => `<li class="flex items-baseline gap-2 text-[11px]">
+                <span class="tabular text-inkfaint shrink-0 w-28">${dataHoraBr(m.em)}</span>
+                <span class="${m.direcao === "recebida" ? "text-goldbright" : m.daEquipe ? "text-positivo" : "text-inkdim"}">${m.direcao === "recebida" ? "Cliente enviou" : `Enviada por ${esc(m.autor)}`}</span>
+              </li>`,
+            )
+            .join("")}
+        </ol>
+      </details>
+      <p class="text-[10px] text-inkfaint mt-1.5">O texto das mensagens fica só no Kommo: a API não libera o conteúdo das conversas do WhatsApp. Aqui aparecem os horários e quem enviou.</p>`;
+  } catch (erro) {
+    if (mensagensDoLead !== leadId || !$("corpoMensagens")) return;
+    $("corpoMensagens").innerHTML = `<p class="text-negativo">Não foi possível carregar as mensagens. ${esc(erro.message)}</p>`;
+  }
+}
+
 // Anexos do lead: arquivos guardados no Kommo (aba de mídia do lead). A lista
 // é carregada depois da ficha, para não atrasar a abertura.
 let anexosDoLead = null; // leadId da ficha cujos anexos estão na tela
@@ -651,6 +720,7 @@ function renderizarFicha(l) {
       ["Etiquetas", l.etiquetas.length ? l.etiquetas.map((t) => `<span class="inline-block border border-line px-1.5 py-0.5 mr-1 mb-1 text-[10px] text-inkdim">${esc(t)}</span>`).join("") : ""],
     ]) +
     blocoDeReunioes(l) +
+    blocoDeMensagens() +
     blocoDaFicha("Origem de marketing", [
       ["Campanha Meta", texto(l.origem.campanhaMeta) || semOrigem],
       ["Conjunto de anúncios", texto(l.origem.conjunto) || semOrigem],
@@ -704,6 +774,7 @@ async function atualizarFichaNoLugar(leadId) {
   renderizarFicha(dados);
   corpo.scrollTop = rolagem;
   carregarAnexos(leadId);
+  carregarMensagens(leadId);
 }
 
 // Endereço direto da ficha: o painel abre já com a ficha deste lead.
@@ -724,6 +795,7 @@ async function abrirFichaDoLead(leadId) {
   try {
     renderizarFicha(await chamarApi(`/leads/${encodeURIComponent(leadId)}`));
     carregarAnexos(leadId);
+    carregarMensagens(leadId);
   } catch (erro) {
     $("corpoFicha").innerHTML = `<p class="text-negativo">Não foi possível carregar a ficha. ${esc(erro.message)}</p>`;
   }

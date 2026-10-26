@@ -882,6 +882,7 @@ function renderizarEscopo() {
   renderizarPerdas();
   renderizarPendencias();
   if (typeof carregarForaDosFunis === "function") carregarForaDosFunis();
+  if (typeof carregarSemResposta === "function") carregarSemResposta(true);
   renderizarLeads();
   renderizarAcontecimentos();
 }

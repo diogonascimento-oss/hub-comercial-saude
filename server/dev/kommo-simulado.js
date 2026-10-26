@@ -189,6 +189,27 @@ for (const [indice, funil] of funis.entries()) {
   }
 }
 
+// Mensagens de chat simuladas (só horários e direção, como o Kommo entrega),
+// registradas no contato de cada lead.
+for (const lead of leads) {
+  const contato = lead._embedded.contacts[0].id;
+  let t = lead.created_at + 30;
+  const quantas = Math.floor(entre(2, 9));
+  for (let i = 0; i < quantas && t < AGORA; i++) {
+    const recebida = i % 2 === 0;
+    eventos.push({
+      id: String(++proximoEvento),
+      type: recebida ? "incoming_chat_message" : "outgoing_chat_message",
+      entity_id: contato,
+      entity_type: "contact",
+      created_at: Math.floor(t),
+      created_by: recebida ? 0 : chance(0.5) ? 0 : 11,
+      value_after: [{ message: { id: `msg${proximoEvento}`, origin: "waba", talk_id: lead.id } }],
+    });
+    t += recebida ? entre(60, 6 * HORA) : entre(5 * 60, 30 * HORA);
+  }
+}
+
 // --- Rotas ----------------------------------------------------------------
 
 const app = express();
@@ -367,7 +388,15 @@ app.get("/api/v4/contacts/:id", (req, res) => {
 app.get("/api/v4/events", (req, res) => {
   const f = req.query.filter || {};
   let lista = eventos;
-  if (f.entity_id) lista = lista.filter((e) => String(e.entity_id) === String(f.entity_id));
+  const tipos = f.type ? String(f.type).split(",") : null;
+  if (tipos) lista = lista.filter((e) => tipos.includes(e.type));
+  else lista = lista.filter((e) => e.type === "lead_status_changed");
+  if (f.entity) {
+    const entidade = String(f.entity).replace(/s$/, "");
+    lista = lista.filter((e) => (e.entity_type || "lead") === entidade);
+  }
+  const ids = f.entity_id === undefined ? null : (typeof f.entity_id === "object" ? Object.values(f.entity_id) : [f.entity_id]).map(String);
+  if (ids) lista = lista.filter((e) => ids.includes(String(e.entity_id)));
   if (f.created_at?.from) lista = lista.filter((e) => e.created_at >= Number(f.created_at.from));
   if (f.created_at?.to) lista = lista.filter((e) => e.created_at <= Number(f.created_at.to));
   paginar(req, res, "events", lista.slice().sort((a, b) => b.created_at - a.created_at));
