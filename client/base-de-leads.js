@@ -1,12 +1,12 @@
 // Aba "Base de leads": todos os leads dos três funis com os campos do Kommo,
-// filtráveis como numa planilha (filtros somados), com ordenação, escolha de
+// filtráveis como numa planilha (filtros ligados por "e" ou "ou"), com ordenação, escolha de
 // colunas e CSV. Depende de app.js ($, chamarApi, esc, numero, baixarCSV) e
 // lead.js (abrirFichaDoLead).
 
 let base = null; // resposta de /api/base-de-leads
 let colunasDaBase = []; // definição de todas as colunas (fixas + campos do Kommo)
 let colunasVisiveis = null; // chaves das colunas mostradas
-let filtrosDaBase = []; // { coluna, operador, valor, valor2 }
+let filtrosDaBase = []; // { coluna, operador, valor, valor2, juncao: "e" | "ou" }
 let ordemDaBase = { coluna: "criadoEm", direcao: -1 };
 
 const COLUNAS_FIXAS = [
@@ -104,15 +104,42 @@ function renderizarFiltrosDaBase() {
             }
           }
           return `<div class="flex items-center gap-2 flex-wrap">
-            <span class="text-[11px] text-inkfaint w-6">${i ? "e" : "Onde"}</span>
+            ${
+              i
+                ? `<select data-filtro="${i}" data-parte="juncao" title="Como este filtro se soma aos anteriores" class="bg-surface2 border border-line px-1 py-1 text-ink text-[11px] w-12"><option value="e" ${f.juncao !== "ou" ? "selected" : ""}>e</option><option value="ou" ${f.juncao === "ou" ? "selected" : ""}>ou</option></select>`
+                : '<span class="text-[11px] text-inkfaint w-12">Onde</span>'
+            }
             <select data-filtro="${i}" data-parte="coluna" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px] max-w-[16rem]">${opcoesDeColuna(f.coluna)}</select>
             <select data-filtro="${i}" data-parte="operador" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">${ops.map(([k, r]) => `<option value="${k}" ${k === f.operador ? "selected" : ""}>${r}</option>`).join("")}</select>
             ${entrada}
             <button type="button" data-remover-filtro="${i}" class="text-inkdim hover:text-negativo text-[11px] px-1" title="Remover filtro">✕</button>
           </div>`;
         })
-        .join("")
+        .join("") + avisoDeMistura()
     : '<p class="text-[11px] text-inkfaint">Nenhum filtro. Use "+ Adicionar filtro" para filtrar por qualquer campo, por exemplo mensalidade maior que 1.000.</p>';
+}
+
+// Com "e" e "ou" misturados, o "e" une primeiro, como numa expressão comum:
+// A e B ou C equivale a (A e B) ou C.
+function avisoDeMistura() {
+  const juncoes = new Set(filtrosDaBase.slice(1).map((f) => (f.juncao === "ou" ? "ou" : "e")));
+  return juncoes.size > 1
+    ? '<p class="text-[11px] text-inkfaint">Com "e" e "ou" juntos, os filtros ligados por "e" formam um grupo, e o lead aparece se atender a qualquer um dos grupos.</p>'
+    : "";
+}
+
+const filtroCompleto = (f) => SEM_VALOR.has(f.operador) || (f.valor !== undefined && f.valor !== null && f.valor !== "");
+
+function passaNosFiltros(lead) {
+  const grupos = [[]];
+  filtrosDaBase.forEach((f, i) => {
+    if (i && f.juncao === "ou") grupos.push([]);
+    grupos[grupos.length - 1].push(f);
+  });
+  // Filtros ainda sem valor não contam; um grupo só com eles é ignorado.
+  const validos = grupos.map((g) => g.filter(filtroCompleto)).filter((g) => g.length);
+  if (!validos.length) return true;
+  return validos.some((g) => g.every((f) => passaNoFiltro(lead, f)));
 }
 
 function passaNoFiltro(lead, f) {
@@ -157,7 +184,7 @@ function passaNoFiltro(lead, f) {
 
 function leadsFiltradosDaBase() {
   const busca = $("buscaBase").value.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  let lista = base.leads.filter((l) => filtrosDaBase.every((f) => passaNoFiltro(l, f)));
+  let lista = base.leads.filter(passaNosFiltros);
   if (busca) {
     lista = lista.filter((l) =>
       [l.nome, l.telefone, l.campanha, l.etapa, l.sdr, l.closer, l.farmer, ...(l.etiquetas || []), ...Object.values(l.valores)]
@@ -265,6 +292,9 @@ $("filtrosBase").addEventListener("change", (e) => {
     renderizarFiltrosDaBase();
   } else if (parte === "operador") {
     f.operador = alvo.value;
+    renderizarFiltrosDaBase();
+  } else if (parte === "juncao") {
+    f.juncao = alvo.value;
     renderizarFiltrosDaBase();
   } else {
     f[parte] = alvo.value;
