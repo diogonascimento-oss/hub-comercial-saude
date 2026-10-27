@@ -1,6 +1,6 @@
 // Markdown simples e seguro para a descrição do lead: títulos (#, ##, ###),
 // **negrito**, *itálico*, ~~riscado~~, `código`, listas (- e 1.), citação (>),
-// linha (---) e links http(s). O texto é escapado antes de qualquer marcação,
+// linha (---), tabelas (| a | b |) e links http(s). O texto é escapado antes de qualquer marcação,
 // então nenhum HTML digitado é executado.
 
 function markdownSeguro(texto) {
@@ -32,7 +32,30 @@ function markdownSeguro(texto) {
     lista = null;
   };
 
-  for (const linha of linhas) {
+  // Tabela: linhas que começam com "|", a segunda sendo o separador |---|---:|.
+  const celulas = (linha) => linha.trim().replace(/^\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
+  const ehSeparador = (linha) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(linha);
+  for (let i = 0; i < linhas.length; i++) {
+    const linha = linhas[i];
+    if (/^\s*\|/.test(linha) && i + 1 < linhas.length && ehSeparador(linhas[i + 1])) {
+      fecharParagrafo();
+      fecharLista();
+      const cabecalho = celulas(linha);
+      const alinhamentos = celulas(linhas[i + 1]).map((c) => (/:$/.test(c) ? (/^:/.test(c) ? "center" : "right") : "left"));
+      const corpo = [];
+      i += 2;
+      while (i < linhas.length && /^\s*\|/.test(linhas[i])) corpo.push(celulas(linhas[i++]));
+      i--;
+      const alinhar = (j) => `text-${alinhamentos[j] || "left"}`;
+      saida.push(
+        `<div class="overflow-x-auto mb-2"><table class="text-xs border border-line"><thead><tr class="bg-surface2">${cabecalho
+          .map((c, j) => `<th class="px-2 py-1 font-semibold text-ink ${alinhar(j)}">${embutido(c)}</th>`)
+          .join("")}</tr></thead><tbody>${corpo
+          .map((l) => `<tr class="border-t border-line">${cabecalho.map((_, j) => `<td class="px-2 py-1 ${alinhar(j)}">${embutido(l[j] ?? "")}</td>`).join("")}</tr>`)
+          .join("")}</tbody></table></div>`,
+      );
+      continue;
+    }
     const titulo = /^(#{1,3})\s+(.+)$/.exec(linha);
     const item = /^\s*[-*+]\s+(.+)$/.exec(linha);
     const numerado = /^\s*\d+[.)]\s+(.+)$/.exec(linha);

@@ -114,7 +114,7 @@ function blocoDaDescricao(l) {
       </div>
       <div id="edicaoDescricao" class="hidden">
         <textarea id="campoDescricao" rows="7" maxlength="4000" class="w-full bg-surface2 border border-line px-3 py-2 text-ink text-xs leading-relaxed font-mono"></textarea>
-        <p class="text-[10px] text-inkfaint mt-1">Aceita Markdown: **negrito**, *itálico*, # título, - lista, 1. lista numerada, &gt; citação, --- linha e [texto](https://link).</p>
+        <p class="text-[10px] text-inkfaint mt-1">Aceita Markdown: **negrito**, *itálico*, # título, - lista, 1. lista numerada, &gt; citação, --- linha, tabelas (| coluna | coluna |) e [texto](https://link).</p>
         <p class="text-[10px] text-inkfaint mt-2 mb-1 uppercase tracking-wide">Prévia</p>
         <div id="previaDescricao" class="text-ink [overflow-wrap:anywhere] leading-relaxed border border-line px-3 py-2 min-h-[2.5rem]"></div>
         <div class="flex flex-wrap items-center gap-2 mt-2">
