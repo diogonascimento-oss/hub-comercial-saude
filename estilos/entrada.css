@@ -2,7 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
-body { background-color: #0b0c11; }
+/* Cores do painel. O tema claro é escolhido no cabeçalho (tema.js grava a
+   escolha no navegador e marca <html data-tema="claro">). */
+:root {
+  color-scheme: dark;
+  --c-bg: 11 12 17;
+  --c-surface: 18 19 27;
+  --c-surface2: 24 26 36;
+  --c-line: rgba(255, 255, 255, 0.09);
+  --c-ink: 233 231 222;
+  --c-inkdim: 154 156 168;
+  --c-inkfaint: 107 109 122;
+  --c-gold: 182 146 63;
+  --c-goldbright: 216 181 101;
+  --c-positivo: 79 179 138;
+  --c-negativo: 208 104 90;
+  --c-cartao: #0f1017;
+  --c-rolagem: #33364a;
+  --c-borda-suave: rgba(255, 255, 255, 0.12);
+}
+:root[data-tema="claro"] {
+  color-scheme: light;
+  --c-bg: 243 242 237;
+  --c-surface: 255 255 255;
+  --c-surface2: 234 232 225;
+  --c-line: rgba(20, 22, 32, 0.13);
+  --c-ink: 26 27 33;
+  --c-inkdim: 84 86 98;
+  --c-inkfaint: 120 122 133;
+  --c-gold: 150 115 38;
+  --c-goldbright: 128 95 20;
+  --c-positivo: 28 125 85;
+  --c-negativo: 178 66 50;
+  --c-cartao: #fbfaf7;
+  --c-rolagem: #c9c7bf;
+  --c-borda-suave: rgba(20, 22, 32, 0.16);
+}
+
+body { background-color: rgb(var(--c-bg)); }
+
+/* Tema claro: cores fixas dos gráficos desenhados em SVG (linhas de grade,
+   textos, contornos e o fundo dos pontos) e das áreas com fundo próprio. */
+:root[data-tema="claro"] .bg-\[\#0f1017\] { background-color: var(--c-cartao); }
+:root[data-tema="claro"] svg [stroke="#1f2130"] { stroke: #e2e0d8; }
+:root[data-tema="claro"] svg [stroke="#33364a"] { stroke: #c9c7bf; }
+:root[data-tema="claro"] svg [stroke="#0b0c11"] { stroke: #ffffff; }
+:root[data-tema="claro"] svg [fill="#0b0c11"] { fill: #ffffff; }
+:root[data-tema="claro"] svg text[fill="#6b6d7a"] { fill: #6f717c; }
+:root[data-tema="claro"] svg text[fill="#9a9ca8"] { fill: #545662; }
+:root[data-tema="claro"] svg text[fill="#d8b565"] { fill: #805f14; }
+:root[data-tema="claro"] svg [fill="#181a24"] { fill: #e6e4dd; }
+:root[data-tema="claro"] svg [fill="#3a3221"] { fill: #efe3c4; }
+/* Textos coloridos por estilo embutido (ex.: tipos de acontecimento): tons
+   mais escuros para ler bem no fundo claro. */
+:root[data-tema="claro"] [style*="color:#d8b565"] { color: #805f14 !important; }
+:root[data-tema="claro"] [style*="color:#6ea8d8"] { color: #2f6ea3 !important; }
+:root[data-tema="claro"] [style*="color:#9a9ca8"] { color: #545662 !important; }
 
 .tabular { font-variant-numeric: tabular-nums; }
 
@@ -11,7 +66,7 @@ body { background-color: #0b0c11; }
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #9a9ca8;
+  color: rgb(var(--c-inkdim));
 }
 
 .titulo-secao {
@@ -19,37 +74,37 @@ body { background-color: #0b0c11; }
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #d8b565;
+  color: rgb(var(--c-goldbright));
 }
 
 /* Grade de cartões separados por uma linha fina. */
 .grade {
   display: grid;
   gap: 1px;
-  background: rgba(255, 255, 255, 0.09);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: var(--c-line);
+  border: 1px solid var(--c-line);
 }
-.grade > div { background: #0f1017; }
+.grade > div { background: var(--c-cartao); }
 
 .barra { transition: width 0.5s ease; min-width: 2px; }
 .rolagem { overflow-y: auto; }
 
-* { scrollbar-width: thin; scrollbar-color: #33364a #12131b; }
+* { scrollbar-width: thin; scrollbar-color: var(--c-rolagem) rgb(var(--c-surface)); }
 
-input:focus, select:focus, button:focus-visible { outline: 2px solid #b6923f; outline-offset: 1px; }
+input:focus, select:focus, button:focus-visible { outline: 2px solid rgb(var(--c-gold)); outline-offset: 1px; }
 
-.aba-ativa { border-color: #b6923f; color: #d8b565; }
+.aba-ativa { border-color: rgb(var(--c-gold)); color: rgb(var(--c-goldbright)); }
 
 table.comparativo td, table.comparativo th { padding: 9px 16px; white-space: nowrap; }
-table.comparativo tbody tr { border-top: 1px solid rgba(255, 255, 255, 0.07); }
-table.comparativo tr.destaque td { background: rgba(182, 146, 63, 0.05); }
+table.comparativo tbody tr { border-top: 1px solid var(--c-line); }
+table.comparativo tr.destaque td { background: rgb(var(--c-gold) / 0.06); }
 
 @media (prefers-reduced-motion: reduce) { .barra { transition: none; } }
 
 /* Seções e painéis recolhidos por padrão. */
 details.recolhivel > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; }
 details.recolhivel > summary::-webkit-details-marker { display: none; }
-details.recolhivel > summary .indicador-recolhivel::after { content: "Mostrar"; font-size: 10px; color: #9a9ca8; border: 1px solid rgba(255, 255, 255, 0.12); padding: 1px 8px; }
+details.recolhivel > summary .indicador-recolhivel::after { content: "Mostrar"; font-size: 10px; color: rgb(var(--c-inkdim)); border: 1px solid var(--c-borda-suave); padding: 1px 8px; }
 details.recolhivel[open] > summary .indicador-recolhivel::after { content: "Ocultar"; }
 details.recolhivel[open] > summary { margin-bottom: 12px; }
 
@@ -75,7 +130,7 @@ details.recolhivel[open] > summary { margin-bottom: 12px; }
 .grade > *:nth-child(6) { animation-delay: 225ms; }
 .grade > *:nth-child(7) { animation-delay: 270ms; }
 .grade > *:nth-child(n + 8) { animation-delay: 315ms; }
-.grade > div:hover { background: #12131b; }
+.grade > div:hover { background: rgb(var(--c-surface)); }
 
 /* Barras crescem a partir da esquerda; gráficos são revelados da esquerda para a direita. */
 .barra { transform-origin: left center; animation: cresce 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }

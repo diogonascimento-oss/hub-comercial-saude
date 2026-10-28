@@ -24,6 +24,7 @@ const SITUACOES_DO_RESUMO = [
   ["remarcacao", "em remarcação"],
   ["reaquecimento", "em reaquecimento"],
   ["farmer", "em protocolo farmer"],
+  ["reuniaoRealizada", "em reunião realizada"],
   ["fechado", "fechado depois do período"],
   ["semInteresse", "sem interesse"],
   ["desqualificado", "desqualificado"],
@@ -40,29 +41,55 @@ function leadsDaCelula(c, linha) {
   return Object.values(saida.porSituacao).flat();
 }
 
+// Etapas posteriores à reunião. Um lead que está nelas sem ter chegado a
+// Qualificados ou a Reuniões Marcadas pulou uma etapa no Kommo: a linha
+// aparece em destaque para conferência.
+const SITUACOES_DEPOIS_DA_REUNIAO = new Set(["farmer", "reuniaoRealizada", "fechado"]);
+const ETAPA_PULADA = ["Lead Qualificado", "Agendado"];
+
 // Linhas do quadro, na ordem da tabela: as cinco do funil e, entre elas, as
 // saídas (só as situações que aparecem no quadro).
 function linhasDoQuadro(b, comSaidas = mostrarSaidasDoResumo()) {
   const total = (linha) => b.campanhas.reduce((t, c) => t + leadsDaCelula(c, linha).length, 0);
   const linhas = [];
   LINHAS_DO_RESUMO.forEach((principal, k) => {
-    linhas.push({ ...principal, tipo: "principal" });
+    linhas.push({ ...principal, tipo: "principal", indice: k });
     if (!comSaidas || k >= SAIDAS_DO_RESUMO.length) return;
     const cabeca = { tipo: "saida", passo: k, rotulo: SAIDAS_DO_RESUMO[k] };
-    if (!total(cabeca)) {
-      const fora = { tipo: "situacao", passo: k, situacao: "fora", rotulo: `chegaram a ${LINHAS_DO_RESUMO[k + 1].rotulo.toLowerCase()} sem passar por esta linha` };
-      if (total(fora)) linhas.push(fora);
-      return;
+    const fora = {
+      tipo: "situacao",
+      passo: k,
+      situacao: "fora",
+      alerta: true,
+      rotulo: `chegaram a ${LINHAS_DO_RESUMO[k + 1].rotulo.toLowerCase()} sem passar por esta linha`,
+      explicacao: `Leads contados em "${LINHAS_DO_RESUMO[k + 1].rotulo}" sem registro de "${LINHAS_DO_RESUMO[k].rotulo}" no Kommo. Vale conferir a movimentação.`,
+    };
+    if (total(cabeca)) {
+      linhas.push(cabeca);
+      for (const [situacao, rotulo] of SITUACOES_DO_RESUMO) {
+        const pulou = k < ETAPA_PULADA.length && SITUACOES_DEPOIS_DA_REUNIAO.has(situacao);
+        const linha = pulou
+          ? {
+              tipo: "situacao",
+              passo: k,
+              situacao,
+              alerta: true,
+              rotulo: `${rotulo}, sem passar por ${ETAPA_PULADA[k]}`,
+              explicacao: `Leads que estão hoje numa etapa posterior à reunião sem terem passado por ${ETAPA_PULADA[k]} no Kommo. Provavelmente pularam uma etapa; vale conferir e corrigir no Kommo para que contem como ${k ? "reunião marcada" : "qualificados"}.`,
+            }
+          : { tipo: "situacao", passo: k, situacao, rotulo };
+        if (total(linha)) linhas.push(linha);
+      }
     }
-    linhas.push(cabeca);
-    for (const [situacao, rotulo] of SITUACOES_DO_RESUMO) {
-      const linha = { tipo: "situacao", passo: k, situacao, rotulo };
-      if (total(linha)) linhas.push(linha);
-    }
-    const fora = { tipo: "situacao", passo: k, situacao: "fora", rotulo: `chegaram a ${LINHAS_DO_RESUMO[k + 1].rotulo.toLowerCase()} sem passar por esta linha` };
     if (total(fora)) linhas.push(fora);
   });
   return linhas;
+}
+
+// Conversão de uma linha principal sobre a anterior, na mesma coluna.
+function conversaoDaLinha(anterior, atual) {
+  if (!anterior) return null;
+  return `${(Math.round((atual / anterior) * 1000) / 10).toLocaleString("pt-BR")}%`;
 }
 const contagemDaCelula = (c, linha) => (linha.campo ? c[linha.campo] || 0 : leadsDaCelula(c, linha).length);
 const totalDaLinha = (b, linha) => b.campanhas.reduce((t, c) => t + contagemDaCelula(c, linha), 0);
@@ -148,10 +175,21 @@ function renderizarResumoDoNucleo() {
             : numero(valor);
       const estiloDaLinha = (linha) =>
         linha.tipo === "principal"
-          ? { tr: "border-t border-line", rotulo: "px-3 py-1.5 text-center text-inkdim", celula: "px-3 py-1.5 text-center tabular text-ink" }
+          ? { tr: "border-t border-line bg-surface2/70", rotulo: "px-3 py-2 text-left text-[13px] font-semibold text-ink", celula: "px-3 py-2 text-center tabular text-[13px] font-semibold text-ink" }
           : linha.tipo === "saida"
-            ? { tr: "border-t border-line bg-surface/40", rotulo: "pl-6 pr-3 py-1 text-left text-[11px] italic text-inkdim", celula: "px-3 py-1 text-center tabular text-[11px] text-inkdim" }
-            : { tr: "bg-surface/40", rotulo: "pl-10 pr-3 py-0.5 text-left text-[11px] text-inkfaint", celula: "px-3 py-0.5 text-center tabular text-[11px] text-inkdim" };
+            ? { tr: "border-t border-line", rotulo: "pl-6 pr-3 py-1 text-left text-[11px] italic text-inkdim", celula: "px-3 py-1 text-center tabular text-[11px] text-inkdim" }
+            : linha.alerta
+              ? { tr: "", rotulo: "pl-10 pr-3 py-0.5 text-left text-[11px] text-goldbright", celula: "px-3 py-0.5 text-center tabular text-[11px] text-goldbright" }
+              : { tr: "", rotulo: "pl-10 pr-3 py-0.5 text-left text-[11px] text-inkfaint", celula: "px-3 py-0.5 text-center tabular text-[11px] text-inkdim" };
+      // Conversão sobre a linha principal anterior, embaixo do número.
+      const conversao = (linha, anterior, atual) => {
+        if (linha.tipo !== "principal" || !linha.indice) return "";
+        const pct = conversaoDaLinha(anterior, atual);
+        return pct
+          ? `<span class="block text-[10px] font-normal text-inkfaint" title="${esc(`${linha.rotulo} sobre ${LINHAS_DO_RESUMO[linha.indice - 1].rotulo}`)}">${pct}</span>`
+          : "";
+      };
+      const anteriorDe = (linha, c) => (c ? c[LINHAS_DO_RESUMO[linha.indice - 1].campo] || 0 : totalDoBloco(b, LINHAS_DO_RESUMO[linha.indice - 1].campo));
       const celulaValor = (c, ci) =>
         c.origemDoValor === "meta"
           ? `<span title="Valor do Meta">${reaisDoResumo(c.valor)}</span>`
@@ -182,17 +220,23 @@ function renderizarResumoDoNucleo() {
           </thead>
           <tbody>
             <tr class="border-t border-line">
-              <td class="px-3 py-1.5 text-center text-inkdim">Valor</td>
+              <td class="px-3 py-1.5 text-left text-inkdim">Valor</td>
               ${b.campanhas.map((c, ci) => `<td class="px-3 py-1.5 text-center tabular">${celulaValor(c, ci)}</td>`).join("")}
               <td class="px-3 py-1.5 text-center tabular font-semibold text-ink bg-surface2" data-total-valor="${bi}">${reaisDoResumo(valorTotalDoBloco(b)) || "—"}</td>
             </tr>
             ${linhasDoBloco
               .map((linha, li) => {
                 const e = estiloDaLinha(linha);
-                return `<tr class="${e.tr}">
+                const dica = linha.explicacao ? ` title="${esc(linha.explicacao)}"` : "";
+                return `<tr class="${e.tr}"${dica}>
                 <td class="${e.rotulo}">${esc(linha.rotulo)}</td>
-                ${b.campanhas.map((c, ci) => `<td class="${e.celula}">${celulaNumero(contagemDaCelula(c, linha), ci, li)}</td>`).join("")}
-                <td class="${e.celula} font-semibold bg-surface2">${celulaNumero(totalDaLinha(b, linha), "total", li)}</td>
+                ${b.campanhas
+                  .map((c, ci) => {
+                    const v = contagemDaCelula(c, linha);
+                    return `<td class="${e.celula}">${celulaNumero(v, ci, li)}${linha.tipo === "principal" && linha.indice ? conversao(linha, anteriorDe(linha, c), v) : ""}</td>`;
+                  })
+                  .join("")}
+                <td class="${e.celula} font-semibold bg-surface2">${celulaNumero(totalDaLinha(b, linha), "total", li)}${linha.tipo === "principal" && linha.indice ? conversao(linha, anteriorDe(linha, null), totalDaLinha(b, linha)) : ""}</td>
               </tr>`;
               })
               .join("")}
@@ -220,7 +264,7 @@ $("resumoNucleo").addEventListener("click", (e) => {
   abrirLeadsDoGrupo(
     `${bloco.titulo} · ${nome}: ${titulo.toLowerCase()}`,
     leads,
-    `Leads que chegaram a "${LINHAS_DO_RESUMO[linha.passo].rotulo}" e não a "${LINHAS_DO_RESUMO[linha.passo + 1].rotulo}", com a etapa em que estão hoje.`,
+    linha.explicacao || `Leads que chegaram a "${LINHAS_DO_RESUMO[linha.passo].rotulo}" e não a "${LINHAS_DO_RESUMO[linha.passo + 1].rotulo}", com a etapa em que estão hoje.`,
     { nome: "saidas.csv", cabecalho: ["ID", "Nome", "Telefone", "Etapa hoje", "Motivo de perda"], linhas: leads.map((l) => [l.leadId || "", l.nome, l.telefone || "", l.etapaAtual || "", l.motivoPerda || ""]) },
   );
 });
@@ -262,6 +306,34 @@ $("resumoNucleo").addEventListener("keydown", (e) => {
 
 // --- Copiar para planilha ----------------------------------------------------------------
 
+// Linhas exportadas: as da tela e, depois de cada linha principal a partir de
+// Qualificados, a conversão sobre a anterior.
+function linhasDaExportacao(b) {
+  const saida = [];
+  for (const l of linhasDoQuadro(b)) {
+    saida.push({
+      tipo: l.tipo === "situacao" && l.alerta ? "alerta" : l.tipo,
+      valores: [
+        l.tipo === "principal" ? l.rotulo : l.tipo === "saida" ? `   ${l.rotulo}` : `      ${l.rotulo}`,
+        ...b.campanhas.map((c) => contagemDaCelula(c, l)),
+        totalDaLinha(b, l),
+      ],
+    });
+    if (l.tipo === "principal" && l.indice) {
+      const anterior = LINHAS_DO_RESUMO[l.indice - 1];
+      saida.push({
+        tipo: "conversao",
+        valores: [
+          `   % sobre ${anterior.rotulo}`,
+          ...b.campanhas.map((c) => conversaoDaLinha(c[anterior.campo] || 0, c[l.campo] || 0) || "—"),
+          conversaoDaLinha(totalDoBloco(b, anterior.campo), totalDoBloco(b, l.campo)) || "—",
+        ],
+      });
+    }
+  }
+  return saida;
+}
+
 function tabelasDoResumo() {
   // Uma matriz por bloco: título, cabeçalho e linhas, já com os totais.
   return resumoDoNucleo.blocos
@@ -271,13 +343,9 @@ function tabelasDoResumo() {
       cabecalhos: cabecalhoDoBloco(b, resumoDoNucleo.nivel),
       linhas: [
         ["Valor", ...b.campanhas.map((c) => c.valor), valorTotalDoBloco(b)],
-        ...linhasDoQuadro(b).map((l) => [
-          l.tipo === "principal" ? l.rotulo : l.tipo === "saida" ? `   ${l.rotulo}` : `      ${l.rotulo}`,
-          ...b.campanhas.map((c) => contagemDaCelula(c, l)),
-          totalDaLinha(b, l),
-        ]),
+        ...linhasDaExportacao(b).map((l) => l.valores),
       ],
-      tipos: ["valor", ...linhasDoQuadro(b).map((l) => l.tipo)],
+      tipos: ["valor", ...linhasDaExportacao(b).map((l) => l.tipo)],
     }));
 }
 
@@ -306,10 +374,12 @@ function htmlDasTabelas(tabelas) {
             (l, i) =>
               `<tr>${l
                 .map((v, j) => {
-                  const sub = t.tipos?.[i] === "saida" || t.tipos?.[i] === "situacao";
+                  const sub = ["saida", "situacao", "alerta", "conversao"].includes(t.tipos?.[i]);
                   const fundo = j === l.length - 1 ? "background:#a9c4eb;font-weight:bold" : sub ? "background:#f3f3f3" : "background:#d9d9d9";
                   const rotulo = j === 0 && sub ? `text-align:left;white-space:pre;color:#555;font-size:10pt;${t.tipos[i] === "saida" ? "font-style:italic" : ""}` : "text-align:center";
-                  return `<td style="${rotulo};${fundo}${sub && j ? ";color:#555;font-size:10pt" : ""}">${esc(j && i === 0 ? reaisDoResumo(v) : String(v ?? ""))}</td>`;
+                  const corDoAlerta = t.tipos?.[i] === "alerta" ? ";color:#8a5a00" : "";
+                  const principal = t.tipos?.[i] === "principal" ? ";font-weight:bold" : "";
+                  return `<td style="${rotulo};${fundo}${sub && j ? ";color:#555;font-size:10pt" : ""}${corDoAlerta}${principal}">${esc(j && i === 0 ? reaisDoResumo(v) : String(v ?? ""))}</td>`;
                 })
                 .join("")}</tr>`,
           )
@@ -415,19 +485,19 @@ $("btnImagemResumo").addEventListener("click", () => {
     y += alturaDoCabecalho;
     // Linhas
     t.linhas.forEach((linha, i) => {
-      const sub = t.tipos[i] === "saida" || t.tipos[i] === "situacao";
+      const sub = ["saida", "situacao", "alerta", "conversao"].includes(t.tipos[i]);
       for (let j = 0; j < n; j++) {
         ctx.fillStyle = j === n - 1 ? "#a9c4eb" : sub ? "#f3f3f3" : "#d9d9d9";
         ctx.fillRect(xDaColuna(j), y, larguraDaColuna(j), alturaLinha);
         ctx.strokeStyle = "#ffffff";
         ctx.strokeRect(xDaColuna(j), y, larguraDaColuna(j), alturaLinha);
-        ctx.fillStyle = sub ? "#555555" : "#222222";
-        ctx.font = `${t.tipos[i] === "saida" && j === 0 ? "italic " : ""}${j === n - 1 ? "bold " : ""}${sub ? "11px" : "13px"} Arial, sans-serif`;
+        ctx.fillStyle = t.tipos[i] === "alerta" ? "#8a5a00" : sub ? "#555555" : "#222222";
+        ctx.font = `${t.tipos[i] === "saida" && j === 0 ? "italic " : ""}${j === n - 1 || t.tipos[i] === "principal" ? "bold " : ""}${sub ? "11px" : "13px"} Arial, sans-serif`;
         const v = linha[j];
         const texto = j && i === 0 ? reaisDoResumo(v) || "—" : String(v ?? "");
         if (j === 0 && sub) {
           ctx.textAlign = "left";
-          const recuo = t.tipos[i] === "saida" ? 14 : 26;
+          const recuo = t.tipos[i] === "saida" || t.tipos[i] === "conversao" ? 14 : 26;
           const limite = Math.floor((larguraRotulo - recuo - 4) / 5.6);
           const limpo = texto.trim();
           ctx.fillText(limpo.length > limite ? `${limpo.slice(0, limite - 1)}…` : limpo, xDaColuna(0) + recuo, y + 17);

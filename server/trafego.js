@@ -42,6 +42,8 @@ export function situacaoDeHoje(lead) {
       return "farmer";
     case "FECHADO":
       return "fechado";
+    case "REUNIAO_REALIZADA":
+      return "reuniaoRealizada";
     default:
       return "emAndamento";
   }

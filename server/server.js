@@ -38,6 +38,8 @@ import { analisarTrafego, consolidarLeads, agruparEComputar, mesclarCusto, combi
 import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
 import { getLocalizacao } from "./localizacao.js";
 
+const ETAPAS_ANTES_DA_REUNIAO = new Set(["CONTATO_INICIAL", "CONTATO_INICIADO", "EM_QUALIFICACAO", "LEAD_QUALIFICADO", "EM_AGENDAMENTO"]);
+const ETAPAS_DEPOIS_DA_REUNIAO = new Set(["REUNIAO_REALIZADA", "PROTOCOLO_FARMER", "FECHADO"]);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
 const MODO_LOCAL = process.env.MODO_LOCAL === "true";
@@ -752,6 +754,9 @@ app.get("/api/leads/:id", async (req, res) => {
         para: comMotivo(ev),
         excluido: idsExcluidos.has(ev.id),
         corrigido: correcoesPorId.has(ev.id),
+        // Foi de uma etapa anterior à reunião direto para uma posterior a ela,
+        // sem passar por Agendado: a reunião não ficou registrada no funil.
+        pulouAgendado: ETAPAS_ANTES_DA_REUNIAO.has(ev.de) && ETAPAS_DEPOIS_DA_REUNIAO.has(ev.para),
         // Quem excluiu ou corrigiu pelo painel, quando e por quê.
         marcacao: ((m) => (m ? { usuario: m.usuario || null, quando: m.criadoEm || null, motivo: m.motivo || "" } : null))(
           exclusoesPorId.get(ev.id) || correcoesPorId.get(ev.id),
