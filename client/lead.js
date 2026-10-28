@@ -660,8 +660,25 @@ function blocoDeReunioes(l) {
 }
 
 // Campos que o Make grava no lead para conduzir a sequência de mensagens automáticas.
-function blocoDaCadencia(campos) {
+// Quando o próximo envio já passou, explica por quê sempre que dá para saber:
+// a sequência vale para a etapa registrada; se o lead saiu dela, os envios
+// param, mas os campos continuam com os últimos valores gravados.
+function situacaoDaCadencia(campos, etapaAtual) {
+  const envio = campos.find((c) => /pr[oó]ximo envio/i.test(c.nome))?.valor || "";
+  const m = envio.match(/(\d{2})\/(\d{2})\/(\d{4})(?:\D+(\d{1,2}):(\d{2}))?/);
+  if (!m) return "";
+  const quando = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), Number(m[4] || 23), Number(m[5] || 59));
+  if (quando > new Date()) return "";
+  const etapaDaCadencia = (campos.find((c) => /etapa/i.test(c.nome))?.valor || "").split(",")[0].trim();
+  if (etapaDaCadencia && etapaAtual && etapaDaCadencia.toLowerCase() !== String(etapaAtual).toLowerCase()) {
+    return `A data do próximo envio já passou porque o lead saiu de ${esc(etapaDaCadencia)} (hoje está em ${esc(etapaAtual)}). A sequência vale só para a etapa em que começou, então os envios pararam; os campos ficam com os últimos valores gravados.`;
+  }
+  return "A data do próximo envio já passou e o lead continua na mesma etapa. Pode ser o fim da sequência ou um envio que não foi feito; o histórico do Make mostra qual dos dois.";
+}
+
+function blocoDaCadencia(campos, etapaAtual) {
   if (!campos.length) return "";
+  const situacao = situacaoDaCadencia(campos, etapaAtual);
   const rotulos = [
     [/etapa/i, "Etapa em que a cadência está"],
     [/passo/i, "Passo da sequência"],
@@ -671,7 +688,7 @@ function blocoDaCadencia(campos) {
   return (
     blocoDaFicha("Cadência de mensagens automáticas", campos.map((c) => [nomeLegivel(c.nome), esc(c.valor)])).replace(
       "</section>",
-      '<p class="text-[10px] text-inkfaint mt-2">Preenchido pelo Make para controlar a sequência de mensagens automáticas. O passo indica em que ponto da sequência o lead está. A equipe não precisa preencher nem alterar esses campos.</p></section>',
+      `${situacao ? `<p class="text-[11px] text-inkdim mt-2">${situacao}</p>` : ""}<p class="text-[10px] text-inkfaint mt-2">Preenchido pelo Make para controlar a sequência de mensagens automáticas. O passo indica em que ponto da sequência o lead está. A equipe não precisa preencher nem alterar esses campos.</p></section>`,
     )
   );
 }
@@ -752,7 +769,7 @@ function renderizarFicha(l) {
       ["Farmer", texto(l.responsaveis.farmer)],
     ]) +
     blocoDaFicha("Demais campos preenchidos no Kommo", outrosCampos.map((c) => [c.nome, esc(c.valor)])) +
-    blocoDaCadencia(camposTecnicos) +
+    blocoDaCadencia(camposTecnicos, l.etapa) +
     (registrosInternos.length
       ? `<details class="border border-line px-3 py-2"><summary class="cursor-pointer text-inkdim">Registros internos da automação (${numero(registrosInternos.length)})</summary>
           <p class="text-[10px] text-inkfaint mt-2">Gravados pelo Make para controlar as mensagens automáticas. A equipe não precisa ler nem alterar.</p>

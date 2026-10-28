@@ -160,8 +160,50 @@ details[open] > *:not(summary) { animation: sobe 0.35s cubic-bezier(0.2, 0.7, 0.
 
 a, button, summary, input, select { transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease; }
 
+/* Resumo do núcleo: seta das linhas principais com detalhamento. */
+.seta-do-passo { transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.seta-do-passo.aberta { transform: rotate(90deg); }
+#resumoNucleo tbody tr { animation: aparece 0.3s ease both; }
+
+/* Resposta ao toque ------------------------------------------------------------ */
+html { scroll-behavior: smooth; }
+.progresso-da-rolagem {
+  position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 60;
+  background: linear-gradient(90deg, rgb(var(--c-gold)), rgb(var(--c-goldbright)));
+  transform-origin: left center; transform: scaleX(0); pointer-events: none;
+}
+header > div > div:first-child { will-change: transform, opacity; }
+
+/* Cartões: luz suave seguindo o ponteiro, leve elevação e retorno ao toque. */
+.grade > div, .reage-ao-toque {
+  background-image: radial-gradient(260px circle at var(--mx, -400px) var(--my, -400px), rgb(var(--c-gold) / 0.09), transparent 70%);
+}
+.grade > div { transition: background-color 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s ease; }
+.grade > div:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.55); z-index: 1; position: relative; }
+.grade > div:active { transform: translateY(0) scale(0.985); }
+
+/* Botões afundam um pouco ao serem pressionados. */
+button:not(:disabled):active, summary:active { transform: scale(0.97); }
+a, button, summary, input, select { transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease, transform 0.12s ease; }
+
+/* Ondulação a partir do ponto tocado (botões com a classe "ondula"). */
+.ondula { position: relative; overflow: hidden; }
+.onda { position: absolute; border-radius: 9999px; background: rgb(var(--c-goldbright) / 0.35); transform: scale(0); animation: onda 0.6s ease-out forwards; pointer-events: none; }
+@keyframes onda { to { transform: scale(1); opacity: 0; } }
+
+/* Boas-vindas ------------------------------------------------------------------ */
+body.com-boas-vindas { overflow: hidden; }
+#boasVindas { transition: opacity 0.6s ease, transform 0.6s ease, filter 0.6s ease; }
+#boasVindas.saindo { opacity: 0; transform: scale(1.04); filter: blur(4px); pointer-events: none; }
+.boas-vindas-logo { animation: caixa-entra 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.boas-vindas-saudacao { animation: sobe 0.6s 0.25s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.boas-vindas-nome { animation: sobe 0.7s 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.boas-vindas-linha { transform-origin: center; animation: cresce 0.9s 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.boas-vindas-sub { animation: aparece 0.8s 0.85s ease both; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+  .grade > div:hover, button:active, summary:active { transform: none !important; }
   .revelar { opacity: 1; transform: none; }
 }
 

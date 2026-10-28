@@ -149,6 +149,10 @@ export default {
       return json(401, { error: "Acesso não autorizado." });
     }
 
+    // Quem está logado sai direto do token do Access, sem esperar o servidor
+    // acordar: é o que a saudação de boas-vindas usa.
+    if (url.pathname === "/api/eu" && request.method === "GET") return json(200, { usuario: usuario.email || null });
+
     const destino = new URL(url.pathname + url.search, env.API_ORIGEM.replace(/\/+$/, "") + "/");
     const cabecalhos = new Headers({ "x-api-token": env.API_TOKEN, Accept: "application/json" });
     const tipo = request.headers.get("Content-Type");

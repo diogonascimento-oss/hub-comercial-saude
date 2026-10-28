@@ -1404,7 +1404,7 @@ function mostrarAba(aba) {
   for (const [id, chave] of [["abaBotaoFunil", "funil"], ["abaBotaoTrafego", "trafego"], ["abaBotaoBase", "base"]]) {
     const ativa = aba === chave;
     $(id).setAttribute("aria-selected", String(ativa));
-    $(id).className = `px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 ${ativa ? "aba-ativa" : "border-transparent text-inkdim hover:text-ink"}`;
+    $(id).className = `ondula px-4 py-2 text-xs font-bold uppercase tracking-wide border-b-2 ${ativa ? "aba-ativa" : "border-transparent text-inkdim hover:text-ink"}`;
   }
   if (aba === "trafego") atualizarTrafego();
   if (aba === "base" && typeof carregarBaseDeLeads === "function") carregarBaseDeLeads();

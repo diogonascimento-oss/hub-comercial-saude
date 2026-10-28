@@ -29,7 +29,17 @@ const SITUACOES_DO_RESUMO = [
   ["semInteresse", "sem interesse"],
   ["desqualificado", "desqualificado"],
 ];
-const mostrarSaidasDoResumo = () => $("saidasResumo")?.checked !== false;
+// Detalhamento recolhível por linha: clicar numa linha principal mostra ou
+// esconde as saídas logo abaixo dela; o botão do topo faz isso em todas.
+const passosRecolhidos = new Set();
+const passoAberto = (k) => !passosRecolhidos.has(k);
+function atualizarBotaoDoDetalhamento() {
+  const botao = $("btnDetalhamentoResumo");
+  if (!botao) return;
+  const algumAberto = SAIDAS_DO_RESUMO.some((_, k) => passoAberto(k));
+  botao.textContent = algumAberto ? "Recolher detalhamento" : "Mostrar detalhamento";
+  botao.setAttribute("aria-pressed", String(algumAberto));
+}
 
 // Leads de uma célula do quadro (linha principal ou de saída).
 function leadsDaCelula(c, linha) {
@@ -49,12 +59,12 @@ const ETAPA_PULADA = ["Lead Qualificado", "Agendado"];
 
 // Linhas do quadro, na ordem da tabela: as cinco do funil e, entre elas, as
 // saídas (só as situações que aparecem no quadro).
-function linhasDoQuadro(b, comSaidas = mostrarSaidasDoResumo()) {
+function linhasDoQuadro(b, aberto = passoAberto) {
   const total = (linha) => b.campanhas.reduce((t, c) => t + leadsDaCelula(c, linha).length, 0);
   const linhas = [];
   LINHAS_DO_RESUMO.forEach((principal, k) => {
     linhas.push({ ...principal, tipo: "principal", indice: k });
-    if (!comSaidas || k >= SAIDAS_DO_RESUMO.length) return;
+    if (k >= SAIDAS_DO_RESUMO.length || !aberto(k)) return;
     const cabeca = { tipo: "saida", passo: k, rotulo: SAIDAS_DO_RESUMO[k] };
     const fora = {
       tipo: "situacao",
@@ -228,8 +238,14 @@ function renderizarResumoDoNucleo() {
               .map((linha, li) => {
                 const e = estiloDaLinha(linha);
                 const dica = linha.explicacao ? ` title="${esc(linha.explicacao)}"` : "";
+                const recolhivel = linha.tipo === "principal" && linha.indice < SAIDAS_DO_RESUMO.length;
+                const rotulo = recolhivel
+                  ? `<button type="button" data-passo="${linha.indice}" aria-expanded="${passoAberto(linha.indice)}" title="${passoAberto(linha.indice) ? "Esconder" : "Mostrar"} quem não avançou desta linha" class="flex items-center gap-2 text-left hover:text-goldbright"><span class="seta-do-passo inline-block text-[10px] text-inkfaint ${passoAberto(linha.indice) ? "aberta" : ""}">▸</span>${esc(linha.rotulo)}</button>`
+                  : linha.tipo === "principal"
+                    ? `<span class="pl-[18px]">${esc(linha.rotulo)}</span>`
+                    : esc(linha.rotulo);
                 return `<tr class="${e.tr}"${dica}>
-                <td class="${e.rotulo}">${esc(linha.rotulo)}</td>
+                <td class="${e.rotulo}">${rotulo}</td>
                 ${b.campanhas
                   .map((c, ci) => {
                     const v = contagemDaCelula(c, linha);
@@ -248,6 +264,15 @@ function renderizarResumoDoNucleo() {
 }
 
 $("resumoNucleo").addEventListener("click", (e) => {
+  const passo = e.target.closest("button[data-passo]");
+  if (passo) {
+    const k = Number(passo.dataset.passo);
+    if (passoAberto(k)) passosRecolhidos.add(k);
+    else passosRecolhidos.delete(k);
+    atualizarBotaoDoDetalhamento();
+    renderizarResumoDoNucleo();
+    return;
+  }
   const botao = e.target.closest("button[data-linha]");
   if (!botao || !resumoDoNucleo) return;
   const bloco = resumoDoNucleo.blocos[Number(botao.dataset.bloco)];
@@ -521,4 +546,9 @@ $("btnImagemResumo").addEventListener("click", () => {
 });
 
 $("colunasResumo").addEventListener("change", () => carregarResumoDoNucleo());
-$("saidasResumo").addEventListener("change", () => renderizarResumoDoNucleo());
+$("btnDetalhamentoResumo").addEventListener("click", () => {
+  const algumAberto = SAIDAS_DO_RESUMO.some((_, k) => passoAberto(k));
+  SAIDAS_DO_RESUMO.forEach((_, k) => (algumAberto ? passosRecolhidos.add(k) : passosRecolhidos.delete(k)));
+  atualizarBotaoDoDetalhamento();
+  renderizarResumoDoNucleo();
+});

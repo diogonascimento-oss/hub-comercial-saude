@@ -47,6 +47,61 @@
     }
   }
 
+  // Barra fina no topo mostra quanto da página já foi percorrido.
+  const progresso = document.createElement("div");
+  progresso.className = "progresso-da-rolagem";
+  progresso.setAttribute("aria-hidden", "true");
+  document.body.appendChild(progresso);
+
+  // Profundidade no cabeçalho: o monograma e o nome descem mais devagar que a
+  // página e esmaecem ao rolar (paralaxe).
+  const marca = document.querySelector("header > div > div:first-child");
+  let pendente = false;
+  function aoRolar() {
+    pendente = false;
+    const y = scrollY;
+    const total = document.documentElement.scrollHeight - innerHeight;
+    progresso.style.transform = `scaleX(${total > 0 ? Math.min(y / total, 1) : 0})`;
+    if (marca && y < 400) {
+      marca.style.transform = `translateY(${(y * 0.35).toFixed(1)}px)`;
+      marca.style.opacity = String(Math.max(1 - y / 260, 0.15));
+    }
+  }
+  addEventListener("scroll", () => {
+    if (!pendente) {
+      pendente = true;
+      requestAnimationFrame(aoRolar);
+    }
+  }, { passive: true });
+  aoRolar();
+
+  // Luz que acompanha o ponteiro nos cartões e quadros: a superfície reage ao
+  // toque e ao mouse.
+  document.addEventListener(
+    "pointermove",
+    (e) => {
+      const alvo = e.target.closest?.(".grade > div, .reage-ao-toque");
+      if (!alvo) return;
+      const r = alvo.getBoundingClientRect();
+      alvo.style.setProperty("--mx", `${e.clientX - r.left}px`);
+      alvo.style.setProperty("--my", `${e.clientY - r.top}px`);
+    },
+    { passive: true },
+  );
+
+  // Ondulação a partir do ponto tocado nos botões principais.
+  document.addEventListener("pointerdown", (e) => {
+    const botao = e.target.closest?.(".ondula");
+    if (!botao) return;
+    const r = botao.getBoundingClientRect();
+    const onda = document.createElement("span");
+    onda.className = "onda";
+    const lado = Math.max(r.width, r.height) * 2;
+    onda.style.cssText = `width:${lado}px;height:${lado}px;left:${e.clientX - r.left - lado / 2}px;top:${e.clientY - r.top - lado / 2}px`;
+    botao.appendChild(onda);
+    setTimeout(() => onda.remove(), 650);
+  });
+
   const grade = document.getElementById("cartoes");
   if (grade) new MutationObserver(() => contarCartoes(grade)).observe(grade, { childList: true });
 })();
