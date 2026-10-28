@@ -44,6 +44,13 @@ export function situacaoDeHoje(lead) {
       return "fechado";
     case "REUNIAO_REALIZADA":
       return "reuniaoRealizada";
+    // Já qualificado, aguardando a marcação da reunião.
+    case "LEAD_QUALIFICADO":
+    case "EM_AGENDAMENTO":
+      return "emAgendamento";
+    case "AGENDADO":
+      return "agendado";
+    // Contato Inicial, Contato Iniciado e Em Qualificação.
     default:
       return "emAndamento";
   }

@@ -21,6 +21,8 @@ const LINHAS_DO_RESUMO = [
 const SAIDAS_DO_RESUMO = ["Não qualificados", "Sem reunião marcada", "Reunião não realizada", "Sem contrato fechado"];
 const SITUACOES_DO_RESUMO = [
   ["emAndamento", "ainda em andamento"],
+  ["emAgendamento", "em agendamento"],
+  ["agendado", "agendado"],
   ["remarcacao", "em remarcação"],
   ["reaquecimento", "em reaquecimento"],
   ["farmer", "em protocolo farmer"],
@@ -56,6 +58,7 @@ function leadsDaCelula(c, linha) {
 // aparece em destaque para conferência.
 const SITUACOES_DEPOIS_DA_REUNIAO = new Set(["farmer", "reuniaoRealizada", "fechado"]);
 const ETAPA_PULADA = ["Lead Qualificado", "Agendado"];
+const SITUACOES_DE_AGENDAMENTO = new Set(["emAgendamento", "agendado"]);
 
 // Linhas do quadro, na ordem da tabela: as cinco do funil e, entre elas, as
 // saídas (só as situações que aparecem no quadro).
@@ -77,7 +80,9 @@ function linhasDoQuadro(b, aberto = passoAberto) {
     if (total(cabeca)) {
       linhas.push(cabeca);
       for (const [situacao, rotulo] of SITUACOES_DO_RESUMO) {
-        const pulou = k < ETAPA_PULADA.length && SITUACOES_DEPOIS_DA_REUNIAO.has(situacao);
+        // Também em destaque: quem não passou por Qualificados e está hoje em
+        // agendamento ou agendado.
+        const pulou = (k < ETAPA_PULADA.length && SITUACOES_DEPOIS_DA_REUNIAO.has(situacao)) || (k === 0 && SITUACOES_DE_AGENDAMENTO.has(situacao));
         const linha = pulou
           ? {
               tipo: "situacao",
@@ -85,7 +90,7 @@ function linhasDoQuadro(b, aberto = passoAberto) {
               situacao,
               alerta: true,
               rotulo: `${rotulo}, sem passar por ${ETAPA_PULADA[k]}`,
-              explicacao: `Leads que estão hoje numa etapa posterior à reunião sem terem passado por ${ETAPA_PULADA[k]} no Kommo. Provavelmente pularam uma etapa; vale conferir e corrigir no Kommo para que contem como ${k ? "reunião marcada" : "qualificados"}.`,
+              explicacao: `Leads que estão hoje ${SITUACOES_DE_AGENDAMENTO.has(situacao) ? "em agendamento ou agendados" : "numa etapa posterior à reunião"} sem terem passado por ${ETAPA_PULADA[k]} no Kommo. Provavelmente pularam uma etapa; vale conferir e corrigir no Kommo para que contem como ${k ? "reunião marcada" : "qualificados"}.`,
             }
           : { tipo: "situacao", passo: k, situacao, rotulo };
         if (total(linha)) linhas.push(linha);
@@ -102,6 +107,7 @@ const ANEXO_DO_RESUMO = [
   ["semInteresse", "Sem interesse"],
   ["desqualificado", "Desqualificado"],
   ["emAndamento", "Em andamento"],
+  ["emAgendamento", "Em agendamento"],
 ];
 const TITULO_DO_ANEXO = "Total no quadro, pela situação de hoje";
 const leadsDoAnexo = (c, situacao) => (c.listas.leads || []).filter((l) => l.situacaoDeHoje === situacao);
