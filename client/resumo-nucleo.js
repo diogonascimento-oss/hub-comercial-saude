@@ -15,6 +15,58 @@ const LINHAS_DO_RESUMO = [
   { campo: "contratosFechados", rotulo: "Contratos Fechados" },
 ];
 
+// Saídas do funil: para cada passo, quem chegou a uma linha e não à seguinte,
+// pela situação de hoje. Assim a conta de cada coluna fecha de uma linha para
+// a outra.
+const SAIDAS_DO_RESUMO = ["Não qualificados", "Sem reunião marcada", "Reunião não realizada", "Sem contrato fechado"];
+const SITUACOES_DO_RESUMO = [
+  ["emAndamento", "ainda em andamento"],
+  ["remarcacao", "em remarcação"],
+  ["reaquecimento", "em reaquecimento"],
+  ["farmer", "em protocolo farmer"],
+  ["fechado", "fechado depois do período"],
+  ["semInteresse", "sem interesse"],
+  ["desqualificado", "desqualificado"],
+];
+const mostrarSaidasDoResumo = () => $("saidasResumo")?.checked !== false;
+
+// Leads de uma célula do quadro (linha principal ou de saída).
+function leadsDaCelula(c, linha) {
+  if (linha.campo) return c.listas[linha.campo] || [];
+  const saida = c.saidas?.[linha.passo];
+  if (!saida) return [];
+  if (linha.situacao === "fora") return saida.foraDaSequencia || [];
+  if (linha.situacao) return saida.porSituacao[linha.situacao] || [];
+  return Object.values(saida.porSituacao).flat();
+}
+
+// Linhas do quadro, na ordem da tabela: as cinco do funil e, entre elas, as
+// saídas (só as situações que aparecem no quadro).
+function linhasDoQuadro(b, comSaidas = mostrarSaidasDoResumo()) {
+  const total = (linha) => b.campanhas.reduce((t, c) => t + leadsDaCelula(c, linha).length, 0);
+  const linhas = [];
+  LINHAS_DO_RESUMO.forEach((principal, k) => {
+    linhas.push({ ...principal, tipo: "principal" });
+    if (!comSaidas || k >= SAIDAS_DO_RESUMO.length) return;
+    const cabeca = { tipo: "saida", passo: k, rotulo: SAIDAS_DO_RESUMO[k] };
+    if (!total(cabeca)) {
+      const fora = { tipo: "situacao", passo: k, situacao: "fora", rotulo: `chegaram a ${LINHAS_DO_RESUMO[k + 1].rotulo.toLowerCase()} sem passar por esta linha` };
+      if (total(fora)) linhas.push(fora);
+      return;
+    }
+    linhas.push(cabeca);
+    for (const [situacao, rotulo] of SITUACOES_DO_RESUMO) {
+      const linha = { tipo: "situacao", passo: k, situacao, rotulo };
+      if (total(linha)) linhas.push(linha);
+    }
+    const fora = { tipo: "situacao", passo: k, situacao: "fora", rotulo: `chegaram a ${LINHAS_DO_RESUMO[k + 1].rotulo.toLowerCase()} sem passar por esta linha` };
+    if (total(fora)) linhas.push(fora);
+  });
+  return linhas;
+}
+const contagemDaCelula = (c, linha) => (linha.campo ? c[linha.campo] || 0 : leadsDaCelula(c, linha).length);
+const totalDaLinha = (b, linha) => b.campanhas.reduce((t, c) => t + contagemDaCelula(c, linha), 0);
+
 const reaisDoResumo = (v) => (v === null || v === undefined ? "" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 const reaisSemSimbolo = (v) => (v === null || v === undefined ? "" : v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const nomeDaColuna = (c) => (c.partes ? c.partes.join(" · ") : c.grupo || "(não informado)");
@@ -87,10 +139,19 @@ function renderizarResumoDoNucleo() {
       if (!b.campanhas.length) {
         return `<div><p class="text-xs font-semibold text-ink mb-1">${esc(b.titulo)}</p><p class="text-xs text-inkdim">Sem leads no período.</p></div>`;
       }
-      const celulaNumero = (valor, ci, campo) =>
+      const linhasDoBloco = linhasDoQuadro(b);
+      const celulaNumero = (valor, ci, li) =>
         valor > 0
-          ? `<button type="button" data-bloco="${bi}" data-coluna="${ci}" data-campo="${campo}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">${numero(valor)}</button>`
-          : numero(valor);
+          ? `<button type="button" data-bloco="${bi}" data-coluna="${ci}" data-linha="${li}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">${numero(valor)}</button>`
+          : valor === 0 && linhasDoBloco[li].tipo !== "principal"
+            ? '<span class="text-inkfaint">—</span>'
+            : numero(valor);
+      const estiloDaLinha = (linha) =>
+        linha.tipo === "principal"
+          ? { tr: "border-t border-line", rotulo: "px-3 py-1.5 text-center text-inkdim", celula: "px-3 py-1.5 text-center tabular text-ink" }
+          : linha.tipo === "saida"
+            ? { tr: "border-t border-line bg-surface/40", rotulo: "pl-6 pr-3 py-1 text-left text-[11px] italic text-inkdim", celula: "px-3 py-1 text-center tabular text-[11px] text-inkdim" }
+            : { tr: "bg-surface/40", rotulo: "pl-10 pr-3 py-0.5 text-left text-[11px] text-inkfaint", celula: "px-3 py-0.5 text-center tabular text-[11px] text-inkdim" };
       const celulaValor = (c, ci) =>
         c.origemDoValor === "meta"
           ? `<span title="Valor do Meta">${reaisDoResumo(c.valor)}</span>`
@@ -125,13 +186,16 @@ function renderizarResumoDoNucleo() {
               ${b.campanhas.map((c, ci) => `<td class="px-3 py-1.5 text-center tabular">${celulaValor(c, ci)}</td>`).join("")}
               <td class="px-3 py-1.5 text-center tabular font-semibold text-ink bg-surface2" data-total-valor="${bi}">${reaisDoResumo(valorTotalDoBloco(b)) || "—"}</td>
             </tr>
-            ${LINHAS_DO_RESUMO.map(
-              (linha) => `<tr class="border-t border-line">
-                <td class="px-3 py-1.5 text-center text-inkdim">${esc(linha.rotulo)}</td>
-                ${b.campanhas.map((c, ci) => `<td class="px-3 py-1.5 text-center tabular text-ink">${celulaNumero(c[linha.campo], ci, linha.campo)}</td>`).join("")}
-                <td class="px-3 py-1.5 text-center tabular font-semibold text-ink bg-surface2">${celulaNumero(totalDoBloco(b, linha.campo), "total", linha.campo)}</td>
-              </tr>`,
-            ).join("")}
+            ${linhasDoBloco
+              .map((linha, li) => {
+                const e = estiloDaLinha(linha);
+                return `<tr class="${e.tr}">
+                <td class="${e.rotulo}">${esc(linha.rotulo)}</td>
+                ${b.campanhas.map((c, ci) => `<td class="${e.celula}">${celulaNumero(contagemDaCelula(c, linha), ci, li)}</td>`).join("")}
+                <td class="${e.celula} font-semibold bg-surface2">${celulaNumero(totalDaLinha(b, linha), "total", li)}</td>
+              </tr>`;
+              })
+              .join("")}
           </tbody>
         </table>
       </div>`;
@@ -140,14 +204,25 @@ function renderizarResumoDoNucleo() {
 }
 
 $("resumoNucleo").addEventListener("click", (e) => {
-  const botao = e.target.closest("button[data-campo]");
+  const botao = e.target.closest("button[data-linha]");
   if (!botao || !resumoDoNucleo) return;
   const bloco = resumoDoNucleo.blocos[Number(botao.dataset.bloco)];
-  const linha = LINHAS_DO_RESUMO.find((l) => l.campo === botao.dataset.campo);
+  const linha = linhasDoQuadro(bloco)[Number(botao.dataset.linha)];
   const colunas = botao.dataset.coluna === "total" ? bloco.campanhas : [bloco.campanhas[Number(botao.dataset.coluna)]];
-  const leads = colunas.flatMap((c) => c.listas[linha.campo] || []);
   const nome = botao.dataset.coluna === "total" ? "total" : nomeDaColuna(colunas[0]);
-  abrirLeadsDoGrupo(`${bloco.titulo} · ${nome}: ${linha.rotulo.toLowerCase()}`, leads);
+  if (linha.tipo === "principal") {
+    abrirLeadsDoGrupo(`${bloco.titulo} · ${nome}: ${linha.rotulo.toLowerCase()}`, colunas.flatMap((c) => c.listas[linha.campo] || []));
+    return;
+  }
+  // Nas saídas, a lista mostra a etapa de hoje e o motivo de perda.
+  const leads = colunas.flatMap((c) => leadsDaCelula(c, linha)).map((l) => ({ ...l, etapaMaisAvancada: [l.etapaAtual, l.motivoPerda].filter(Boolean).join(" · ") }));
+  const titulo = linha.tipo === "saida" ? linha.rotulo : `${SAIDAS_DO_RESUMO[linha.passo]}, ${linha.rotulo}`;
+  abrirLeadsDoGrupo(
+    `${bloco.titulo} · ${nome}: ${titulo.toLowerCase()}`,
+    leads,
+    `Leads que chegaram a "${LINHAS_DO_RESUMO[linha.passo].rotulo}" e não a "${LINHAS_DO_RESUMO[linha.passo + 1].rotulo}", com a etapa em que estão hoje.`,
+    { nome: "saidas.csv", cabecalho: ["ID", "Nome", "Telefone", "Etapa hoje", "Motivo de perda"], linhas: leads.map((l) => [l.leadId || "", l.nome, l.telefone || "", l.etapaAtual || "", l.motivoPerda || ""]) },
+  );
 });
 
 // Valor digitado: grava ao sair do campo ou com Enter.
@@ -196,8 +271,13 @@ function tabelasDoResumo() {
       cabecalhos: cabecalhoDoBloco(b, resumoDoNucleo.nivel),
       linhas: [
         ["Valor", ...b.campanhas.map((c) => c.valor), valorTotalDoBloco(b)],
-        ...LINHAS_DO_RESUMO.map((l) => [l.rotulo, ...b.campanhas.map((c) => c[l.campo] || 0), totalDoBloco(b, l.campo)]),
+        ...linhasDoQuadro(b).map((l) => [
+          l.tipo === "principal" ? l.rotulo : l.tipo === "saida" ? `   ${l.rotulo}` : `      ${l.rotulo}`,
+          ...b.campanhas.map((c) => contagemDaCelula(c, l)),
+          totalDaLinha(b, l),
+        ]),
       ],
+      tipos: ["valor", ...linhasDoQuadro(b).map((l) => l.tipo)],
     }));
 }
 
@@ -225,7 +305,12 @@ function htmlDasTabelas(tabelas) {
           .map(
             (l, i) =>
               `<tr>${l
-                .map((v, j) => `<td style="text-align:center;${j === l.length - 1 ? "background:#a9c4eb;font-weight:bold" : i % 2 ? "background:#d9d9d9" : ""}">${esc(j && i === 0 ? reaisDoResumo(v) : String(v ?? ""))}</td>`)
+                .map((v, j) => {
+                  const sub = t.tipos?.[i] === "saida" || t.tipos?.[i] === "situacao";
+                  const fundo = j === l.length - 1 ? "background:#a9c4eb;font-weight:bold" : sub ? "background:#f3f3f3" : "background:#d9d9d9";
+                  const rotulo = j === 0 && sub ? `text-align:left;white-space:pre;color:#555;font-size:10pt;${t.tipos[i] === "saida" ? "font-style:italic" : ""}` : "text-align:center";
+                  return `<td style="${rotulo};${fundo}${sub && j ? ";color:#555;font-size:10pt" : ""}">${esc(j && i === 0 ? reaisDoResumo(v) : String(v ?? ""))}</td>`;
+                })
                 .join("")}</tr>`,
           )
           .join("")}
@@ -330,14 +415,26 @@ $("btnImagemResumo").addEventListener("click", () => {
     y += alturaDoCabecalho;
     // Linhas
     t.linhas.forEach((linha, i) => {
+      const sub = t.tipos[i] === "saida" || t.tipos[i] === "situacao";
       for (let j = 0; j < n; j++) {
-        ctx.fillStyle = j === n - 1 ? "#a9c4eb" : i % 2 ? "#d9d9d9" : "#ffffff";
+        ctx.fillStyle = j === n - 1 ? "#a9c4eb" : sub ? "#f3f3f3" : "#d9d9d9";
         ctx.fillRect(xDaColuna(j), y, larguraDaColuna(j), alturaLinha);
-        ctx.fillStyle = "#222222";
-        ctx.font = j === n - 1 ? "bold 13px Arial, sans-serif" : "13px Arial, sans-serif";
-        ctx.textAlign = "center";
+        ctx.strokeStyle = "#ffffff";
+        ctx.strokeRect(xDaColuna(j), y, larguraDaColuna(j), alturaLinha);
+        ctx.fillStyle = sub ? "#555555" : "#222222";
+        ctx.font = `${t.tipos[i] === "saida" && j === 0 ? "italic " : ""}${j === n - 1 ? "bold " : ""}${sub ? "11px" : "13px"} Arial, sans-serif`;
         const v = linha[j];
-        ctx.fillText(j && i === 0 ? reaisDoResumo(v) || "—" : String(v ?? ""), xDaColuna(j) + larguraDaColuna(j) / 2, y + 17);
+        const texto = j && i === 0 ? reaisDoResumo(v) || "—" : String(v ?? "");
+        if (j === 0 && sub) {
+          ctx.textAlign = "left";
+          const recuo = t.tipos[i] === "saida" ? 14 : 26;
+          const limite = Math.floor((larguraRotulo - recuo - 4) / 5.6);
+          const limpo = texto.trim();
+          ctx.fillText(limpo.length > limite ? `${limpo.slice(0, limite - 1)}…` : limpo, xDaColuna(0) + recuo, y + 17);
+        } else {
+          ctx.textAlign = "center";
+          ctx.fillText(texto, xDaColuna(j) + larguraDaColuna(j) / 2, y + 17);
+        }
       }
       y += alturaLinha;
     });
@@ -354,3 +451,4 @@ $("btnImagemResumo").addEventListener("click", () => {
 });
 
 $("colunasResumo").addEventListener("change", () => carregarResumoDoNucleo());
+$("saidasResumo").addEventListener("change", () => renderizarResumoDoNucleo());

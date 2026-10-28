@@ -1687,6 +1687,7 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
             reunioesRealizadas: g.realizadas,
             contratosFechados: g.contratoFechado,
             listas: { leads: g.leads, qualificados: g.leadsQualificados, reunioesMarcadas: g.leadsReuniao, reunioesRealizadas: g.leadsRealizadas, contratosFechados: g.leadsFechados },
+            saidas: g.saidas,
           };
         });
       return { codigo: c.codigo, titulo: c.tituloNoResumo || c.nome || c.codigo, campanhas };

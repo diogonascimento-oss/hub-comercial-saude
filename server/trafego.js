@@ -7,6 +7,7 @@ import {
   ORDEM_ETAPAS,
   CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO,
   ROTULO_SEM_RASTREIO_DE_ANUNCIO,
+  MOTIVOS_SEM_INTERESSE,
 } from "./config.js";
 import { nomeDaEtapa } from "./mapeamento.js";
 import { getLocalizacao } from "./localizacao.js";
@@ -23,6 +24,28 @@ const ETAPAS_MARCO = [
   { rotulo: "Protocolo Farmer", alcancou: (l) => l.etapasVisitadas.has("PROTOCOLO_FARMER") },
   { rotulo: "Fechado", alcancou: (l) => l.etapasVisitadas.has("FECHADO") },
 ];
+
+const chaveDoMotivo = (m) => String(m || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const MOTIVOS_DE_SEM_INTERESSE = new Set(MOTIVOS_SEM_INTERESSE.map(chaveDoMotivo));
+
+// Onde o lead está hoje, para explicar a saída de quem não avançou no funil.
+// Mesma separação dos cartões: "Sem interesse" pelo motivo de perda.
+export function situacaoDeHoje(lead) {
+  switch (lead.etapa) {
+    case "DESQUALIFICADO":
+      return MOTIVOS_DE_SEM_INTERESSE.has(chaveDoMotivo(lead.motivoPerda)) ? "semInteresse" : "desqualificado";
+    case "REMARCACAO":
+      return "remarcacao";
+    case "REAQUECIMENTO":
+      return "reaquecimento";
+    case "PROTOCOLO_FARMER":
+      return "farmer";
+    case "FECHADO":
+      return "fechado";
+    default:
+      return "emAndamento";
+  }
+}
 
 const umaCasa = (numerador, denominador) => (denominador ? Math.round((numerador / denominador) * 1000) / 10 : 0);
 const doisDecimais = (valor) => Math.round(valor * 100) / 100;
@@ -79,13 +102,36 @@ export function consolidarLeads({ leads, eventosPorLead, deTs, ateTs, apenasNovo
       // "Situação da reunião" ou saída de Agendado para uma etapa pós-reunião).
       reuniaoRealizada: reunioesDoLead(lead, eventos).some((r) => r.resultado === "Realizada"),
       etapaMaisAvancada: nomeDaEtapa(maisAvancada),
+      etapaAtual: lead.etapaNome || nomeDaEtapa(lead.etapa),
+      motivoPerda: lead.motivoPerda || "",
+      situacaoDeHoje: situacaoDeHoje(lead),
       localizacao: getLocalizacao(lead.telefone),
     });
   }
   return consolidados;
 }
 
-const resumoDoLead = (l) => ({ leadId: l.leadId, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: l.etapaMaisAvancada });
+const resumoDoLead = (l) => ({ leadId: l.leadId, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: l.etapaMaisAvancada, etapaAtual: l.etapaAtual, motivoPerda: l.motivoPerda });
+
+// Para cada passo do funil (leads → qualificados → reunião marcada → reunião
+// realizada → contrato), quem chegou a um nível e não ao seguinte, separado
+// pela situação de hoje. Assim a conta fecha: nível = seguinte + saídas,
+// a não ser por leads que chegaram ao seguinte sem passar por este
+// (contados em "foraDaSequencia").
+function saidasDoFunil(niveis) {
+  const saidas = [];
+  for (let k = 0; k < niveis.length - 1; k++) {
+    const seguinte = new Set(niveis[k + 1].map((l) => l.leadId));
+    const atual = new Set(niveis[k].map((l) => l.leadId));
+    const porSituacao = {};
+    for (const l of niveis[k]) {
+      if (seguinte.has(l.leadId)) continue;
+      (porSituacao[l.situacaoDeHoje] ||= []).push(resumoDoLead(l));
+    }
+    saidas.push({ porSituacao, foraDaSequencia: niveis[k + 1].filter((l) => !atual.has(l.leadId)).map(resumoDoLead) });
+  }
+  return saidas;
+}
 
 function agrupar(leads, chaveDoGrupo) {
   const grupos = new Map();
@@ -126,6 +172,7 @@ export function agruparEComputar(leads, chaveDoGrupo) {
       leadsFarmer: farmer.map(resumoDoLead),
       leadsRealizadas: realizadas.map(resumoDoLead),
       leadsFechados: fechados.map(resumoDoLead),
+      saidas: saidasDoFunil([doGrupo, qualificados, reuniao, realizadas, fechados]),
     });
   }
   return resultado.sort((a, b) => b.totalLeads - a.totalLeads);

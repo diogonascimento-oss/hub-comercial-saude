@@ -391,13 +391,14 @@
               <option value="todos">Campanha, conjunto e anúncio</option>
             </select>
           </label>
+          <label class="text-[11px] text-inkdim flex items-center gap-1.5" title="Mostra, entre as linhas, para onde foram os leads que não chegaram à linha seguinte"><input type="checkbox" id="saidasResumo" checked class="accent-gold"> Mostrar quem não avançou</label>
           <button type="button" id="btnCsvResumo" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Baixar CSV</button>
           <button type="button" id="btnHtmlResumo" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Baixar HTML</button>
           <button type="button" id="btnImagemResumo" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Baixar imagem</button>
         </div>
       </div>
       <div class="border border-line bg-bg p-5 space-y-2">
-        <p class="text-[11px] text-inkdim leading-relaxed">Um quadro por campanha do núcleo, com as campanhas do Meta lado a lado, no período do filtro. Mostra as três campanhas, independente da campanha escolhida acima. Clique em um número para ver os leads.</p>
+        <p class="text-[11px] text-inkdim leading-relaxed">Um quadro por campanha do núcleo, com as campanhas do Meta lado a lado, no período do filtro. Mostra as três campanhas, independente da campanha escolhida acima. Clique em um número para ver os leads. Entre as linhas, "quem não avançou" mostra onde estão hoje os leads que não chegaram à linha seguinte, para a conta de cada coluna fechar.</p>
         <p id="notaResumoNucleo" class="text-[11px] text-goldbright leading-relaxed"></p>
         <p id="notaValorResumo" class="text-[10px] text-inkfaint leading-relaxed"></p>
         <div id="resumoNucleo" class="space-y-6 pt-2"></div>
