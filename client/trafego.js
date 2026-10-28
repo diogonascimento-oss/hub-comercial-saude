@@ -289,97 +289,23 @@ async function atualizarGraficoDeCusto() {
 
 // --- Carga e renderização da aba ---------------------------------------------------
 
-// Tabela principal da seção 3: uma linha por dia de chegada (ou por campanha
-// do Meta, conjunto ou anúncio), com a situação dos leads. Cada número abre a
-// lista dos leads; o detalhamento mostra, em cada linha, onde estão hoje os
-// que não chegaram à etapa seguinte.
+// Tabela por campanha do Meta, no formato do relatório de tráfego: uma linha
+// por campanha e uma linha de total. Cada número abre a lista dos leads.
 const COLUNAS_POR_CAMPANHA = [
   { campo: "totalLeads", lista: "leads", rotulo: "Leads", titulo: "leads" },
   { campo: "qualificados", lista: "leadsQualificados", rotulo: "Qualificados", titulo: "qualificados" },
-  { campo: "desqualificadosHoje", lista: "leadsDesqualificadosHoje", rotulo: "Desqualificados", titulo: "desqualificados" },
-  { campo: "semInteresseHoje", lista: "leadsSemInteresseHoje", rotulo: "Sem interesse", titulo: "sem interesse" },
-  { campo: "emQualificacaoHoje", lista: "leadsEmQualificacaoHoje", rotulo: "Em qualificação / contato iniciado", titulo: "em qualificação ou contato iniciado" },
-  { campo: "reuniao", lista: "leadsReuniao", rotulo: "Reuniões marcadas", titulo: "com reunião marcada" },
-  { campo: "contratoFechado", lista: "leadsFechados", rotulo: "Fechados", titulo: "com contrato fechado" },
-];
-const LINHAS_DA_TABELA_POR_CAMPANHA = {
-  dia: { chave: "porDia", rotulo: "Dia de chegada" },
-  campanha: { chave: "porCampanhaMeta", rotulo: "Campanha do Meta" },
-  conjunto: { chave: "porConjunto", rotulo: "Conjunto de anúncios" },
-  anuncio: { chave: "porAnuncio", rotulo: "Anúncio" },
-};
-// Passos do detalhamento: de cada linha do funil para a seguinte.
-const PASSOS_DO_CRUZAMENTO = [
-  { de: "Leads", para: "Qualificados", rotulo: "Não qualificados", pulou: "Lead Qualificado" },
-  { de: "Qualificados", para: "Reuniões marcadas", rotulo: "Sem reunião marcada", pulou: "Agendado" },
-  { de: "Reuniões marcadas", para: "Fechados", rotulo: "Sem contrato fechado", pulou: null },
+  { campo: "reuniao", lista: "leadsReuniao", rotulo: "Marcadas", titulo: "com reunião marcada" },
+  { campo: "realizadas", lista: "leadsRealizadas", rotulo: "Realizadas", titulo: "com reunião realizada" },
+  { campo: "contratoFechado", lista: "leadsFechados", rotulo: "Contratos", titulo: "com contrato fechado" },
 ];
 const moeda = (valor) => (valor === null || valor === undefined ? "—" : valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
-const linhasAbertasDoCruzamento = new Set(); // índices de linha (ou "total") com o detalhamento aberto
-
-function rotuloDoDia(iso) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-  const [a, m, d] = iso.split("-").map(Number);
-  const semana = new Date(Date.UTC(a, m - 1, d)).toLocaleDateString("pt-BR", { weekday: "short", timeZone: "UTC" }).replace(".", "");
-  return `${semana} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
-}
-
-// Junta as saídas de vários grupos (linha de total).
-function somarSaidas(grupos) {
-  return PASSOS_DO_CRUZAMENTO.map((_, k) => {
-    const porSituacao = {};
-    const foraDaSequencia = [];
-    for (const g of grupos) {
-      const s = g.saidasDiretas?.[k];
-      if (!s) continue;
-      for (const [situacao, lista] of Object.entries(s.porSituacao)) (porSituacao[situacao] ||= []).push(...lista);
-      foraDaSequencia.push(...(s.foraDaSequencia || []));
-    }
-    return { porSituacao, foraDaSequencia };
-  });
-}
-
-// Conteúdo do detalhamento de uma linha: um passo por linha, com as situações
-// de hoje dos que não avançaram. Cada número abre a lista.
-function detalhamentoDoCruzamento(saidas, nomeDaLinha) {
-  const rotulos = Object.fromEntries(SITUACOES_DO_RESUMO);
-  const listas = [];
-  const html = PASSOS_DO_CRUZAMENTO.map((passo, k) => {
-    const s = saidas[k] || { porSituacao: {}, foraDaSequencia: [] };
-    const total = Object.values(s.porSituacao).reduce((t, l) => t + l.length, 0);
-    const itens = SITUACOES_DO_RESUMO.filter(([situacao]) => s.porSituacao[situacao]?.length).map(([situacao]) => {
-      const alerta = passo.pulou && SITUACOES_DEPOIS_DA_REUNIAO.has(situacao);
-      const rotulo = alerta ? `${rotulos[situacao]}, sem passar por ${passo.pulou}` : rotulos[situacao];
-      listas.push({ titulo: `${nomeDaLinha} · ${passo.rotulo.toLowerCase()}, ${rotulo}`, leads: s.porSituacao[situacao] });
-      return `<button type="button" data-detalhe="${listas.length - 1}" class="${alerta ? "text-goldbright" : "text-inkdim"} hover:text-ink"${alerta ? ` title="Está hoje numa etapa posterior à reunião sem ter passado por ${passo.pulou} no Kommo. Vale conferir a movimentação."` : ""}>${esc(rotulo)} <span class="tabular underline decoration-dotted underline-offset-2 ${alerta ? "" : "text-ink"}">${numero(s.porSituacao[situacao].length)}</span></button>`;
-    });
-    if (s.foraDaSequencia?.length) {
-      listas.push({ titulo: `${nomeDaLinha} · chegaram a ${passo.para.toLowerCase()} sem passar por ${passo.de.toLowerCase()}`, leads: s.foraDaSequencia });
-      itens.push(`<button type="button" data-detalhe="${listas.length - 1}" class="text-goldbright hover:text-ink" title="Contados em ${passo.para} sem registro de ${passo.de} no Kommo.">chegaram a ${esc(passo.para.toLowerCase())} sem passar por esta etapa <span class="tabular underline decoration-dotted underline-offset-2">${numero(s.foraDaSequencia.length)}</span></button>`);
-    }
-    let cabeca = `<span class="italic text-inkdim">${esc(passo.rotulo)}</span> <span class="tabular text-ink">${numero(total)}</span>`;
-    if (total) {
-      listas.push({ titulo: `${nomeDaLinha} · ${passo.rotulo.toLowerCase()}`, leads: Object.values(s.porSituacao).flat() });
-      cabeca = `<button type="button" data-detalhe="${listas.length - 1}" class="italic text-inkdim hover:text-ink">${esc(passo.rotulo)} <span class="not-italic tabular text-ink underline decoration-dotted underline-offset-2">${numero(total)}</span></button>`;
-    }
-    return `<div class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-      <span class="text-inkfaint text-[10px] uppercase tracking-wide w-60 shrink-0">${esc(passo.de)} → ${esc(passo.para)}</span>
-      ${cabeca}${itens.length ? `<span class="text-inkfaint">:</span>${itens.join('<span class="text-inkfaint">·</span>')}` : ""}
-    </div>`;
-  }).join("");
-  return { html, listas };
-}
 
 function renderizarTabelaPorCampanha(a) {
-  const modo = LINHAS_DA_TABELA_POR_CAMPANHA[$("linhasPorCampanha").value] || LINHAS_DA_TABELA_POR_CAMPANHA.dia;
-  const grupos = a[modo.chave] || [];
+  const grupos = a.porCampanhaMeta || [];
   const tabela = $("tabelaPorCampanha");
-  const porCampanha = modo.chave === "porCampanhaMeta";
-  $("notaPorCampanha").textContent =
-    ($("apenasNovos").checked
-      ? "Leads que chegaram no período, acompanhados até hoje."
-      : "Todos os leads com movimentação no período, inclusive os que chegaram antes.") +
-    " Desqualificados, sem interesse e em qualificação mostram onde o lead está hoje.";
+  $("notaPorCampanha").textContent = $("apenasNovos").checked
+    ? "Leads que chegaram no período, acompanhados até hoje: tudo o que aconteceu com eles depois conta aqui."
+    : "Todos os leads com movimentação no período, inclusive os que chegaram antes.";
   if (!grupos.length) {
     tabela.innerHTML = '<tbody><tr><td class="text-inkdim">Sem leads no período.</td></tr></tbody>';
     $("rodapePorCampanha").textContent = "";
@@ -387,102 +313,52 @@ function renderizarTabelaPorCampanha(a) {
   }
   const inv = a.investimento || {};
   const somar = (campo) => grupos.reduce((t, g) => t + (g[campo] || 0), 0);
-  const algumInvestido = porCampanha && grupos.some((g) => g.investido !== null && g.investido !== undefined);
+  const algumInvestido = grupos.some((g) => g.investido !== null && g.investido !== undefined);
   const totalInvestido = algumInvestido ? Math.round(grupos.reduce((t, g) => t + (g.investido || 0), 0) * 100) / 100 : null;
-  const nColunas = COLUNAS_POR_CAMPANHA.length + 1 + (porCampanha ? 1 : 0);
-  const nomeDoGrupo = (g) => (modo.chave === "porDia" ? rotuloDoDia(g.grupo) : g.grupo);
-  const listasDoDetalhe = [];
-  const linhaDeDetalhe = (chave, saidas, nome) => {
-    if (!linhasAbertasDoCruzamento.has(chave)) return "";
-    const { html, listas } = detalhamentoDoCruzamento(saidas, nome);
-    const base = listasDoDetalhe.length;
-    listasDoDetalhe.push(...listas);
-    const comIndice = html.replace(/data-detalhe="(\d+)"/g, (_, n) => `data-detalhe="${base + Number(n)}"`);
-    return `<tr class="detalhe-do-cruzamento"><td colspan="${nColunas}" class="!whitespace-normal bg-surface/60 text-[11px] !py-2.5 !pl-8 space-y-1.5">${comIndice}</td></tr>`;
-  };
-  const seta = (chave) =>
-    `<button type="button" data-abrir="${chave}" aria-expanded="${linhasAbertasDoCruzamento.has(chave)}" title="Mostrar ou esconder para onde foram os que não avançaram" class="seta-do-passo inline-block w-3 text-[10px] text-inkfaint hover:text-goldbright ${linhasAbertasDoCruzamento.has(chave) ? "aberta" : ""}">▸</button>`;
   const celula = (g, i, c, ci) =>
-    g[c.campo]
-      ? `<td class="text-right tabular"><button data-campanha="${i}" data-coluna="${ci}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">${numero(g[c.campo])}</button></td>`
-      : `<td class="text-right tabular text-inkfaint">0</td>`;
+    `<td class="text-right tabular"><button data-campanha="${i}" data-coluna="${ci}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">${numero(g[c.campo])}</button></td>`;
   tabela.innerHTML = `
     <thead>
       <tr class="text-inkdim text-[10px] uppercase tracking-wide">
-        <th class="text-left font-normal align-bottom">${esc(modo.rotulo)}</th>
-        ${porCampanha ? '<th class="text-right font-normal align-bottom">Investido</th>' : ""}
-        ${COLUNAS_POR_CAMPANHA.map((c) => `<th class="text-right font-normal align-bottom !whitespace-normal max-w-[110px]">${esc(c.rotulo)}</th>`).join("")}
+        <th rowspan="2" class="text-left font-normal align-bottom">Campanha</th>
+        <th rowspan="2" class="text-right font-normal align-bottom">Investido</th>
+        <th rowspan="2" class="text-right font-normal align-bottom">Leads</th>
+        <th rowspan="2" class="text-right font-normal align-bottom">Qualificados</th>
+        <th colspan="2" class="text-center font-normal">Reuniões</th>
+        <th rowspan="2" class="text-right font-normal align-bottom">Contratos</th>
+      </tr>
+      <tr class="text-inkdim text-[10px] uppercase tracking-wide">
+        <th class="text-right font-normal">Marcadas</th>
+        <th class="text-right font-normal">Realizadas</th>
       </tr>
     </thead>
     <tbody>
       ${grupos
         .map(
           (g, i) => `<tr>
-        <td class="text-ink max-w-[260px] truncate" title="${esc(g.grupo)}">${seta(String(i))} ${esc(nomeDoGrupo(g))}</td>
-        ${porCampanha ? `<td class="text-right tabular text-inkdim">${moeda(g.investido)}</td>` : ""}
+        <td class="text-ink max-w-[220px] truncate" title="${esc(g.grupo)}">${esc(g.grupo)}</td>
+        <td class="text-right tabular text-inkdim">${moeda(g.investido)}</td>
         ${COLUNAS_POR_CAMPANHA.map((c, ci) => celula(g, i, c, ci)).join("")}
-      </tr>${linhaDeDetalhe(String(i), g.saidasDiretas || [], nomeDoGrupo(g))}`,
+      </tr>`,
         )
         .join("")}
       <tr class="destaque font-semibold">
-        <td class="text-goldbright">${seta("total")} Total</td>
-        ${porCampanha ? `<td class="text-right tabular text-goldbright">${moeda(totalInvestido)}</td>` : ""}
-        ${COLUNAS_POR_CAMPANHA.map((c, ci) => `<td class="text-right tabular text-goldbright"><button data-campanha="total" data-coluna="${ci}" class="underline decoration-dotted underline-offset-2 hover:text-ink">${numero(somar(c.campo))}</button></td>`).join("")}
-      </tr>${linhaDeDetalhe("total", somarSaidas(grupos), "Total")}
+        <td class="text-goldbright">Total</td>
+        <td class="text-right tabular text-goldbright">${moeda(totalInvestido)}</td>
+        ${COLUNAS_POR_CAMPANHA.map((c) => `<td class="text-right tabular text-goldbright">${numero(somar(c.campo))}</td>`).join("")}
+      </tr>
     </tbody>`;
-  const algumAberto = linhasAbertasDoCruzamento.size > 0;
-  $("btnDetalhamentoCruzamento").textContent = algumAberto ? "Recolher detalhamento" : "Mostrar detalhamento";
-  tabela.onclick = (e) => {
-    const abrir = e.target.closest("button[data-abrir]");
-    if (abrir) {
-      const chave = abrir.dataset.abrir;
-      if (linhasAbertasDoCruzamento.has(chave)) linhasAbertasDoCruzamento.delete(chave);
-      else linhasAbertasDoCruzamento.add(chave);
-      renderizarTabelaPorCampanha(a);
-      return;
-    }
-    const detalhe = e.target.closest("button[data-detalhe]");
-    if (detalhe) {
-      const d = listasDoDetalhe[Number(detalhe.dataset.detalhe)];
-      const leads = d.leads.map((l) => ({ ...l, etapaMaisAvancada: [l.etapaAtual, l.motivoPerda].filter(Boolean).join(" · ") }));
-      abrirLeadsDoGrupo(d.titulo, leads, "Leads que não chegaram à etapa seguinte, com a etapa em que estão hoje.", {
-        nome: "saidas.csv",
-        cabecalho: ["ID", "Nome", "Telefone", "Etapa hoje", "Motivo de perda"],
-        linhas: leads.map((l) => [l.leadId || "", l.nome, l.telefone || "", l.etapaAtual || "", l.motivoPerda || ""]),
-      });
-      return;
-    }
-    const botao = e.target.closest("button[data-campanha]");
-    if (!botao) return;
-    const c = COLUNAS_POR_CAMPANHA[Number(botao.dataset.coluna)];
-    if (botao.dataset.campanha === "total") {
-      abrirLeadsDoGrupo(`Total: ${c.titulo}`, grupos.flatMap((g) => g[c.lista] || []));
-      return;
-    }
+  tabela.querySelectorAll("button[data-campanha]").forEach((botao) => {
     const g = grupos[Number(botao.dataset.campanha)];
-    abrirLeadsDoGrupo(`${nomeDoGrupo(g)}: ${c.titulo}`, g[c.lista] || []);
-  };
-  $("rodapePorCampanha").textContent = !porCampanha
-    ? "Clique na seta de uma linha para ver, passo a passo, onde estão hoje os leads que não avançaram."
-    : !inv.configurado
-      ? "Investido: aparece quando a integração com o Meta estiver configurada (token de acesso no servidor)."
-      : inv.erro
-        ? `Investido indisponível: ${inv.erro}`
-        : "Investido: valor gasto no Meta no período, associado pelo nome da campanha. Campanhas cujo nome no Kommo difere do Meta ficam sem valor.";
+    const c = COLUNAS_POR_CAMPANHA[Number(botao.dataset.coluna)];
+    botao.addEventListener("click", () => abrirLeadsDoGrupo(`${g.grupo}: ${c.titulo}`, g[c.lista] || []));
+  });
+  $("rodapePorCampanha").textContent = !inv.configurado
+    ? "Investido: aparece quando a integração com o Meta estiver configurada (token de acesso no servidor)."
+    : inv.erro
+      ? `Investido indisponível: ${inv.erro}`
+      : "Investido: valor gasto no Meta no período, associado pelo nome da campanha. Campanhas cujo nome no Kommo difere do Meta ficam sem valor.";
 }
-
-$("linhasPorCampanha").addEventListener("change", () => {
-  linhasAbertasDoCruzamento.clear();
-  if (analiseDeTrafego) renderizarTabelaPorCampanha(analiseDeTrafego);
-});
-$("btnDetalhamentoCruzamento").addEventListener("click", () => {
-  if (!analiseDeTrafego) return;
-  const modo = LINHAS_DA_TABELA_POR_CAMPANHA[$("linhasPorCampanha").value] || LINHAS_DA_TABELA_POR_CAMPANHA.dia;
-  const grupos = analiseDeTrafego[modo.chave] || [];
-  if (linhasAbertasDoCruzamento.size) linhasAbertasDoCruzamento.clear();
-  else ["total", ...grupos.map((_, i) => String(i))].forEach((k) => linhasAbertasDoCruzamento.add(k));
-  renderizarTabelaPorCampanha(analiseDeTrafego);
-});
 
 function renderizarTrafego() {
   const a = analiseDeTrafego;

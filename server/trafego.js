@@ -105,9 +105,6 @@ export function consolidarLeads({ leads, eventosPorLead, deTs, ateTs, apenasNovo
       reuniaoRealizada: reunioesDoLead(lead, eventos).some((r) => r.resultado === "Realizada"),
       etapaMaisAvancada: nomeDaEtapa(maisAvancada),
       etapaAtual: lead.etapaNome || nomeDaEtapa(lead.etapa),
-      etapaChave: lead.etapa,
-      // Dia de chegada (fuso do escritório), para a visão por dia.
-      chegouEm: criadoNoPeriodo ? new Date(lead.criadoEm * 1000).toLocaleDateString("sv-SE", { timeZone: "America/Recife" }) : null,
       motivoPerda: lead.motivoPerda || "",
       situacaoDeHoje: situacaoDeHoje(lead),
       localizacao: getLocalizacao(lead.telefone),
@@ -157,9 +154,6 @@ export function agruparEComputar(leads, chaveDoGrupo) {
     const farmer = passou("PROTOCOLO_FARMER");
     const fechados = passou("FECHADO");
     const realizadas = doGrupo.filter((l) => l.reuniaoRealizada);
-    const desqualificadosHoje = doGrupo.filter((l) => l.situacaoDeHoje === "desqualificado");
-    const semInteresseHoje = doGrupo.filter((l) => l.situacaoDeHoje === "semInteresse");
-    const emQualificacaoHoje = doGrupo.filter((l) => l.etapaChave === "CONTATO_INICIADO" || l.etapaChave === "EM_QUALIFICACAO");
     resultado.push({
       grupo,
       totalLeads: doGrupo.length,
@@ -181,16 +175,6 @@ export function agruparEComputar(leads, chaveDoGrupo) {
       leadsRealizadas: realizadas.map(resumoDoLead),
       leadsFechados: fechados.map(resumoDoLead),
       saidas: saidasDoFunil([doGrupo, qualificados, reuniao, realizadas, fechados]),
-      // Situação de hoje, para a tabela por dia: desqualificados e sem
-      // interesse pelo motivo de perda; em qualificação inclui Contato Iniciado.
-      desqualificadosHoje: desqualificadosHoje.length,
-      semInteresseHoje: semInteresseHoje.length,
-      emQualificacaoHoje: emQualificacaoHoje.length,
-      leadsDesqualificadosHoje: desqualificadosHoje.map(resumoDoLead),
-      leadsSemInteresseHoje: semInteresseHoje.map(resumoDoLead),
-      leadsEmQualificacaoHoje: emQualificacaoHoje.map(resumoDoLead),
-      // Saídas em três passos: leads → qualificados → reunião marcada → fechado.
-      saidasDiretas: saidasDoFunil([doGrupo, qualificados, reuniao, fechados]),
     });
   }
   return resultado.sort((a, b) => b.totalLeads - a.totalLeads);
@@ -235,9 +219,6 @@ export function analisarTrafego(parametros) {
     porAnuncio: agruparEComputar(leads, (l) => l.anuncio),
     porAnuncioEConjunto: agruparEComputar(leads, chaveAnuncioEConjunto),
     porCampanhaMeta: agruparEComputar(leads, (l) => l.campanhaMeta),
-    // Por dia de chegada, em ordem de data. Leads que chegaram antes do
-    // período (só sem "apenas novos") ficam num grupo à parte, no fim.
-    porDia: agruparEComputar(leads, (l) => l.chegouEm || "Chegaram antes do período").sort((a, b) => String(a.grupo).localeCompare(String(b.grupo))),
     porCampanha: agruparEComputar(leads, (l) => l.campanha),
     porRegiao: agruparEComputar(leads, (l) => l.localizacao.regiao),
     porEstado: agruparEComputar(leads, (l) => l.localizacao.estado),
