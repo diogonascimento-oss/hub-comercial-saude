@@ -1,5 +1,5 @@
 // Saudação ao abrir o painel: uma vez por sessão do navegador, por cerca de
-// dois segundos, com o primeiro nome da conta usada no login. Um clique ou
+// quatro segundos, com o primeiro nome da conta usada no login. Um clique ou
 // qualquer tecla fecha antes. Depende de app.js (chamarApi).
 
 (function () {
@@ -67,5 +67,5 @@
   }
   tela.addEventListener("click", fechar);
   addEventListener("keydown", fechar, { once: true });
-  setTimeout(fechar, semMovimento ? 1600 : 2300);
+  setTimeout(fechar, semMovimento ? 3600 : 4300);
 })();

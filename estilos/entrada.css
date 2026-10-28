@@ -174,10 +174,7 @@ html { scroll-behavior: smooth; }
 }
 header > div > div:first-child { will-change: transform, opacity; }
 
-/* Cartões: luz suave seguindo o ponteiro, leve elevação e retorno ao toque. */
-.grade > div, .reage-ao-toque {
-  background-image: radial-gradient(260px circle at var(--mx, -400px) var(--my, -400px), rgb(var(--c-gold) / 0.09), transparent 70%);
-}
+/* Cartões: leve elevação e retorno ao toque. */
 .grade > div { transition: background-color 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s ease; }
 .grade > div:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.55); z-index: 1; position: relative; }
 .grade > div:active { transform: translateY(0) scale(0.985); }

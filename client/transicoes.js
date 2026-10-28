@@ -75,20 +75,6 @@
   }, { passive: true });
   aoRolar();
 
-  // Luz que acompanha o ponteiro nos cartões e quadros: a superfície reage ao
-  // toque e ao mouse.
-  document.addEventListener(
-    "pointermove",
-    (e) => {
-      const alvo = e.target.closest?.(".grade > div, .reage-ao-toque");
-      if (!alvo) return;
-      const r = alvo.getBoundingClientRect();
-      alvo.style.setProperty("--mx", `${e.clientX - r.left}px`);
-      alvo.style.setProperty("--my", `${e.clientY - r.top}px`);
-    },
-    { passive: true },
-  );
-
   // Ondulação a partir do ponto tocado nos botões principais.
   document.addEventListener("pointerdown", (e) => {
     const botao = e.target.closest?.(".ondula");
