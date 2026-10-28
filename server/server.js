@@ -1642,6 +1642,26 @@ async function comAnaliseAtual(registros) {
 // do Meta lado a lado, no formato da planilha da coordenação. O valor
 // investido vem do Meta quando o token está configurado; sem ele, vale o valor
 // digitado no próprio resumo para aquele período.
+// Quadros do resumo. "ir" junta as campanhas cujo código começa com IR
+// (formulário e WhatsApp); "todas" junta as três. O código de um quadro
+// unificado é a junção dos códigos, usada também para guardar o valor digitado.
+function quadrosDoResumo(juntar) {
+  const unico = (c) => ({ codigo: c.codigo, codigos: [c.codigo], titulo: c.tituloNoResumo || c.nome || c.codigo });
+  const unido = (lista, titulo) => ({ codigo: lista.map((c) => c.codigo).join("+"), codigos: lista.map((c) => c.codigo), titulo });
+  if (juntar === "todas") return [unido(CAMPANHAS, "Todas as campanhas do núcleo")];
+  if (juntar === "ir") {
+    const ir = CAMPANHAS.filter((c) => /^IR\b/i.test(c.codigo));
+    if (ir.length < 2) return CAMPANHAS.map(unico);
+    const quadros = [];
+    for (const c of CAMPANHAS) {
+      if (!ir.includes(c)) quadros.push(unico(c));
+      else if (c === ir[0]) quadros.push(unido(ir, "IR · formulário e WhatsApp"));
+    }
+    return quadros;
+  }
+  return CAMPANHAS.map(unico);
+}
+
 app.get("/api/trafego/resumo-nucleo", async (req, res) => {
   const periodo = lerPeriodo(req);
   if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
@@ -1649,6 +1669,8 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
   // Colunas de cada quadro: campanha do Meta, conjunto de anúncios ou anúncio.
   // "todos": uma coluna por combinação campanha + conjunto + anúncio.
   const nivel = ["conjunto", "anuncio", "todos"].includes(req.query.colunas) ? req.query.colunas : "campanha";
+  // Quadros: um por campanha, os dois de IR juntos, ou as três juntas.
+  const juntar = ["ir", "todas"].includes(req.query.juntar) ? req.query.juntar : "nao";
   const SEPARADOR = "\u241f";
   try {
     const hoje = dataLocal(Math.floor(Date.now() / 1000));
@@ -1664,23 +1686,33 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
       }
     }
     const chaveDoPeriodo = `${periodo.inicio}|${periodo.fim}`;
-    const blocos = CAMPANHAS.map((c) => {
-      const analise = analisarTrafego({ leads: leads.filter((l) => l.campanha === c.codigo), eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
+    const blocos = quadrosDoResumo(juntar).map((c) => {
+      const doQuadro = leads.filter((l) => c.codigos.includes(l.campanha));
+      const analise = analisarTrafego({ leads: doQuadro, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
       const doNivel =
         nivel === "todos"
           ? agruparEComputar(
-              consolidarLeads({ leads: leads.filter((l) => l.campanha === c.codigo), eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos }),
+              consolidarLeads({ leads: doQuadro, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos }),
               (l) => [l.campanhaMeta, l.conjunto, l.anuncio].map((x) => x || "(não informado)").join(SEPARADOR),
             )
           : { campanha: analise.porCampanhaMeta, conjunto: analise.porConjunto, anuncio: analise.porAnuncio }[nivel];
       // O gasto do Meta só é associado por campanha; nos outros níveis, o valor é digitado.
       const grupos = linhasDoMeta && nivel === "campanha" ? associarInvestimentoPorCampanha(doNivel, linhasDoMeta) : doNivel;
-      const digitados = valores[chaveDoPeriodo]?.[c.codigo] || {};
+      // Valor digitado: o do próprio quadro; num quadro unificado sem valor
+      // próprio, a soma do que foi digitado em cada campanha que ele reúne.
+      const doPeriodo = valores[chaveDoPeriodo] || {};
+      const digitadoNo = (codigo, chave) => doPeriodo[codigo]?.[chave] ?? null;
+      const valorDigitado = (chave) => {
+        const proprio = digitadoNo(c.codigo, chave);
+        if (proprio !== null || c.codigos.length === 1) return proprio;
+        const partes = c.codigos.map((codigo) => digitadoNo(codigo, chave)).filter((v) => v !== null);
+        return partes.length ? Math.round(partes.reduce((a, b) => a + b, 0) * 100) / 100 : null;
+      };
       const campanhas = [...grupos]
         .sort((a, b) => String(a.grupo).localeCompare(String(b.grupo), "pt-BR", { numeric: true }))
         .map((g) => {
           const doMeta = g.investido ?? null;
-          const digitado = digitados[nivel === "campanha" ? g.grupo : `${nivel}:${g.grupo}`] ?? null;
+          const digitado = valorDigitado(nivel === "campanha" ? g.grupo : `${nivel}:${g.grupo}`);
           return {
             grupo: g.grupo,
             ...(nivel === "todos" ? { partes: String(g.grupo).split(SEPARADOR) } : {}),
@@ -1695,9 +1727,9 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
             saidas: g.saidas,
           };
         });
-      return { codigo: c.codigo, titulo: c.tituloNoResumo || c.nome || c.codigo, campanhas };
+      return { codigo: c.codigo, titulo: c.titulo, campanhas };
     });
-    res.json({ inicio: periodo.inicio, fim: periodo.fim, apenasNovos, nivel, meta, blocos });
+    res.json({ inicio: periodo.inicio, fim: periodo.fim, apenasNovos, nivel, juntar, meta, blocos });
   } catch (erro) {
     responderErro(res, erro, "Falha ao montar o resumo para o núcleo");
   }
@@ -1708,7 +1740,8 @@ app.put("/api/trafego/resumo-nucleo/valor", async (req, res) => {
   const nivelDoValor = ["conjunto", "anuncio", "todos"].includes(req.body?.nivel) ? req.body.nivel : "campanha";
   const grupo = req.body?.grupo && nivelDoValor !== "campanha" ? `${nivelDoValor}:${req.body.grupo}` : req.body?.grupo;
   const periodo = lerPeriodo({ query: { inicio, fim } });
-  if (!periodo || !CAMPANHAS.some((c) => c.codigo === campanha) || !grupo || String(grupo).length > 300) {
+  const codigosValidos = String(campanha || "").split("+");
+  if (!periodo || !campanha || !codigosValidos.every((k) => CAMPANHAS.some((c) => c.codigo === k)) || !grupo || String(grupo).length > 300) {
     return res.status(400).json({ error: "Dados inválidos." });
   }
   const bruto = req.body.valor;

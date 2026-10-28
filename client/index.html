@@ -385,6 +385,13 @@
       <div class="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
         <h3 id="tResumoNucleo" class="titulo-secao">2. Resumo para o núcleo</h3>
         <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-[11px] text-inkdim flex items-center gap-1.5">Quadros
+            <select id="quadrosResumo" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">
+              <option value="nao">Um por campanha</option>
+              <option value="ir">IR unificado</option>
+              <option value="todas">Tudo unificado</option>
+            </select>
+          </label>
           <label class="text-[11px] text-inkdim flex items-center gap-1.5">Colunas por
             <select id="colunasResumo" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">
               <option value="campanha">Campanha do Meta</option>
@@ -400,7 +407,7 @@
         </div>
       </div>
       <div class="border border-line bg-bg p-5 space-y-2">
-        <p class="text-[11px] text-inkdim leading-relaxed">Um quadro por campanha do núcleo, com as campanhas do Meta lado a lado, no período do filtro. Mostra as três campanhas, independente da campanha escolhida acima. Clique em um número para ver os leads. Entre as linhas principais, o detalhamento mostra onde estão hoje os leads que não chegaram à linha seguinte, para a conta de cada coluna fechar. Clique no nome de uma linha principal para esconder ou mostrar o detalhamento dela.</p>
+        <p class="text-[11px] text-inkdim leading-relaxed">Um quadro por campanha do núcleo, com as campanhas do Meta lado a lado, no período do filtro. Mostra as três campanhas, independente da campanha escolhida acima; em "Quadros", dá para juntar as duas de IR (formulário e WhatsApp) ou as três num quadro só. Clique em um número para ver os leads. Entre as linhas principais, o detalhamento mostra onde estão hoje os leads que não chegaram à linha seguinte, para a conta de cada coluna fechar. Clique no nome de uma linha principal para esconder ou mostrar o detalhamento dela.</p>
         <p id="notaResumoNucleo" class="text-[11px] text-goldbright leading-relaxed"></p>
         <p id="notaValorResumo" class="text-[10px] text-inkfaint leading-relaxed"></p>
         <div id="resumoNucleo" class="space-y-6 pt-2"></div>

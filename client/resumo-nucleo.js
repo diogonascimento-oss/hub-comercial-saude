@@ -146,12 +146,13 @@ async function carregarResumoDoNucleo(forcar = false) {
   if (!inicio || !fim) return;
   const apenasNovos = $("apenasNovos").checked;
   const nivel = $("colunasResumo").value;
-  const chave = `${inicio}|${fim}|${apenasNovos}|${nivel}|${dados?.geradoEm || ""}`;
+  const juntar = $("quadrosResumo").value;
+  const chave = `${inicio}|${fim}|${apenasNovos}|${nivel}|${juntar}|${dados?.geradoEm || ""}`;
   if (!forcar && chave === chaveDoResumo) return;
   chaveDoResumo = chave;
   $("resumoNucleo").innerHTML = '<p class="text-xs text-inkdim">Carregando.</p>';
   try {
-    resumoDoNucleo = await chamarApi(`/trafego/resumo-nucleo?inicio=${inicio}&fim=${fim}&apenasNovos=${apenasNovos}&colunas=${nivel}`);
+    resumoDoNucleo = await chamarApi(`/trafego/resumo-nucleo?inicio=${inicio}&fim=${fim}&apenasNovos=${apenasNovos}&colunas=${nivel}&juntar=${juntar}`);
     renderizarResumoDoNucleo();
   } catch (erro) {
     chaveDoResumo = "";
@@ -419,7 +420,8 @@ function descricaoDoPeriodo() {
   const br = (iso) => iso.split("-").reverse().join("/");
   return `Período: ${br(r.inicio)} a ${br(r.fim)} · ${r.apenasNovos ? "leads que chegaram no período, acompanhados até hoje" : "tudo o que aconteceu no período"}`;
 }
-const nomeDoArquivoDoResumo = (extensao) => `resumo-nucleo_${resumoDoNucleo.inicio}_a_${resumoDoNucleo.fim}_${resumoDoNucleo.nivel}.${extensao}`;
+const nomeDoArquivoDoResumo = (extensao) =>
+  `resumo-nucleo_${resumoDoNucleo.inicio}_a_${resumoDoNucleo.fim}_${resumoDoNucleo.nivel}${{ ir: "_ir-unificado", todas: "_unificado" }[resumoDoNucleo.juntar] || ""}.${extensao}`;
 
 // CSV com ponto e vírgula, que o Excel em português abre direto nas colunas.
 $("btnCsvResumo").addEventListener("click", () => {
@@ -539,13 +541,14 @@ $("btnImagemResumo").addEventListener("click", () => {
   canvas.toBlob((blob) => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `resumo-nucleo_${r.inicio}_a_${r.fim}.png`;
+    a.download = nomeDoArquivoDoResumo("png");
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }, "image/png");
 });
 
 $("colunasResumo").addEventListener("change", () => carregarResumoDoNucleo());
+$("quadrosResumo").addEventListener("change", () => carregarResumoDoNucleo());
 $("btnDetalhamentoResumo").addEventListener("click", () => {
   const algumAberto = SAIDAS_DO_RESUMO.some((_, k) => passoAberto(k));
   SAIDAS_DO_RESUMO.forEach((_, k) => (algumAberto ? passosRecolhidos.add(k) : passosRecolhidos.delete(k)));
