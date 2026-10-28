@@ -96,11 +96,12 @@ function linhasDoQuadro(b, aberto = passoAberto) {
   return linhas;
 }
 
-// Anexo do quadro: total de sem interesse e desqualificados entre todos os
+// Anexo do quadro: total de sem interesse, desqualificados e em andamento entre todos os
 // leads da coluna, pela situação de hoje, sem precisar somar o detalhamento.
 const ANEXO_DO_RESUMO = [
   ["semInteresse", "Sem interesse"],
   ["desqualificado", "Desqualificado"],
+  ["emAndamento", "Em andamento"],
 ];
 const TITULO_DO_ANEXO = "Total no quadro, pela situação de hoje";
 const leadsDoAnexo = (c, situacao) => (c.listas.leads || []).filter((l) => l.situacaoDeHoje === situacao);
