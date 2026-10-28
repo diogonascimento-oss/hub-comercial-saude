@@ -419,7 +419,17 @@
       <h3 id="tTrafegoCruzamentos" class="titulo-secao mb-3">3. Campanha, conjunto de anúncios, anúncio e região</h3>
       <div class="border border-line bg-bg p-5 mb-px">
         <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 mb-3">
-          <p class="rotulo">Por campanha do Meta</p>
+          <div class="flex items-center gap-2 flex-wrap">
+            <label class="text-[11px] text-inkdim flex items-center gap-1.5">Linhas por
+              <select id="linhasPorCampanha" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">
+                <option value="dia">Dia de chegada</option>
+                <option value="campanha">Campanha do Meta</option>
+                <option value="conjunto">Conjunto de anúncios</option>
+                <option value="anuncio">Anúncio</option>
+              </select>
+            </label>
+            <button type="button" id="btnDetalhamentoCruzamento" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Mostrar detalhamento</button>
+          </div>
           <p id="notaPorCampanha" class="text-[10px] text-inkfaint"></p>
         </div>
         <div class="overflow-x-auto"><table id="tabelaPorCampanha" class="comparativo compacta w-full text-xs"></table></div>
