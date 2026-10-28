@@ -96,6 +96,15 @@ function linhasDoQuadro(b, aberto = passoAberto) {
   return linhas;
 }
 
+// Anexo do quadro: total de sem interesse e desqualificados entre todos os
+// leads da coluna, pela situação de hoje, sem precisar somar o detalhamento.
+const ANEXO_DO_RESUMO = [
+  ["semInteresse", "Sem interesse"],
+  ["desqualificado", "Desqualificado"],
+];
+const TITULO_DO_ANEXO = "Total no quadro, pela situação de hoje";
+const leadsDoAnexo = (c, situacao) => (c.listas.leads || []).filter((l) => l.situacaoDeHoje === situacao);
+
 // Conversão de uma linha principal sobre a anterior, na mesma coluna.
 function conversaoDaLinha(anterior, atual) {
   if (!anterior) return null;
@@ -258,6 +267,22 @@ function renderizarResumoDoNucleo() {
               })
               .join("")}
           </tbody>
+          <tbody>
+            <tr class="border-t-2 border-gold/40">
+              <td colspan="${b.campanhas.length + 2}" class="px-3 pt-2.5 pb-1 text-[10px] uppercase tracking-wide text-inkfaint">${TITULO_DO_ANEXO}</td>
+            </tr>
+            ${ANEXO_DO_RESUMO.map(([situacao, rotulo]) => {
+              const botao = (lista, coluna) =>
+                lista.length
+                  ? `<button type="button" data-anexo="${situacao}" data-bloco="${bi}" data-coluna="${coluna}" class="underline decoration-dotted underline-offset-2 hover:text-goldbright">${numero(lista.length)}</button>`
+                  : '<span class="text-inkfaint">0</span>';
+              return `<tr>
+                <td class="px-3 py-1.5 text-left text-[12px] font-semibold text-ink"><span class="pl-[18px]">${rotulo}</span></td>
+                ${b.campanhas.map((c, ci) => `<td class="px-3 py-1.5 text-center tabular text-[12px] font-semibold text-ink">${botao(leadsDoAnexo(c, situacao), ci)}</td>`).join("")}
+                <td class="px-3 py-1.5 text-center tabular text-[12px] font-semibold text-ink bg-surface2">${botao(b.campanhas.flatMap((c) => leadsDoAnexo(c, situacao)), "total")}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
         </table>
       </div>`;
     })
@@ -265,6 +290,20 @@ function renderizarResumoDoNucleo() {
 }
 
 $("resumoNucleo").addEventListener("click", (e) => {
+  const anexo = e.target.closest("button[data-anexo]");
+  if (anexo && resumoDoNucleo) {
+    const bloco = resumoDoNucleo.blocos[Number(anexo.dataset.bloco)];
+    const colunas = anexo.dataset.coluna === "total" ? bloco.campanhas : [bloco.campanhas[Number(anexo.dataset.coluna)]];
+    const nome = anexo.dataset.coluna === "total" ? "total" : nomeDaColuna(colunas[0]);
+    const rotulo = ANEXO_DO_RESUMO.find(([s]) => s === anexo.dataset.anexo)[1];
+    const leads = colunas.flatMap((c) => leadsDoAnexo(c, anexo.dataset.anexo)).map((l) => ({ ...l, etapaMaisAvancada: [l.etapaAtual, l.motivoPerda].filter(Boolean).join(" · ") }));
+    abrirLeadsDoGrupo(`${bloco.titulo} · ${nome}: ${rotulo.toLowerCase()}`, leads, "Todos os leads da coluna que estão hoje nesta situação, em qualquer ponto do funil em que tenham parado.", {
+      nome: "situacao-hoje.csv",
+      cabecalho: ["ID", "Nome", "Telefone", "Etapa hoje", "Motivo de perda"],
+      linhas: leads.map((l) => [l.leadId || "", l.nome, l.telefone || "", l.etapaAtual || "", l.motivoPerda || ""]),
+    });
+    return;
+  }
   const passo = e.target.closest("button[data-passo]");
   if (passo) {
     const k = Number(passo.dataset.passo);
@@ -357,6 +396,13 @@ function linhasDaExportacao(b) {
       });
     }
   }
+  saida.push({ tipo: "anexoTitulo", valores: [TITULO_DO_ANEXO, ...b.campanhas.map(() => ""), ""] });
+  for (const [situacao, rotulo] of ANEXO_DO_RESUMO) {
+    saida.push({
+      tipo: "anexo",
+      valores: [rotulo, ...b.campanhas.map((c) => leadsDoAnexo(c, situacao).length), b.campanhas.reduce((t, c) => t + leadsDoAnexo(c, situacao).length, 0)],
+    });
+  }
   return saida;
 }
 
@@ -398,13 +444,18 @@ function htmlDasTabelas(tabelas) {
         ${t.linhas
           .map(
             (l, i) =>
-              `<tr>${l
+              t.tipos?.[i] === "anexoTitulo"
+                ? `<tr><td colspan="${l.length}" style="text-align:left;background:#ffffff;border-top:2px solid #1f5597;color:#555;font-size:9pt;text-transform:uppercase;letter-spacing:0.5px;padding-top:8px">${esc(l[0])}</td></tr>`
+                : `<tr>${l
                 .map((v, j) => {
                   const sub = ["saida", "situacao", "alerta", "conversao"].includes(t.tipos?.[i]);
                   const fundo = j === l.length - 1 ? "background:#a9c4eb;font-weight:bold" : sub ? "background:#f3f3f3" : "background:#d9d9d9";
                   const rotulo = j === 0 && sub ? `text-align:left;white-space:pre;color:#555;font-size:10pt;${t.tipos[i] === "saida" ? "font-style:italic" : ""}` : "text-align:center";
                   const corDoAlerta = t.tipos?.[i] === "alerta" ? ";color:#8a5a00" : "";
                   const principal = t.tipos?.[i] === "principal" ? ";font-weight:bold" : "";
+                  if (t.tipos?.[i] === "anexo") {
+                    return `<td style="text-align:center;font-weight:bold;background:${j === l.length - 1 ? "#a9c4eb" : "#fff2cc"}">${esc(String(v ?? ""))}</td>`;
+                  }
                   return `<td style="${rotulo};${fundo}${sub && j ? ";color:#555;font-size:10pt" : ""}${corDoAlerta}${principal}">${esc(j && i === 0 ? reaisDoResumo(v) : String(v ?? ""))}</td>`;
                 })
                 .join("")}</tr>`,
@@ -512,14 +563,27 @@ $("btnImagemResumo").addEventListener("click", () => {
     y += alturaDoCabecalho;
     // Linhas
     t.linhas.forEach((linha, i) => {
+      if (t.tipos[i] === "anexoTitulo") {
+        const larguraTotal = larguraRotulo + (n - 1) * larguraColuna;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(xDaColuna(0), y, larguraTotal, alturaLinha);
+        ctx.fillStyle = "#1f5597";
+        ctx.fillRect(xDaColuna(0), y, larguraTotal, 2);
+        ctx.fillStyle = "#555555";
+        ctx.font = "11px Arial, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(String(linha[0]).toUpperCase(), xDaColuna(0) + 8, y + 18);
+        y += alturaLinha;
+        return;
+      }
       const sub = ["saida", "situacao", "alerta", "conversao"].includes(t.tipos[i]);
       for (let j = 0; j < n; j++) {
-        ctx.fillStyle = j === n - 1 ? "#a9c4eb" : sub ? "#f3f3f3" : "#d9d9d9";
+        ctx.fillStyle = j === n - 1 ? "#a9c4eb" : t.tipos[i] === "anexo" ? "#fff2cc" : sub ? "#f3f3f3" : "#d9d9d9";
         ctx.fillRect(xDaColuna(j), y, larguraDaColuna(j), alturaLinha);
         ctx.strokeStyle = "#ffffff";
         ctx.strokeRect(xDaColuna(j), y, larguraDaColuna(j), alturaLinha);
         ctx.fillStyle = t.tipos[i] === "alerta" ? "#8a5a00" : sub ? "#555555" : "#222222";
-        ctx.font = `${t.tipos[i] === "saida" && j === 0 ? "italic " : ""}${j === n - 1 || t.tipos[i] === "principal" ? "bold " : ""}${sub ? "11px" : "13px"} Arial, sans-serif`;
+        ctx.font = `${t.tipos[i] === "saida" && j === 0 ? "italic " : ""}${j === n - 1 || t.tipos[i] === "principal" || t.tipos[i] === "anexo" ? "bold " : ""}${sub ? "11px" : "13px"} Arial, sans-serif`;
         const v = linha[j];
         const texto = j && i === 0 ? reaisDoResumo(v) || "—" : String(v ?? "");
         if (j === 0 && sub) {

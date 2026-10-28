@@ -113,7 +113,7 @@ export function consolidarLeads({ leads, eventosPorLead, deTs, ateTs, apenasNovo
   return consolidados;
 }
 
-const resumoDoLead = (l) => ({ leadId: l.leadId, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: l.etapaMaisAvancada, etapaAtual: l.etapaAtual, motivoPerda: l.motivoPerda });
+const resumoDoLead = (l) => ({ leadId: l.leadId, nome: l.nome, telefone: l.telefone, etapaMaisAvancada: l.etapaMaisAvancada, etapaAtual: l.etapaAtual, motivoPerda: l.motivoPerda, situacaoDeHoje: l.situacaoDeHoje });
 
 // Para cada passo do funil (leads → qualificados → reunião marcada → reunião
 // realizada → contrato), quem chegou a um nível e não ao seguinte, separado
