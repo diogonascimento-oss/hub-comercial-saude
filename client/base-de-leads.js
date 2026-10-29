@@ -19,6 +19,7 @@ const COLUNAS_FIXAS = [
   { chave: "farmer", nome: "Farmer", tipo: "lista" },
   { chave: "etiquetas", nome: "Etiquetas", tipo: "texto" },
   { chave: "criadoEm", nome: "Criado em", tipo: "data" },
+  { chave: "horaDeChegada", nome: "Hora de chegada", tipo: "hora" },
   { chave: "atualizadoEm", nome: "Última atualização", tipo: "data" },
 ];
 const VISIVEIS_PADRAO = ["nome", "campanha", "etapa", "sdr", "criadoEm"];
@@ -28,6 +29,9 @@ const OPERADORES = {
   numero: [["maior", "maior que"], ["maiorIgual", "maior ou igual a"], ["menor", "menor que"], ["menorIgual", "menor ou igual a"], ["igual", "igual a"], ["entre", "entre"], ["vazio", "está vazio"], ["preenchido", "está preenchido"]],
   data: [["depois", "a partir de"], ["antes", "até"], ["entre", "entre"], ["vazio", "está vazio"], ["preenchido", "está preenchido"]],
   lista: [["eh", "é"], ["naoEh", "não é"], ["vazio", "está vazio"], ["preenchido", "está preenchido"]],
+  // Hora do dia em que o lead chegou, em qualquer data. "Entre 18:00 e 08:00"
+  // atravessa a meia-noite.
+  hora: [["entre", "entre"], ["depois", "a partir de"], ["antes", "até"]],
 };
 const SEM_VALOR = new Set(["vazio", "preenchido"]);
 
@@ -47,7 +51,10 @@ function guardarPreferencias() {
 }
 
 const CHAVES_FIXAS = new Set(COLUNAS_FIXAS.map((c) => c.chave));
+const horaDoDia = (iso) => (iso ? new Date(iso).toLocaleTimeString("pt-BR", { timeZone: "America/Recife", hour: "2-digit", minute: "2-digit" }) : "");
+const dataEHora = (iso) => new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Recife", dateStyle: "short", timeStyle: "short" });
 function valorDaColuna(lead, chave) {
+  if (chave === "horaDeChegada") return horaDoDia(lead.criadoEm);
   if (chave === "etiquetas") return (lead.etiquetas || []).join(", ");
   return CHAVES_FIXAS.has(chave) ? lead[chave] : lead.valores[chave];
 }
@@ -89,7 +96,7 @@ function renderizarFiltrosDaBase() {
         .map((f, i) => {
           const col = colunaPorChave(f.coluna);
           const ops = OPERADORES[col.tipo];
-          const tipoDoCampo = col.tipo === "data" ? "date" : col.tipo === "numero" ? "number" : "text";
+          const tipoDoCampo = col.tipo === "data" ? "date" : col.tipo === "hora" ? "time" : col.tipo === "numero" ? "number" : "text";
           let entrada = "";
           if (!SEM_VALOR.has(f.operador)) {
             if (col.tipo === "lista") {
@@ -173,6 +180,14 @@ function passaNoFiltro(lead, f) {
       entre: f.valor2 === undefined || f.valor2 === "" ? n >= a : n >= Math.min(a, b) && n <= Math.max(a, b),
     }[f.operador];
   }
+  if (col.tipo === "hora") {
+    const de = f.valor;
+    const ate = f.valor2;
+    if (f.operador === "depois") return v >= de;
+    if (f.operador === "antes") return v <= de;
+    if (!ate) return v >= de;
+    return de <= ate ? v >= de && v <= ate : v >= de || v <= ate;
+  }
   if (col.tipo === "data") {
     const dia = new Date(v).toLocaleDateString("sv-SE", { timeZone: "America/Recife" });
     if (f.operador === "depois") return dia >= f.valor;
@@ -216,7 +231,7 @@ function leadsFiltradosDaBase() {
 function formatarCelula(col, v) {
   if (v === undefined || v === null || v === "") return '<span class="text-inkfaint">—</span>';
   if (col.tipo === "numero") return Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-  if (col.tipo === "data") return new Date(v).toLocaleDateString("pt-BR", { timeZone: "America/Recife" });
+  if (col.tipo === "data") return col.chave === "criadoEm" ? dataEHora(v) : new Date(v).toLocaleDateString("pt-BR", { timeZone: "America/Recife" });
   const t = String(v);
   return esc(t.length > 80 ? `${t.slice(0, 79)}…` : t);
 }
@@ -350,7 +365,7 @@ $("btnCsvBase").addEventListener("click", () => {
   const texto = (c, v) => {
     if (v === undefined || v === null || v === "") return "";
     if (c.tipo === "numero") return Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2, useGrouping: false });
-    if (c.tipo === "data") return new Date(v).toLocaleDateString("pt-BR", { timeZone: "America/Recife" });
+    if (c.tipo === "data") return c.chave === "criadoEm" ? dataEHora(v) : new Date(v).toLocaleDateString("pt-BR", { timeZone: "America/Recife" });
     return String(v);
   };
   baixarCSV(

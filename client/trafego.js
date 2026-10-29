@@ -364,6 +364,9 @@ function renderizarTrafego() {
   const a = analiseDeTrafego;
   if (!a) return;
   $("totalLeadsTrafego").textContent = numero(a.totalLeads);
+  // Os rótulos dizem o que está sendo contado em cada modo.
+  $("rotuloLeadsTrafego").textContent = a.apenasNovos ? "Leads que chegaram no período" : "Leads com movimentação no período";
+  $("rotuloQualificadosTrafego").textContent = a.apenasNovos ? "Desses, qualificados até hoje" : "Qualificados no período";
   $("totalQualificadosTrafego").textContent = numero(a.totalQualificados);
 
   const aviso = $("avisoSemOrigem");
