@@ -45,34 +45,190 @@ function fecharModaisDeTrafego() {
 // --- Detalhamento: leads de um grupo -------------------------------------------
 
 // regra: texto opcional, exibido acima da lista, explicando como os leads foram contados.
-// csv: { nome, cabecalho, linhas } opcional; sem ele, o CSV traz as colunas da lista.
-let csvDaLista = null;
-function abrirLeadsDoGrupo(titulo, leads, regra = "", csv = null) {
-  const arquivo = titulo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "").toLowerCase().slice(0, 60);
-  csvDaLista = csv || {
-    nome: `${arquivo || "leads"}.csv`,
-    cabecalho: ["ID", "Nome", "Telefone", "Situação"],
-    linhas: leads.map((l) => [l.leadId || "", l.nome, l.telefone || "", l.etapaMaisAvancada || ""]),
-  };
+// O quarto parâmetro (CSV próprio) é aceito por compatibilidade; o download
+// usa as colunas escolhidas na lista.
+// Colunas: as da própria lista (ID, nome, telefone, situação) e qualquer
+// coluna da Base de leads, buscada pelo ID do lead. A escolha fica no navegador.
+const COLUNAS_PROPRIAS_DA_LISTA = [
+  { chave: "_id", nome: "ID" },
+  { chave: "_nome", nome: "Nome" },
+  { chave: "_telefone", nome: "Telefone" },
+  { chave: "_situacao", nome: "Situação" },
+];
+const COLUNAS_PADRAO_DA_LISTA = ["_nome", "_telefone", "_situacao"];
+let listaAberta = null; // { titulo, leads, regra, arquivo }
+let colunasDaLista = (() => {
+  try {
+    const salvas = JSON.parse(localStorage.getItem("colunasDaListaDeLeads") || "null");
+    return Array.isArray(salvas) && salvas.length ? salvas : [...COLUNAS_PADRAO_DA_LISTA];
+  } catch {
+    return [...COLUNAS_PADRAO_DA_LISTA];
+  }
+})();
+let basePorId = null;
+let baseIndexadaEm = "";
+
+// Ordem fixa das colunas: as da lista primeiro (ID, nome, telefone,
+// situação) e depois as da Base, na ordem da Base.
+function ordenarColunasDaLista() {
+  const ordem = [...COLUNAS_PROPRIAS_DA_LISTA, ...colunasExtrasDaLista()].map((c) => c.chave);
+  const posicao = (k) => (ordem.includes(k) ? ordem.indexOf(k) : ordem.length);
+  colunasDaLista = [...new Set(colunasDaLista)].sort((x, y) => posicao(x) - posicao(y));
+}
+
+function guardarColunasDaLista() {
+  ordenarColunasDaLista();
+  try {
+    localStorage.setItem("colunasDaListaDeLeads", JSON.stringify(colunasDaLista));
+  } catch {
+    // A escolha vale só nesta visita.
+  }
+}
+const colunasExtrasDaLista = () => (typeof colunasDaBase !== "undefined" ? colunasDaBase : []).filter((c) => c.chave !== "nome" && c.chave !== "telefone");
+const definicaoDaColunaDaLista = (chave) => COLUNAS_PROPRIAS_DA_LISTA.find((c) => c.chave === chave) || colunasExtrasDaLista().find((c) => c.chave === chave);
+const usaColunasDaBase = () => colunasDaLista.some((k) => !k.startsWith("_"));
+
+async function garantirBaseDaLista() {
+  if (typeof carregarBaseDeLeads !== "function") return;
+  await carregarBaseDeLeads();
+  if (base && baseIndexadaEm !== base.geradoEm) {
+    basePorId = new Map(base.leads.map((l) => [String(l.id), l]));
+    baseIndexadaEm = base.geradoEm;
+  }
+}
+
+// Texto de uma célula, para a tela e para os downloads.
+function textoDaColunaDaLista(l, chave) {
+  if (chave === "_id") return l.leadId ? String(l.leadId) : "";
+  if (chave === "_nome") return l.nome || "";
+  if (chave === "_telefone") return l.telefone || "";
+  if (chave === "_situacao") return l.etapaMaisAvancada || "";
+  const col = definicaoDaColunaDaLista(chave);
+  const doLead = basePorId?.get(String(l.leadId));
+  if (!col || !doLead) return "";
+  const v = valorDaColuna(doLead, chave);
+  if (v === undefined || v === null || v === "") return "";
+  if (col.tipo === "numero") return Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  if (col.tipo === "data") return col.chave === "criadoEm" ? dataEHora(v) : new Date(v).toLocaleDateString("pt-BR", { timeZone: "America/Recife" });
+  return String(v);
+}
+
+function renderizarListaAberta() {
+  const { titulo, leads, regra } = listaAberta;
+  const colunas = colunasDaLista.map(definicaoDaColunaDaLista).filter(Boolean);
+  const padrao = colunasDaLista.join() === COLUNAS_PADRAO_DA_LISTA.join();
   $("btnCsvLeads").classList.toggle("hidden", !leads.length);
+  $("btnHtmlLeads").classList.toggle("hidden", !leads.length);
   $("tituloLeads").textContent = `${titulo} (${numero(leads.length)})`;
   $("regraDosLeads").textContent = regra;
   $("regraDosLeads").classList.toggle("hidden", !regra);
-  $("corpoLeadsDoGrupo").innerHTML = leads.length
-    ? leads
-        .map(
-          (l) => `
+  // Com colunas a mais, a janela se alarga e a lista vira tabela.
+  const caixa = $("modalLeads").firstElementChild;
+  caixa.classList.toggle("max-w-lg", padrao);
+  caixa.classList.toggle("max-w-5xl", !padrao);
+  if (!leads.length) {
+    $("corpoLeadsDoGrupo").innerHTML = '<p class="text-inkdim">Nenhum lead neste grupo.</p>';
+  } else if (padrao) {
+    $("corpoLeadsDoGrupo").innerHTML = leads
+      .map(
+        (l) => `
       <button ${l.leadId ? `data-lead="${esc(String(l.leadId))}"` : "disabled"} class="w-full flex items-center justify-between gap-3 border-b border-line py-1.5 text-left hover:bg-surface2" title="Abrir a ficha do lead">
         <span class="text-ink truncate">${esc(l.nome)}</span>
         <span class="text-inkdim font-mono shrink-0">${esc(l.telefone || "sem telefone")}</span>
         <span class="text-inkfaint text-[10px] shrink-0 w-28 text-right">${esc(l.etapaMaisAvancada || "")}</span>
       </button>`,
+      )
+      .join("");
+  } else {
+    $("corpoLeadsDoGrupo").innerHTML = `<div class="overflow-x-auto"><table class="w-full text-xs">
+      <thead><tr class="text-inkdim text-[10px] uppercase tracking-wide">${colunas.map((c) => `<th class="text-left font-normal px-2 py-1.5 whitespace-nowrap">${esc(c.nome)}</th>`).join("")}</tr></thead>
+      <tbody>${leads
+        .map(
+          (l) => `<tr ${l.leadId ? `data-lead="${esc(String(l.leadId))}"` : ""} class="border-t border-line hover:bg-surface2 ${l.leadId ? "cursor-pointer" : ""}" title="Abrir a ficha do lead">${colunas
+            .map((c) => {
+              const t = textoDaColunaDaLista(l, c.chave);
+              const classe = c.chave === "_nome" ? "text-ink" : c.chave === "_telefone" ? "text-inkdim font-mono" : "text-inkdim";
+              return `<td class="px-2 py-1.5 ${classe} max-w-[260px] truncate" title="${esc(t)}">${t ? esc(t) : '<span class="text-inkfaint">—</span>'}</td>`;
+            })
+            .join("")}</tr>`,
         )
-        .join("")
-    : '<p class="text-inkdim">Nenhum lead neste grupo.</p>';
-  $("corpoLeadsDoGrupo").querySelectorAll("button[data-lead]").forEach((b) => b.addEventListener("click", () => abrirFichaDoLead(b.dataset.lead)));
-  abrirDialogo("modalLeads");
+        .join("")}</tbody></table></div>`;
+  }
+  $("corpoLeadsDoGrupo").querySelectorAll("[data-lead]").forEach((b) => b.addEventListener("click", () => abrirFichaDoLead(b.dataset.lead)));
 }
+
+function renderizarEscolhaDeColunasDaLista() {
+  const extras = colunasExtrasDaLista();
+  const caixa = (c) =>
+    `<label class="flex items-center gap-1.5 text-[11px] text-inkdim whitespace-nowrap"><input type="checkbox" data-coluna-lista="${esc(c.chave)}" ${colunasDaLista.includes(c.chave) ? "checked" : ""} ${c.chave === "_nome" ? "disabled" : ""} class="accent-gold">${esc(c.nome)}</label>`;
+  $("colunasDaLista").innerHTML = `
+    <p class="rotulo mb-2">Colunas da lista e dos downloads</p>
+    <div class="flex flex-wrap gap-x-4 gap-y-1.5">${COLUNAS_PROPRIAS_DA_LISTA.map(caixa).join("")}</div>
+    ${extras.length ? `<p class="text-[10px] text-inkfaint mt-3 mb-1.5">Campos do Kommo e da Base de leads</p><div class="flex flex-wrap gap-x-4 gap-y-1.5 max-h-40 overflow-y-auto">${extras.map(caixa).join("")}</div>` : '<p class="text-[10px] text-inkfaint mt-3">Carregando os campos do Kommo.</p>'}
+    <button type="button" id="btnColunasPadraoDaLista" class="mt-3 text-[11px] underline decoration-dotted underline-offset-2 text-inkdim hover:text-goldbright">Voltar ao padrão</button>`;
+}
+
+function abrirLeadsDoGrupo(titulo, leads, regra = "") {
+  const arquivo = titulo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "").toLowerCase().slice(0, 60) || "leads";
+  listaAberta = { titulo, leads, regra, arquivo };
+  $("colunasDaLista").classList.add("hidden");
+  renderizarListaAberta();
+  abrirDialogo("modalLeads");
+  // Colunas da Base escolhidas antes: busca os dados e redesenha.
+  if (usaColunasDaBase()) garantirBaseDaLista().then(() => listaAberta?.titulo === titulo && renderizarListaAberta()).catch(() => {});
+}
+
+$("btnColunasLeads").addEventListener("click", async () => {
+  const painel = $("colunasDaLista");
+  painel.classList.toggle("hidden");
+  if (painel.classList.contains("hidden")) return;
+  renderizarEscolhaDeColunasDaLista();
+  try {
+    await garantirBaseDaLista();
+    renderizarEscolhaDeColunasDaLista();
+  } catch {
+    // Sem a base, ficam só as colunas da própria lista.
+  }
+});
+$("colunasDaLista").addEventListener("change", async (e) => {
+  const caixa = e.target.closest("input[data-coluna-lista]");
+  if (!caixa) return;
+  const k = caixa.dataset.colunaLista;
+  colunasDaLista = caixa.checked ? [...colunasDaLista, k] : colunasDaLista.filter((x) => x !== k);
+  if (!colunasDaLista.includes("_nome")) colunasDaLista.unshift("_nome");
+  guardarColunasDaLista();
+  if (usaColunasDaBase()) await garantirBaseDaLista().catch(() => {});
+  renderizarListaAberta();
+});
+$("colunasDaLista").addEventListener("click", (e) => {
+  if (e.target.id !== "btnColunasPadraoDaLista") return;
+  colunasDaLista = [...COLUNAS_PADRAO_DA_LISTA];
+  guardarColunasDaLista();
+  renderizarEscolhaDeColunasDaLista();
+  renderizarListaAberta();
+});
+
+function tabelaDaListaAberta() {
+  const colunas = colunasDaLista.map(definicaoDaColunaDaLista).filter(Boolean);
+  return { cabecalho: colunas.map((c) => c.nome), linhas: listaAberta.leads.map((l) => colunas.map((c) => textoDaColunaDaLista(l, c.chave))) };
+}
+$("btnCsvLeads").addEventListener("click", async () => {
+  if (!listaAberta) return;
+  if (usaColunasDaBase()) await garantirBaseDaLista().catch(() => {});
+  const { cabecalho, linhas } = tabelaDaListaAberta();
+  baixarCSV(`${listaAberta.arquivo}.csv`, cabecalho, linhas);
+});
+$("btnHtmlLeads").addEventListener("click", async () => {
+  if (!listaAberta) return;
+  if (usaColunasDaBase()) await garantirBaseDaLista().catch(() => {});
+  const { cabecalho, linhas } = tabelaDaListaAberta();
+  const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Recife", dateStyle: "short", timeStyle: "short" });
+  const documento = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(listaAberta.titulo)}</title>
+<style>body{font-family:Calibri,Arial,sans-serif;margin:24px;color:#222}h1{font-size:18px;margin:0 0 4px}p{font-size:12px;color:#555;margin:0 0 6px}table{border-collapse:collapse;margin-top:14px;font-size:12px}th{background:#1f5597;color:#fff;text-align:left;padding:6px 10px}td{padding:5px 10px;border-bottom:1px solid #e2e2e2}tr:nth-child(even) td{background:#f5f5f5}@media print{body{margin:0}}</style></head>
+<body><h1>${esc(listaAberta.titulo)} (${listaAberta.leads.length})</h1>${listaAberta.regra ? `<p>${esc(listaAberta.regra)}</p>` : ""}<p>Gerado em ${esc(agora)}</p>
+<table><thead><tr>${cabecalho.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${linhas.map((l) => `<tr>${l.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;
+  baixarArquivo(`${listaAberta.arquivo}.html`, documento, "text/html;charset=utf-8");
+});
 
 // --- Listas e gráficos de grupos ------------------------------------------------
 
@@ -770,4 +926,4 @@ for (const id of ["modalSemana", "modalLeads", "modalSoma"]) {
   $(id).addEventListener("click", (e) => e.target === $(id) && fecharDialogo(id));
 }
 
-$("btnCsvLeads").addEventListener("click", () => csvDaLista && baixarCSV(csvDaLista.nome, csvDaLista.cabecalho, csvDaLista.linhas));
+
