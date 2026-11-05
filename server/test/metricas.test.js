@@ -105,9 +105,10 @@ test("volumes do período", () => {
   assert.equal(volume.semInteresse, 1);
 });
 
-test("a falta de um lead agendado antes do período não entra na taxa", () => {
+test("a falta de um lead agendado antes do período conta no total, mas não na taxa", () => {
   const { volume } = calcular();
-  assert.equal(volume.naoRealizadas, 1); // só o lead 2; o 7 foi agendado antes do período
+  assert.equal(volume.naoRealizadas, 2); // leads 2 e 7; o 7 foi agendado antes do período
+  assert.equal(volume.naoRealizadasDaCoorte, 1); // só o lead 2
   assert.equal(volume.entradasEmRemarcacao, 2); // 2 e 7 entraram na coluna
   assert.equal(volume.remarcacoesRecuperadas, 1);
   assert.equal(volume.remarcacoesRecuperadasERealizadas, 1);

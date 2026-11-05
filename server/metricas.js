@@ -151,7 +151,8 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
   let remarcacoes = 0;
   let reunioesRealizadas = 0; // saídas de Agendado com reunião realizada, na janela
   let realizadasDaCoorte = 0; // idem, com o agendamento também dentro da janela
-  let naoRealizadas = 0;
+  let naoRealizadas = 0; // saídas de Agendado sem reunião, na janela (qualquer data de agendamento)
+  let naoRealizadasDaCoorte = 0; // idem, com o agendamento também dentro da janela (base da taxa)
   let naoRealizadasComEtiquetaNoShow = 0;
   let perdidasAntesDaReuniao = 0;
   let outrasSaidasDeAgendado = 0;
@@ -282,9 +283,14 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
           registrarAcontecimento(lead, ev, "realizada", peloCampo === true ? "pelo campo Situação da reunião" : "");
         } else if (ev.para === "REMARCACAO" || peloCampo === false) {
           // Na lista do dia entra toda reunião que não aconteceu, inclusive as
-          // marcadas antes do período (o cartão "Não realizadas" conta só as
-          // marcadas dentro dele).
+          // marcadas antes do período (o cartão "Não realizadas" também conta
+          // as marcadas antes; só a taxa usa as marcadas dentro dele).
           registrarAcontecimento(lead, ev, "naoRealizada", peloCampo === false && lead.situacaoDaReuniao ? lead.situacaoDaReuniao : "");
+          // Conta toda reunião que não aconteceu no período, como as realizadas,
+          // mesmo que o agendamento seja anterior (a taxa usa só a coorte).
+          naoRealizadas++;
+          leadsComReuniaoNaoRealizada.add(lead.id);
+          if (tem(ETIQUETAS.noShow)) naoRealizadasComEtiquetaNoShow++;
         } else if (ev.para === "DESQUALIFICADO") {
           registrarAcontecimento(lead, ev, "perdidaAntesDaReuniao");
         }
@@ -298,9 +304,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
             realizadasDaCoorte++;
             if (ultimoAgendamentoVeioDeRemarcacao) remarcacoesRecuperadasERealizadas++;
           } else if (ev.para === "REMARCACAO" || peloCampo === false) {
-            naoRealizadas++;
-            leadsComReuniaoNaoRealizada.add(lead.id);
-            if (tem(ETIQUETAS.noShow)) naoRealizadasComEtiquetaNoShow++;
+            naoRealizadasDaCoorte++;
           } else if (ev.para === "DESQUALIFICADO") {
             perdidasAntesDaReuniao++;
           } else {
@@ -439,6 +443,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
       reunioesRealizadas,
       realizadasDaCoorte,
       naoRealizadas,
+      naoRealizadasDaCoorte,
       perdidasAntesDaReuniao,
       outrasSaidasDeAgendado,
       reunioesEmAberto,
@@ -456,7 +461,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
       qualificacao: taxa(qualificados, leadsRecebidos),
       qualificadoParaAgendado: taxa(qualificadosQueAgendaram.size, qualificados),
       comparecimento: taxa(realizadasDaCoorte, reunioesMarcadas),
-      naoRealizacao: taxa(naoRealizadas, reunioesMarcadas),
+      naoRealizacao: taxa(naoRealizadasDaCoorte, reunioesMarcadas),
       emAberto: taxa(reunioesEmAberto, reunioesMarcadas),
       remarcacaoRecuperada: taxa(remarcacoesRecuperadas, entradasEmRemarcacao),
       reuniaoParaFechamento: taxa(fechados, reunioesRealizadas),
