@@ -371,10 +371,7 @@ function cartao(valor, rotulo, detalhe, corDoValor = "text-ink", comparacao = ""
 }
 
 function renderizarCartoes() {
-  const { volume: v, taxas: t, etiquetas } = escopo();
-  const noShow = etiquetas.noShow.emUso
-    ? `${numero(etiquetas.noShow.total)} com a etiqueta NO_SHOW`
-    : "Etiqueta NO_SHOW ainda não utilizada";
+  const { volume: v, taxas: t } = escopo();
   const c = comparacaoComAnterior;
 
   $("cartoes").innerHTML = [
@@ -382,7 +379,7 @@ function renderizarCartoes() {
     cartao(numero(v.qualificados), "Qualificados", `Taxa de qualificação: <span class="${classeDaTaxa(t.qualificacao)}">${percentual(t.qualificacao)}</span><br>${linkDoIndicador("qualificadosSemAgendamento", `${numero(v.qualificadosSemAgendamento)} sem agendamento`)}`, "text-ink", c("qualificados"), "qualificados"),
     cartao(numero(v.reunioesMarcadas), "Reuniões marcadas", `${numero(v.reunioesMarcadasNovas)} novas · ${numero(v.remarcacoes)} remarcações<br>Qualificado para agendado: <span class="${classeDaTaxa(t.qualificadoParaAgendado)}">${percentual(t.qualificadoParaAgendado)}</span>`, "text-goldbright", c("reunioesMarcadas"), "reunioesMarcadas"),
     cartao(numero(v.reunioesRealizadas), "Reuniões realizadas", `Comparecimento: <span class="${classeDaTaxa(t.comparecimento)}">${percentual(t.comparecimento)}</span>`, "text-positivo", c("reunioesRealizadas"), "reunioesRealizadas"),
-    cartao(numero(v.naoRealizadas), "Não realizadas", `${percentual(t.naoRealizacao)} das marcadas<br>${esc(noShow)}`, "text-negativo", c("naoRealizadas", true), "naoRealizadas"),
+    cartao(numero(v.naoRealizadas), "Não realizadas", `${numero(v.naoRealizadasDaCoorte)} de reuniões marcadas neste período (${percentual(t.naoRealizacao)})`, "text-negativo", c("naoRealizadas", true), "naoRealizadas"),
     cartao(numero(v.remarcacoesRecuperadas), "Remarcações recuperadas", `De ${numero(v.entradasEmRemarcacao)} entradas em Remarcação: ${percentual(t.remarcacaoRecuperada)}<br>${numero(v.remarcacoesRecuperadasERealizadas)} recuperadas e realizadas`, "text-ink", c("remarcacoesRecuperadas"), "remarcacoesRecuperadas"),
     cartao(numero(v.fechados), "Contratos fechados", `Reunião para fechamento: <span class="${classeDaTaxa(t.reuniaoParaFechamento)}">${percentual(t.reuniaoParaFechamento)}</span><br>Conversão final: ${percentual(t.conversaoFinal)}`, "text-positivo", c("fechados"), "fechados"),
     cartao(numero(v.desqualificados), "Desqualificados", "Sem perfil para o caso, contato inválido ou duplicado", "text-ink", c("desqualificados", true), "desqualificados"),
