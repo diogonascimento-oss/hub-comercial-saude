@@ -114,6 +114,22 @@
   <main class="max-w-[1400px] mx-auto px-5 md:px-10 mt-8 space-y-10 pb-16">
    <div id="abaFunil" class="space-y-10">
 
+    <!-- Atalhos para as seções desta aba -->
+    <nav data-atalhos class="sticky top-0 z-20 bg-bg border-b border-line py-2 flex flex-wrap items-center gap-1" aria-label="Ir para uma seção desta aba">
+      <span class="rotulo mr-2">Ir para</span>
+      <button type="button" data-ir="tIndicadores" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">1. Indicadores</button>
+      <button type="button" data-ir="tAcontecimentos" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">2. Acontecimentos do dia</button>
+      <button type="button" data-ir="tEvolucao" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">3. Evolução</button>
+      <button type="button" data-ir="tTempos" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">4. Tempos</button>
+      <button type="button" data-ir="tPendencias" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">5. Pendências</button>
+      <button type="button" data-ir="tComparativo" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">6. Comparativo</button>
+      <button type="button" data-ir="tPessoas" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">7. Responsáveis</button>
+      <button type="button" data-ir="tFunil" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">8. Volume por etapa</button>
+      <button type="button" data-ir="tConversao" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">9. Conversão</button>
+      <button type="button" data-ir="tPerdas" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">10. Perdas</button>
+      <button type="button" data-ir="tRegistro" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">11. Leads movimentados</button>
+    </nav>
+
     <!-- Seletor de campanha -->
     <div>
       <p class="rotulo mb-2">Campanha exibida</p>
@@ -355,6 +371,17 @@
 
    <div id="abaTrafego" class="hidden space-y-10">
 
+    <!-- Atalhos para as seções desta aba -->
+    <nav data-atalhos class="sticky top-0 z-20 bg-bg border-b border-line py-2 flex flex-wrap items-center gap-1" aria-label="Ir para uma seção desta aba">
+      <span class="rotulo mr-2">Ir para</span>
+      <button type="button" data-ir="tTrafegoResumo" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">1. Origem</button>
+      <button type="button" data-ir="tResumoNucleo" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">2. Resumo do núcleo</button>
+      <button type="button" data-ir="tPreQualificados" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">3. Pré-qualificados</button>
+      <button type="button" data-ir="tTrafegoCruzamentos" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">4. Campanha e anúncio</button>
+      <button type="button" data-ir="tSemanas" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">5. Histórico semanal</button>
+      <button type="button" data-ir="tDistribuicao" class="px-2.5 py-1 text-[11px] border border-line text-inkdim hover:text-ink hover:border-gold/60">6. Distribuição</button>
+    </nav>
+
     <div>
       <p class="rotulo mb-2">Esta aba mostra</p>
       <div id="seletorCampanhaTrafego" class="flex flex-wrap gap-1 border-b border-line" role="tablist"></div>
@@ -428,7 +455,7 @@
         </label>
       </div>
       <div class="border border-line bg-bg p-5 space-y-2">
-        <p class="text-[11px] text-inkdim leading-relaxed">Leads que já chegam com o perfil da campanha, segundo as respostas do questionário gravadas no Kommo, antes de qualquer contato da equipe. Não é a mesma coisa que \"Qualificados\", que continua sendo só o lead que a equipe qualificou na mão. Seguem o filtro de período, a campanha escolhida acima e a opção de leads que chegaram no período. A coluna \"Pré-qualificados aguardando contato\" é a fila de leads bons que a equipe ainda não qualificou nem descartou. Clique em um número para ver os leads, com as respostas e o parecer de cada um.</p>
+        <p class="text-[11px] text-inkdim leading-relaxed">Leads que já chegam com o perfil da campanha, segundo as respostas do questionário gravadas no Kommo, antes de qualquer contato da equipe. Não é a mesma coisa que \"Qualificados\", que continua sendo só o lead que a equipe qualificou na mão. Seguem o filtro de período, a campanha escolhida acima e a opção de leads que chegaram no período. A coluna \"Pré-qualificados em triagem\" é a fila de leads bons que a equipe ainda não qualificou nem descartou. Clique em um número para ver os leads, com as respostas e o parecer de cada um. \"Sem respostas\" são leads sem nenhuma resposta do questionário gravada nos campos do Kommo (por exemplo, quem chegou pelo WhatsApp sem preencher o formulário). \"Em triagem\" são pré-qualificados que a equipe ainda não qualificou e que seguem em andamento, isto é, não foram perdidos nem fechados; alguns já podem ter sido contatados.</p>
         <div id="preQualificados" class="space-y-6 pt-2"></div>
       </div>
     </section>
@@ -730,6 +757,7 @@
   <script src="trafego.js"></script>
   <script src="resumo-nucleo.js"></script>
   <script src="pre-qualificados.js"></script>
+  <script src="atalhos.js"></script>
   <script src="markdown.js"></script>
   <script src="lead.js"></script>
   <script src="acontecimentos.js"></script>

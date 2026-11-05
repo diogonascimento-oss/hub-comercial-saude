@@ -47,7 +47,7 @@ const COLUNAS_PRE_QUALIFICACAO = [
     regra: () => "Leads que a equipe qualificou (mesma contagem de \"Qualificados\" do resto do painel), de qualquer perfil de resposta.",
   },
   {
-    titulo: "Pré-qualificados aguardando contato",
+    titulo: "Pré-qualificados em triagem",
     campo: "preQualificadosEmTriagem",
     filtro: (l) => l.preEmTriagem,
     regra: () => "Pré-qualificados que a equipe ainda não qualificou nem descartou: continuam em Contato Inicial, Contato Iniciado ou Em Qualificação.",
