@@ -54,6 +54,9 @@ const COLUNAS_PROPRIAS_DA_LISTA = [
   { chave: "_nome", nome: "Nome" },
   { chave: "_telefone", nome: "Telefone" },
   { chave: "_situacao", nome: "Situação" },
+  // Só têm conteúdo nas listas da seção de pré-qualificados.
+  { chave: "_respostas", nome: "Respostas do questionário" },
+  { chave: "_parecer", nome: "Parecer" },
 ];
 const COLUNAS_PADRAO_DA_LISTA = ["_nome", "_telefone", "_situacao"];
 let listaAberta = null; // { titulo, leads, regra, arquivo }
@@ -103,6 +106,8 @@ function textoDaColunaDaLista(l, chave) {
   if (chave === "_nome") return l.nome || "";
   if (chave === "_telefone") return l.telefone || "";
   if (chave === "_situacao") return l.etapaMaisAvancada || "";
+  if (chave === "_respostas") return l.respostas || "";
+  if (chave === "_parecer") return l.parecer || "";
   const col = definicaoDaColunaDaLista(chave);
   const doLead = basePorId?.get(String(l.leadId));
   if (!col || !doLead) return "";
@@ -113,10 +118,19 @@ function textoDaColunaDaLista(l, chave) {
   return String(v);
 }
 
+// Chaves das colunas da lista aberta. Nas listas da seção de pré-qualificados
+// (leads com "respostas"), as respostas do questionário e o parecer entram
+// sozinhos, na tela e nos downloads.
+function chavesDasColunasDaLista() {
+  const comRespostas = listaAberta?.leads.some((l) => l.respostas !== undefined);
+  return comRespostas ? [...new Set([...colunasDaLista, "_respostas", "_parecer"])] : colunasDaLista;
+}
+
 function renderizarListaAberta() {
   const { titulo, leads, regra } = listaAberta;
-  const colunas = colunasDaLista.map(definicaoDaColunaDaLista).filter(Boolean);
-  const padrao = colunasDaLista.join() === COLUNAS_PADRAO_DA_LISTA.join();
+  const chaves = chavesDasColunasDaLista();
+  const colunas = chaves.map(definicaoDaColunaDaLista).filter(Boolean);
+  const padrao = chaves.join() === COLUNAS_PADRAO_DA_LISTA.join();
   $("btnCsvLeads").classList.toggle("hidden", !leads.length);
   $("btnHtmlLeads").classList.toggle("hidden", !leads.length);
   $("tituloLeads").textContent = `${titulo} (${numero(leads.length)})`;
@@ -163,7 +177,7 @@ function renderizarEscolhaDeColunasDaLista() {
     `<label class="flex items-center gap-1.5 text-[11px] text-inkdim whitespace-nowrap"><input type="checkbox" data-coluna-lista="${esc(c.chave)}" ${colunasDaLista.includes(c.chave) ? "checked" : ""} ${c.chave === "_nome" ? "disabled" : ""} class="accent-gold">${esc(c.nome)}</label>`;
   $("colunasDaLista").innerHTML = `
     <p class="rotulo mb-2">Colunas da lista e dos downloads</p>
-    <div class="flex flex-wrap gap-x-4 gap-y-1.5">${COLUNAS_PROPRIAS_DA_LISTA.map(caixa).join("")}</div>
+    <div class="flex flex-wrap gap-x-4 gap-y-1.5">${COLUNAS_PROPRIAS_DA_LISTA.filter((c) => c.chave !== "_respostas" && c.chave !== "_parecer").map(caixa).join("")}</div>
     ${extras.length ? `<p class="text-[10px] text-inkfaint mt-3 mb-1.5">Campos do Kommo e da Base de leads</p><div class="flex flex-wrap gap-x-4 gap-y-1.5 max-h-40 overflow-y-auto">${extras.map(caixa).join("")}</div>` : '<p class="text-[10px] text-inkfaint mt-3">Carregando os campos do Kommo.</p>'}
     <button type="button" id="btnColunasPadraoDaLista" class="mt-3 text-[11px] underline decoration-dotted underline-offset-2 text-inkdim hover:text-goldbright">Voltar ao padrão</button>`;
 }
@@ -209,7 +223,7 @@ $("colunasDaLista").addEventListener("click", (e) => {
 });
 
 function tabelaDaListaAberta() {
-  const colunas = colunasDaLista.map(definicaoDaColunaDaLista).filter(Boolean);
+  const colunas = chavesDasColunasDaLista().map(definicaoDaColunaDaLista).filter(Boolean);
   return { cabecalho: colunas.map((c) => c.nome), linhas: listaAberta.leads.map((l) => colunas.map((c) => textoDaColunaDaLista(l, c.chave))) };
 }
 $("btnCsvLeads").addEventListener("click", async () => {
@@ -568,6 +582,7 @@ async function atualizarTrafego(forcar = false) {
     atualizarGraficoDeCusto();
     carregarSemanas();
     if (typeof carregarResumoDoNucleo === "function") carregarResumoDoNucleo();
+    if (typeof carregarPreQualificados === "function") carregarPreQualificados();
   } catch (erro) {
     mostrarErro(erro.message);
   }

@@ -285,3 +285,67 @@ export const FUSO_HORARIO = "-03:00";
 
 export const ETAPA_POR_CHAVE = new Map(ETAPAS.map((e) => [e.chave, e]));
 export const ORDEM_ETAPAS = ETAPAS.map((e) => e.chave);
+
+// Pré-qualificação pelo questionário.
+//
+// "Qualificado" no painel é só quem a equipe qualificou na mão (moveu para
+// Lead Qualificado). "Pré-qualificado" é outra coisa: o lead cujas respostas
+// do questionário, gravadas nos campos do Kommo, já atendem ao critério da
+// campanha, antes de qualquer contato do atendente. Serve para saber quanto do
+// tráfego chega com o perfil certo e quais leads bons ainda esperam contato.
+//
+// Cada critério lê um campo de lead do Kommo:
+//   campo.id    - ID do campo (GET /api/diagnostico/campos lista os IDs). Quando
+//                 preenchido, vale sobre o nome.
+//   campo.nome  - expressão que localiza o campo pelo nome. Se vários campos
+//                 combinarem, vale o mais preenchido na campanha.
+//   tipo        - como interpretar a resposta:
+//     "valor"      valor em reais, digitado ("R$ 1.500") ou faixa ("R$ 900 a R$
+//                  1.500", "acima de R$ 2.000"); compara com "acimaDe". Faixa
+//                  que cruza o limite fica como PENDENTE.
+//     "simnao"     "Sim" atende; "Não" não atende.
+//     "escola"     como "simnao", e também entende "Particular" / "Pública".
+//     "plano"      atende quando a resposta casa com "aceitos"; não atende quando
+//                  casa com "recusados"; resposta fora das duas fica PENDENTE.
+//
+// Resultado de cada lead:
+//   pré-qualificado - todos os critérios atendidos
+//   não qualificado - algum critério claramente não atendido
+//   pendente        - sem falha, mas com resposta em faixa que cruza o limite,
+//                     resposta não reconhecida ou critério sem resposta
+//   sem respostas   - nenhum critério respondido (ex.: lead de WhatsApp)
+//
+// "complementar" são perguntas mostradas à parte, que NÃO entram na decisão.
+//
+// IR-W (WhatsApp) usa as regras de IR-Q: se o lead não tiver as respostas
+// gravadas, aparece como "sem respostas".
+const REGRAS_IR = {
+  titulo: "Tema 324/TNU",
+  criterios: [
+    { chave: "filhoComDeficiencia", rotulo: "Filho com deficiência", descricao: "responde \"sim\" sobre filho com deficiência", tipo: "simnao", campo: { id: null, nome: /defici[eê]ncia|neurodiverg|autis|\btea\b|laudo/i } },
+    { chave: "escolaParticular", rotulo: "Escola particular", descricao: "responde \"sim\" sobre escola particular", tipo: "escola", campo: { id: null, nome: /escola|col[eé]gio|particular/i } },
+    { chave: "mensalidade", rotulo: "Mensalidade", descricao: "mensalidade acima de R$ 950 (a faixa de R$ 900 a R$ 1.500 fica pendente, pois falta confirmar se passa de R$ 950)", tipo: "valor", acimaDe: 950, campo: { id: null, nome: /mensalidade|valor.*(escola|mensal)|quanto.*paga/i } },
+  ],
+  complementar: [],
+};
+
+export const PRE_QUALIFICACAO = {
+  "IR-Q": REGRAS_IR,
+  "IR-W": REGRAS_IR,
+  "REA-Q": {
+    titulo: "Reajuste abusivo",
+    criterios: [
+      {
+        chave: "tipoDePlano", rotulo: "Tipo de plano", descricao: "plano Empresarial/CNPJ ou Familiar", tipo: "plano",
+        aceitos: /empresarial|cnpj|\bpme\b|\bmei\b|famil/i,
+        recusados: /individual|pessoa f[ií]sica|\bpf\b/i,
+        campo: { id: null, nome: /tipo.*plano|plano.*(tipo|modalidade)|modalidade|contrata[cç][aã]o/i },
+      },
+      { chave: "mensalidade", rotulo: "Mensalidade", descricao: "mensalidade acima de R$ 2.000", tipo: "valor", acimaDe: 2000, campo: { id: null, nome: /mensalidade|valor.*(plano|mensal)|quanto.*paga/i } },
+    ],
+    // Informação complementar: não é requisito de qualificação.
+    complementar: [
+      { chave: "aumentoRecente", rotulo: "Aumento recente", tipo: "simnao", campo: { id: null, nome: /aument|reajust/i } },
+    ],
+  },
+};

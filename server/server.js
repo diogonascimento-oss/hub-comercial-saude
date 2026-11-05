@@ -37,6 +37,7 @@ import * as armazenamento from "./armazenamento.js";
 import { analisarTrafego, consolidarLeads, agruparEComputar, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
 import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
 import { getLocalizacao } from "./localizacao.js";
+import { analisarPreQualificacao } from "./prequalificacao.js";
 
 const ETAPAS_ANTES_DA_REUNIAO = new Set(["CONTATO_INICIAL", "CONTATO_INICIADO", "EM_QUALIFICACAO", "LEAD_QUALIFICADO", "EM_AGENDAMENTO"]);
 const ETAPAS_DEPOIS_DA_REUNIAO = new Set(["REUNIAO_REALIZADA", "PROTOCOLO_FARMER", "FECHADO"]);
@@ -1609,7 +1610,7 @@ function periodoDe(inicio, fim) {
 }
 
 // Análise de tráfego de um período, opcionalmente restrita a uma campanha.
-async function calcularAnaliseDeTrafego(periodo, { apenasNovos, campanha }) {
+async function baseDoTrafego(periodo, { apenasNovos, campanha }) {
   // Com apenasNovos, a análise acompanha os leads que chegaram no período até
   // hoje: entram só os criados entre o início e o fim, mas as movimentações
   // consideradas vão até a data atual. Assim, um lead que chegou na semana e
@@ -1619,7 +1620,12 @@ async function calcularAnaliseDeTrafego(periodo, { apenasNovos, campanha }) {
   const periodoDosEventos = apenasNovos && periodo.fim < hoje ? lerPeriodo({ query: { inicio: periodo.inicio, fim: hoje } }) : periodo;
   const { leads, eventosPorLead } = await prepararPeriodo(periodoDosEventos);
   const doEscopo = campanha && campanha !== "TODAS" ? leads.filter((l) => l.campanha === campanha) : leads;
-  return analisarTrafego({ leads: doEscopo, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
+  return { leads: doEscopo, eventosPorLead };
+}
+
+async function calcularAnaliseDeTrafego(periodo, opcoes) {
+  const { leads, eventosPorLead } = await baseDoTrafego(periodo, opcoes);
+  return analisarTrafego({ leads, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos: opcoes.apenasNovos });
 }
 
 // Semanas salvas guardam o orçamento, as decisões e as observações; os números
@@ -1785,6 +1791,25 @@ app.get("/api/analise-trafego", async (req, res) => {
     res.json(analise);
   } catch (erro) {
     responderErro(res, erro, "Falha ao montar a análise de tráfego");
+  }
+});
+
+// Pré-qualificados pelo questionário: classifica os leads do período pelas
+// respostas gravadas nos campos do Kommo (regras em PRE_QUALIFICACAO, no
+// config.js), por anúncio, conjunto ou campanha do Meta. Não altera nada no
+// Kommo e não muda a contagem de "qualificados", que continua sendo só a da equipe.
+app.get("/api/trafego/pre-qualificados", async (req, res) => {
+  const periodo = lerPeriodo(req);
+  if (!periodo) return res.status(400).json({ error: "Informe inicio e fim no formato AAAA-MM-DD." });
+  try {
+    const apenasNovos = req.query.apenasNovos === "true";
+    const { leads, eventosPorLead } = await baseDoTrafego(periodo, { apenasNovos, campanha: req.query.campanha });
+    const consolidados = consolidarLeads({ leads, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
+    // Sem a lista de campos da conta não dá para localizar as respostas pelo nome.
+    const definicoes = await camposDaConta();
+    res.json({ ...analisarPreQualificacao({ consolidados, leads, definicoes, agruparPor: req.query.agruparPor }), apenasNovos });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao montar os pré-qualificados");
   }
 });
 

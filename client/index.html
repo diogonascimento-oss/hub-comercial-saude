@@ -415,8 +415,26 @@
       </div>
     </section>
 
+    <section aria-labelledby="tPreQualificados">
+      <div class="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
+        <h3 id="tPreQualificados" class="titulo-secao">3. Pré-qualificados pelo questionário</h3>
+        <label class="text-[11px] text-inkdim flex items-center gap-1.5">Agrupar por
+          <select id="agruparPreQualificados" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">
+            <option value="anuncio">Anúncio</option>
+            <option value="conjunto">Conjunto de anúncios</option>
+            <option value="campanhaMeta">Campanha do Meta</option>
+            <option value="campanha">Campanha do núcleo</option>
+          </select>
+        </label>
+      </div>
+      <div class="border border-line bg-bg p-5 space-y-2">
+        <p class="text-[11px] text-inkdim leading-relaxed">Leads que já chegam com o perfil da campanha, segundo as respostas do questionário gravadas no Kommo, antes de qualquer contato da equipe. Não é a mesma coisa que \"Qualificados\", que continua sendo só o lead que a equipe qualificou na mão. Seguem o filtro de período, a campanha escolhida acima e a opção de leads que chegaram no período. A coluna \"Pré-qualificados aguardando contato\" é a fila de leads bons que a equipe ainda não qualificou nem descartou. Clique em um número para ver os leads, com as respostas e o parecer de cada um.</p>
+        <div id="preQualificados" class="space-y-6 pt-2"></div>
+      </div>
+    </section>
+
     <section aria-labelledby="tTrafegoCruzamentos">
-      <h3 id="tTrafegoCruzamentos" class="titulo-secao mb-3">3. Campanha, conjunto de anúncios, anúncio e região</h3>
+      <h3 id="tTrafegoCruzamentos" class="titulo-secao mb-3">4. Campanha, conjunto de anúncios, anúncio e região</h3>
       <div class="border border-line bg-bg p-5 mb-px">
         <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 mb-3">
           <p class="rotulo">Por campanha do Meta</p>
@@ -465,7 +483,7 @@
     <section aria-labelledby="tSemanas">
       <div class="border border-line p-5">
         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
-          <h3 id="tSemanas" class="titulo-secao">4. Histórico semanal salvo</h3>
+          <h3 id="tSemanas" class="titulo-secao">5. Histórico semanal salvo</h3>
           <button id="btnSalvarSemana" class="bg-gold hover:bg-goldbright text-bg font-bold px-4 py-1.5 text-xs uppercase tracking-wide">Salvar período como semana</button>
         </div>
         <p class="text-[11px] text-inkdim mb-3">Salva o período selecionado no filtro. Em uma semana salva é possível registrar o orçamento, decisões e observações, e comparar com a semana anterior.</p>
@@ -475,7 +493,7 @@
     </section>
 
     <section aria-labelledby="tDistribuicao">
-      <h3 id="tDistribuicao" class="titulo-secao mb-3">5. Distribuição e engajamento</h3>
+      <h3 id="tDistribuicao" class="titulo-secao mb-3">6. Distribuição e engajamento</h3>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-px bg-line border border-line">
         <div class="bg-bg p-5">
           <p class="rotulo mb-3">Distribuição por conjunto de anúncios</p>
@@ -711,6 +729,7 @@
   <script src="relatorio-semanal.js"></script>
   <script src="trafego.js"></script>
   <script src="resumo-nucleo.js"></script>
+  <script src="pre-qualificados.js"></script>
   <script src="markdown.js"></script>
   <script src="lead.js"></script>
   <script src="acontecimentos.js"></script>

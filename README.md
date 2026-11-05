@@ -109,6 +109,7 @@ Aba própria, com a origem de marketing dos leads:
 
 - Leads, qualificados, reuniões e contratos por conjunto de anúncios, por anúncio e por região.
 - Distribuição por estado, em barras ou em mapa, a partir do DDD do telefone.
+- Pré-qualificados pelo questionário, por anúncio, conjunto ou campanha: leads cujas respostas, gravadas no Kommo, já atendem ao critério da campanha, separados de quem a equipe qualificou na mão (ver "Pré-qualificação" abaixo).
 - Engajamento por etapa de cada conjunto de anúncios e de cada estado.
 - Histórico semanal salvo, com orçamento, decisões e observações de cada semana.
 - Comparação com a semana anterior e soma de várias semanas.
@@ -116,6 +117,17 @@ Aba própria, com a origem de marketing dos leads:
 - Relatório semanal em HTML, para leitura e impressão.
 
 As regras de contagem e as limitações de cada indicador estão documentadas no próprio painel, no endereço `/documentacao`.
+
+**Pré-qualificação.** "Qualificado" continua sendo só o lead que a equipe moveu para Lead Qualificado. "Pré-qualificado" lê as respostas do questionário nos campos do lead no Kommo, antes de qualquer contato:
+
+| Campanha | Critério |
+|---|---|
+| Reajuste (REA-Q) | Plano Empresarial/CNPJ ou Familiar, e mensalidade acima de R$ 2.000. "Recebeu aumento recentemente" é mostrado à parte e não decide nada. |
+| IR (IR-Q e IR-W) | Responde "sim" sobre filho com deficiência e sobre escola particular, e mensalidade acima de R$ 950. A faixa de R$ 900 a R$ 1.500 fica **pendente**, pois falta confirmar se passa de R$ 950. |
+
+Cada lead cai em uma de quatro situações: pré-qualificado, pendente, não qualificado ou sem respostas (nenhum critério respondido, caso comum nos leads de WhatsApp). A seção mostra os números por anúncio, conjunto, campanha do Meta ou campanha do núcleo, ao lado dos qualificados pela equipe e da fila de **pré-qualificados aguardando contato** (ainda em Contato Inicial, Contato Iniciado ou Em Qualificação). Clicar em um número abre os leads com as respostas e o parecer de cada um.
+
+As regras ficam em `PRE_QUALIFICACAO`, em `server/config.js`. Cada critério localiza o campo do Kommo pelo ID (`campo.id`) ou, sem ele, pelo nome (`campo.nome`). A seção mostra, em cada campanha, qual campo foi lido; se um campo não for encontrado, aparece um aviso, e a rota `GET /api/diagnostico/campos` lista os campos e IDs da conta para preencher a configuração.
 
 ### 3.8 Fora do escopo desta versão
 
@@ -131,6 +143,7 @@ As regras de contagem e as limitações de cada indicador estão documentadas no
 │   ├── index.html
 │   ├── app.js              Aba do funil, exportações e correção de eventos
 │   ├── trafego.js          Aba de tráfego e campanhas
+│   ├── pre-qualificados.js  Seção de pré-qualificados da aba de tráfego
 │   ├── relatorio-semanal.js  Relatórios em HTML para download
 │   ├── mapa-brasil.js      Mapa por estado
 │   ├── documentacao.html   Metodologia de cálculo dos indicadores
@@ -145,6 +158,7 @@ As regras de contagem e as limitações de cada indicador estão documentadas no
 │   ├── leads.js            Normalização de leads e eventos
 │   ├── metricas.js         Cálculo dos indicadores do funil
 │   ├── trafego.js          Análise de tráfego, custo e soma de semanas
+│   ├── prequalificacao.js  Pré-qualificação pelas respostas do questionário
 │   ├── localizacao.js      Estado e região a partir do DDD
 │   ├── armazenamento.js    Exclusões, correções e semanas salvas (Upstash)
 │   ├── dev/                Kommo simulado, com dados fictícios

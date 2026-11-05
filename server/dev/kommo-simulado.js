@@ -75,6 +75,27 @@ const eventos = [];
 let proximoLead = 500000;
 let proximoEvento = 9000000;
 
+// Respostas do questionário gravadas nos campos do lead. Os funis 0 (IR-Q) e 2
+// (REA-Q) vêm do formulário e quase sempre trazem as respostas; o funil 1
+// (IR-W) vem de conversa de WhatsApp e quase nunca traz.
+function respostasDoQuestionario(indice) {
+  const campo = (id, nome, valor) => ({ field_id: id, field_name: nome, values: [{ value: valor }] });
+  if (indice === 2) {
+    if (!chance(0.9)) return [];
+    return [
+      campo(7030, "Tipo de plano", escolher(["Empresarial/CNPJ", "Familiar", "Individual", "Individual", "Coletivo por adesão"])),
+      ...(chance(0.92) ? [campo(7031, "Mensalidade do plano", escolher(["R$ 2.300,00", "3.100", "1.200", "Acima de R$ 2.000", "R$ 1.500 a R$ 2.500", "980"]))] : []),
+      ...(chance(0.8) ? [campo(7032, "Recebeu aumento recentemente?", escolher(["Sim", "Sim", "Não"]))] : []),
+    ];
+  }
+  if (!chance(indice === 1 ? 0.1 : 0.9)) return [];
+  return [
+    campo(7020, "Filho com deficiência?", escolher(["Sim", "Sim", "Sim", "Não"])),
+    ...(chance(0.95) ? [campo(7011, "Escola particular?", escolher(["Sim", "Sim", "Não"]))] : []),
+    ...(chance(0.92) ? [campo(7010, "Mensalidade da escola", escolher(["Acima de R$ 1.500", "R$ 900 a R$ 1.500", "Até R$ 900", "R$ 1.200", "850,00", "R$ 2.300,00"]))] : []),
+  ];
+}
+
 for (const [indice, funil] of funis.entries()) {
   const coluna = (i) => funil.ids[i];
   const perfil = PERFIS[indice];
@@ -178,8 +199,7 @@ for (const [indice, funil] of funis.entries()) {
             { field_id: CAMPOS.campanhaMeta, field_name: "Campanha Meta", values: [{ value: CAMPANHAS_META[indice === 2 ? 1 : 0] }] },
             { field_id: CAMPOS.conjunto, field_name: "Conjunto de anúncios", values: [{ value: escolher(CONJUNTOS) }] },
             { field_id: CAMPOS.anuncio, field_name: "Anúncio / Criativo", values: [{ value: escolher(ANUNCIOS) }] },
-            ...(chance(0.7) ? [{ field_id: 7010, field_name: "Mensalidade da escola", values: [{ value: escolher(["R$ 1.500", "1200", "850,00", "R$ 2.300,00", "980", "3.100"]) }] }] : []),
-            ...(chance(0.8) ? [{ field_id: 7011, field_name: "Tipo de escola", values: [{ value: escolher(["Particular", "Pública", "Particular", "Filantrópica"]) }] }] : []),
+            ...respostasDoQuestionario(indice),
           ]
         : null,
       _embedded: {
@@ -246,7 +266,7 @@ app.get("/api/v4/leads/pipelines", (req, res) =>
 );
 
 app.get("/api/v4/leads/custom_fields", (req, res) =>
-  res.json({ _embedded: { custom_fields: [{ id: 7001, name: "Motivo de desqualificação", code: null, type: "select" }, { id: 7002, name: "Descrição", code: null, type: "textarea" }, { id: 7003, name: "Data da Reunião", code: null, type: "date_time" }, { id: 7010, name: "Mensalidade da escola", code: null, type: "text" }, { id: 7011, name: "Tipo de escola", code: null, type: "select" }] } }),
+  res.json({ _embedded: { custom_fields: [{ id: 7001, name: "Motivo de desqualificação", code: null, type: "select" }, { id: 7002, name: "Descrição", code: null, type: "textarea" }, { id: 7003, name: "Data da Reunião", code: null, type: "date_time" }, { id: 7010, name: "Mensalidade da escola", code: null, type: "text" }, { id: 7011, name: "Escola particular?", code: null, type: "select" }, { id: 7020, name: "Filho com deficiência?", code: null, type: "select" }, { id: 7030, name: "Tipo de plano", code: null, type: "select" }, { id: 7031, name: "Mensalidade do plano", code: null, type: "text" }, { id: 7032, name: "Recebeu aumento recentemente?", code: null, type: "select" }] } }),
 );
 
 app.get("/api/v4/leads", (req, res) => {
