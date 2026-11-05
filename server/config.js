@@ -339,7 +339,7 @@ export const PRE_QUALIFICACAO = {
         chave: "tipoDePlano", rotulo: "Tipo de plano", descricao: "plano Empresarial/CNPJ ou Familiar", tipo: "plano",
         aceitos: /empresarial|cnpj|\bpme\b|\bmei\b|famil/i,
         recusados: /individual|pessoa f[ií]sica|\bpf\b/i,
-        campo: { id: null, nome: /tipo.*plano|plano.*(tipo|modalidade)|modalidade|contrata[cç][aã]o/i },
+        campo: { id: null, nome: /tipo.*plano|modelo.*plano|plano.*(tipo|modalidade)|modalidade|contrata[cç][aã]o/i },
       },
       { chave: "mensalidade", rotulo: "Mensalidade", descricao: "mensalidade acima de R$ 2.000", tipo: "valor", acimaDe: 2000, campo: { id: null, nome: /mensalidade|valor.*(plano|mensal)|quanto.*paga/i } },
     ],

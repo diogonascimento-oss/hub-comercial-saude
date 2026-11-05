@@ -218,3 +218,25 @@ test("agrupamento por conjunto e campanha sem leads não gera bloco", () => {
   assert.equal(analisarPreQualificacao({ ...cenarioRea(), agruparPor: "invalido" }).agruparPor, "anuncio");
   assert.equal(analisarPreQualificacao({ leads: [], consolidados: [], definicoes: [] }).campanhas.length, 0);
 });
+
+test("campos reais da conta: cada critério acha o seu campo pelo nome", () => {
+  const nomes = {
+    1094674: "Plano de saúde", 1121931: "Descrição", 1127409: "Campanha Meta", 1127443: "IR: Mensalidade escolar",
+    1127439: "IR: Filho(a) possui deficiência?", 1127441: "IR: Estuda em escola particular?",
+    1127445: "REA: Modelo do plano", 1127447: "REA: Valor do plano", 1127449: "REA: Recebeu aumento recente?",
+    1127427: "Situação da reunião", 1127423: "Código da campanha",
+  };
+  const definicoes = Object.entries(nomes).map(([id, name]) => ({ id: Number(id), name }));
+  // Cada campanha vê só os seus leads: o IR responde os campos do IR, o REA os do REA.
+  const leadsIR = [{ campos: { 1127439: "Sim", 1127441: "Sim", 1127443: "R$ 1.500" } }];
+  const leadsREA = [{ campos: { 1127445: "Empresarial", 1127447: "R$ 2.500", 1127449: "Sim" } }];
+  const ir = resolverCampos(PRE_QUALIFICACAO["IR-Q"].criterios, definicoes, leadsIR);
+  assert.equal(ir.filhoComDeficiencia.id, 1127439);
+  assert.equal(ir.escolaParticular.id, 1127441);
+  assert.equal(ir.mensalidade.id, 1127443);
+  const regras = PRE_QUALIFICACAO["REA-Q"];
+  const rea = resolverCampos([...regras.criterios, ...regras.complementar], definicoes, leadsREA);
+  assert.equal(rea.tipoDePlano.id, 1127445);
+  assert.equal(rea.mensalidade.id, 1127447);
+  assert.equal(rea.aumentoRecente.id, 1127449);
+});
