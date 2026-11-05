@@ -445,14 +445,18 @@
     <section aria-labelledby="tPreQualificados">
       <div class="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
         <h3 id="tPreQualificados" class="titulo-secao">3. Pré-qualificados pelo questionário</h3>
-        <label class="text-[11px] text-inkdim flex items-center gap-1.5">Agrupar por
-          <select id="agruparPreQualificados" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">
-            <option value="anuncio">Anúncio</option>
-            <option value="conjunto">Conjunto de anúncios</option>
-            <option value="campanhaMeta">Campanha do Meta</option>
-            <option value="campanha">Campanha do núcleo</option>
-          </select>
-        </label>
+        <div class="flex items-center gap-3 flex-wrap">
+          <label class="text-[11px] text-inkdim flex items-center gap-1.5">Agrupar por
+            <select id="agruparPreQualificados" class="bg-surface2 border border-line px-2 py-1 text-ink text-[11px]">
+              <option value="anuncio">Anúncio</option>
+              <option value="conjunto">Conjunto de anúncios</option>
+              <option value="campanhaMeta">Campanha do Meta</option>
+              <option value="campanha">Campanha do núcleo</option>
+            </select>
+          </label>
+          <button type="button" id="btnHtmlPreQualificados" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Baixar HTML</button>
+          <button type="button" id="btnImagemPreQualificados" class="border border-line hover:border-gold text-inkdim hover:text-ink text-[11px] font-semibold px-3 py-1">Baixar imagem</button>
+        </div>
       </div>
       <div class="border border-line bg-bg p-5 space-y-2">
         <p class="text-[11px] text-inkdim leading-relaxed">Leads que já chegam com o perfil da campanha, segundo as respostas do questionário gravadas no Kommo, antes de qualquer contato da equipe. Não é a mesma coisa que \"Qualificados\", que continua sendo só o lead que a equipe qualificou na mão. Seguem o filtro de período, a campanha escolhida acima e a opção de leads que chegaram no período. A coluna \"Pré-qualificados em triagem\" é a fila de leads bons que a equipe ainda não qualificou nem descartou. Clique em um número para ver os leads, com as respostas e o parecer de cada um. \"Sem respostas\" são leads sem nenhuma resposta do questionário gravada nos campos do Kommo (por exemplo, quem chegou pelo WhatsApp sem preencher o formulário). \"Em triagem\" são pré-qualificados que a equipe ainda não qualificou e que seguem em andamento, isto é, não foram perdidos nem fechados; alguns já podem ter sido contatados.</p>
