@@ -19,7 +19,7 @@ async function carregarSemResposta(forcar = false) {
           .map(
             (l) => `<div class="flex items-center justify-between gap-3 py-2 border-b border-line last:border-0">
           <div class="min-w-0">
-            <button type="button" data-lead="${esc(l.id)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(l.nome)}</button>
+            <button type="button" data-lead="${esc(l.id)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(l.nome)}${marcaPre(l)}</button>
             <p class="text-[10px] text-inkfaint">${esc(l.campanha)} · ${esc(nomeEtapa(l.etapaAtual))}${l.sdr ? ` · SDR: ${esc(l.sdr)}` : ""}</p>
           </div>
           <span class="text-[11px] tabular shrink-0 font-semibold ${l.aguardandoSeg >= 86400 ? "text-negativo" : "text-goldbright"}">há ${duracaoCurta(l.aguardandoSeg)}</span>

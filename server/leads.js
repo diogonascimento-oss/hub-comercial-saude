@@ -122,10 +122,64 @@ function motivoDePerda(lead, etapa) {
   return "";
 }
 
+// Chave de comparação de telefones brasileiros: só os dígitos, sem o código do
+// país (55) e com o nono dígito dos celulares. Os números antigos não têm o 9
+// (8635-5452) e os novos têm (98635-5452), mas são o mesmo aparelho; o formulário
+// e o WhatsApp também gravam o mesmo número com e sem +55. Fixos (começam em 2 a
+// 5) ficam como estão. Serve só para comparar: o telefone exibido não muda.
+export function chaveDoTelefone(telefone) {
+  let t = String(telefone ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  if ((t.length === 12 || t.length === 13) && t.startsWith("55")) t = t.slice(2);
+  if (t.length === 10 && /[6-9]/.test(t[2])) t = `${t.slice(0, 2)}9${t.slice(2)}`;
+  if (t.length === 8 && /[6-9]/.test(t[0])) t = `9${t}`;
+  return t;
+}
+
+// Campo de origem do lead (campanha do Meta, conjunto ou anúncio): o configurado
+// em CAMPOS e, se vier vazio, os campos equivalentes (mesmo nome, com outro ID).
+function valorDeOrigem(lead, chave, opcoes) {
+  for (const id of [CAMPOS[chave], ...(opcoes.camposDeOrigem?.[chave] || [])]) {
+    const valor = valorDoCampo(lead.custom_fields_values, id);
+    if (valor) return valor;
+  }
+  return "";
+}
+
+// Nome de um campo para comparar: sem acentos, pontuação, maiúsculas e sem o
+// prefixo da campanha ("IR:", "REA:"), com que os campos novos têm sido criados.
+const nomeDoCampoParaComparar = (nome) =>
+  String(nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/^\s*(ir|rea)(-[qw])?\s*[:\-]\s*/, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+// Outros campos de lead com o mesmo nome dos campos de origem configurados.
+// Quando um campo é recriado (ou a automação passa a gravar em um campo novo,
+// com outro ID), os leads novos trazem a campanha no campo novo e o painel,
+// que lia só o ID antigo, passa a mostrá-los como "(não informado)". Devolve,
+// para cada campo de origem, os IDs equivalentes. definicoes: campos de lead
+// da conta, com id e name.
+export function camposDeOrigemEquivalentes(definicoes) {
+  const resultado = {};
+  for (const chave of ["campanhaMeta", "conjunto", "anuncio"]) {
+    const configurado = (definicoes || []).find((d) => Number(d.id) === CAMPOS[chave]);
+    const nome = configurado ? nomeDoCampoParaComparar(configurado.name) : "";
+    resultado[chave] = nome
+      ? definicoes.filter((d) => Number(d.id) !== CAMPOS[chave] && nomeDoCampoParaComparar(d.name) === nome).map((d) => Number(d.id))
+      : [];
+  }
+  return resultado;
+}
+
 // Leads normalizados e sem duplicidade. Dois leads com o mesmo telefone na
 // mesma campanha são tratados como a mesma pessoa; permanece o mais recente.
+// O telefone é comparado por chaveDoTelefone, então o mesmo número com e sem o
+// nono dígito, ou com e sem +55, também conta como duplicado.
 // A mesma pessoa pode existir em campanhas diferentes.
-export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento) {
+export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento, opcoes = {}) {
   const normalizados = [];
   for (const lead of leadsBrutos) {
     const campanha = mapeamento.campanhaPorFunil.get(Number(lead.pipeline_id));
@@ -158,10 +212,9 @@ export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento) {
       // Kommo grava nos leads de anúncio de WhatsApp: utm_campaign para a
       // campanha, utm_term para o conjunto e utm_content para o anúncio.
       origem: {
-        campanhaMeta:
-          valorDoCampo(lead.custom_fields_values, CAMPOS.campanhaMeta) || valorDoRastreamento(lead.custom_fields_values, "UTM_CAMPAIGN"),
-        conjunto: valorDoCampo(lead.custom_fields_values, CAMPOS.conjunto) || valorDoRastreamento(lead.custom_fields_values, "UTM_TERM"),
-        anuncio: valorDoCampo(lead.custom_fields_values, CAMPOS.anuncio) || valorDoRastreamento(lead.custom_fields_values, "UTM_CONTENT"),
+        campanhaMeta: valorDeOrigem(lead, "campanhaMeta", opcoes) || valorDoRastreamento(lead.custom_fields_values, "UTM_CAMPAIGN"),
+        conjunto: valorDeOrigem(lead, "conjunto", opcoes) || valorDoRastreamento(lead.custom_fields_values, "UTM_TERM"),
+        anuncio: valorDeOrigem(lead, "anuncio", opcoes) || valorDoRastreamento(lead.custom_fields_values, "UTM_CONTENT"),
       },
       responsaveis: {
         sdr: nomeOficialDoResponsavel("sdr", valorDoCampo(lead.custom_fields_values, CAMPOS.sdrResponsavel)),
@@ -179,7 +232,8 @@ export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento) {
   normalizados.sort((a, b) => a.id - b.id);
   const semDuplicidade = new Map();
   for (const lead of normalizados) {
-    const chave = lead.telefone.length >= 8 ? `${lead.campanha}:${lead.telefone}` : `id:${lead.id}`;
+    const telefone = chaveDoTelefone(lead.telefone);
+    const chave = telefone.length >= 8 ? `${lead.campanha}:${telefone}` : `id:${lead.id}`;
     semDuplicidade.set(chave, lead);
   }
   return Array.from(semDuplicidade.values());

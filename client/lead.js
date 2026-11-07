@@ -40,7 +40,7 @@ async function buscarLeads() {
           (l) => `
       <button data-lead="${esc(String(l.id))}" class="w-full text-left px-3 py-2 border-b border-line last:border-0 hover:bg-surface2 block">
         <span class="flex items-baseline justify-between gap-3">
-          <span class="text-ink truncate">${esc(l.nome)}</span>
+          <span class="text-ink truncate">${esc(l.nome)}${marcaPre(l)}</span>
           <span class="text-inkfaint text-[10px] shrink-0">${esc(l.campanha)}${l.estado ? ` · ${esc(l.estado)}` : ""}</span>
         </span>
         <span class="flex items-baseline justify-between gap-3 mt-0.5 text-[10px]">
@@ -148,7 +148,7 @@ async function salvarDescricao() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ texto, textoAnterior: descricaoAberta.texto }),
     });
-    const corpo = (r.headers.get("Content-Type") || "").includes("application/json") ? await r.json() : { error: "A sessão expirou. Recarregue a página para entrar novamente." };
+    const corpo = await lerCorpoDaResposta(r);
     if (r.status === 409 && corpo.textoAtual !== undefined) {
       // Alguém mudou a descrição no Kommo: o texto digitado fica no campo e o
       // texto atual do Kommo aparece embaixo. Um novo clique em Salvar
@@ -352,7 +352,7 @@ async function salvarAlteracao() {
   status.textContent = "Salvando no Kommo.";
   try {
     const r = await fetch(`${API}/leads/${encodeURIComponent(leadId)}/edicao`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
-    const resposta = (r.headers.get("Content-Type") || "").includes("application/json") ? await r.json() : { error: "A sessão expirou. Recarregue a página para entrar novamente." };
+    const resposta = await lerCorpoDaResposta(r);
     if (r.status === 409) {
       // Alguém mudou o lead no Kommo: recarrega a ficha com os valores atuais.
       await atualizarFichaNoLugar(leadId);
@@ -545,7 +545,7 @@ async function enviarAnexos(arquivos) {
         headers: { "Content-Type": "application/octet-stream", "x-nome-arquivo": encodeURIComponent(f.name), "x-tipo-arquivo": f.type || "" },
         body: f,
       });
-      const corpo = (r.headers.get("Content-Type") || "").includes("application/json") ? await r.json() : { error: "A sessão expirou. Recarregue a página para entrar novamente." };
+      const corpo = await lerCorpoDaResposta(r);
       if (!r.ok) throw new Error(corpo.error || `O servidor respondeu com o código ${r.status}.`);
     } catch (erro) {
       erros.push(`${f.name}: ${erro.message}`);
@@ -730,7 +730,7 @@ function renderizarFicha(l) {
     '<p id="statusFicha" class="text-[11px] text-positivo empty:hidden"></p>' +
     blocoDeAlteracao() +
     blocoDaFicha("Identificação", [
-      ["Nome", esc(l.nome)],
+      ["Nome", esc(l.nome) + marcaPre(l)],
       ["Telefone", `<span class="font-mono">${esc(telefoneFormatado(l.telefone))}</span>`],
       ["Estado provável", `${localizacao}<br><span class="text-[10px] text-inkfaint">Estimativa pelo DDD: indica onde a linha foi habilitada, não necessariamente onde a pessoa mora.</span>`],
       ["Título no Kommo", texto(l.titulo)],

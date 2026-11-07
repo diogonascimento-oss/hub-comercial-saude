@@ -563,17 +563,18 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
     resultado.listas = {
       leadsPorIndicador: [...indicadoresPorLead].map(([leadId, indicadores]) => {
         const l = porId.get(leadId);
-        return { id: l.id, nome: l.nome, telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, motivoPerda: l.etapa === "DESQUALIFICADO" ? l.motivoPerda || "" : undefined, indicadores };
+        return { id: l.id, nome: l.nome, marcaPre: l.marcaPre || "", telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, motivoPerda: l.etapa === "DESQUALIFICADO" ? l.motivoPerda || "" : undefined, indicadores };
       }),
       leadsPorEtapa: [...etapasPorLead].map(([leadId, etapas]) => {
         const l = porId.get(leadId);
-        return { id: l.id, nome: l.nome, telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, motivoPerda: l.etapa === "DESQUALIFICADO" ? l.motivoPerda || "" : undefined, etapas };
+        return { id: l.id, nome: l.nome, marcaPre: l.marcaPre || "", telefone: l.telefone, campanha: l.campanha, etapaAtual: l.etapa, motivoPerda: l.etapa === "DESQUALIFICADO" ? l.motivoPerda || "" : undefined, etapas };
       }),
       leadsDoPeriodo: leads
         .filter((l) => ultimaEtapaNoPeriodo.has(l.id))
         .map((l) => ({
           id: l.id,
           nome: l.nome,
+          marcaPre: l.marcaPre || "",
           semNome: l.semNome,
           telefone: l.telefone,
           campanha: l.campanha,
@@ -586,6 +587,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
         .map((l) => ({
           id: l.id,
           nome: l.nome,
+          marcaPre: l.marcaPre || "",
           telefone: l.telefone,
           campanha: l.campanha,
           etapaAtual: l.etapa,
@@ -598,6 +600,7 @@ export function calcularEscopo({ leads, eventosPorLead, deTs, ateTs, agora, incl
           return {
             id: l.id,
             nome: l.nome,
+            marcaPre: l.marcaPre || "",
             telefone: l.telefone,
             campanha: l.campanha,
             agendadoEm: new Date(ts * 1000).toISOString(),

@@ -208,6 +208,39 @@ export function avaliarLead(lead, regras, campos) {
   return { situacao, parecer, respostas, complementares };
 }
 
+// --- Marca nos leads ------------------------------------------------------------
+
+// Quantos leads recentes de cada campanha servem para escolher os campos do
+// questionário. Só os mais recentes, para valer o questionário de agora, mesmo
+// que um campo antigo tenha sido substituído por outro.
+const LEADS_PARA_ESCOLHER_CAMPOS = 400;
+
+// Marca cada lead com "preQualificado" (todos os critérios atendidos pelas
+// respostas) e "marcaPre", que a tela mostra como "(pré)" ao lado do nome:
+//   ativo      - pré-qualificado e ainda no jogo (verde)
+//   descartado - pré-qualificado, mas hoje desqualificado ou em venda perdida,
+//                exceto "sem interesse" (cinza e riscado)
+// situacaoDoLead devolve a situação de hoje do lead (situacaoDeHoje, de
+// trafego.js); "desqualificado" é o que vira "descartado".
+export function marcarPreQualificados(leads, definicoes, situacaoDoLead, regras = PRE_QUALIFICACAO) {
+  for (const lead of leads) {
+    lead.preQualificado = false;
+    lead.marcaPre = "";
+  }
+  for (const [codigo, regrasDaCampanha] of Object.entries(regras)) {
+    const doBloco = leads.filter((l) => l.campanha === codigo);
+    if (!doBloco.length) continue;
+    const recentes = [...doBloco].sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0)).slice(0, LEADS_PARA_ESCOLHER_CAMPOS);
+    const campos = resolverCampos([...regrasDaCampanha.criterios, ...(regrasDaCampanha.complementar || [])], definicoes, recentes);
+    for (const lead of doBloco) {
+      if (avaliarLead(lead, regrasDaCampanha, campos).situacao !== "preQualificado") continue;
+      lead.preQualificado = true;
+      lead.marcaPre = situacaoDoLead(lead) === "desqualificado" ? "descartado" : "ativo";
+    }
+  }
+  return leads;
+}
+
 // --- Análise por campanha e por grupo ---------------------------------------
 
 const AGRUPAMENTOS = {
@@ -269,6 +302,7 @@ export function analisarPreQualificacao({ consolidados, leads, definicoes, agrup
         situacao: a.situacao,
         parecer: a.parecer,
         respostas: a.respostas,
+        marcaPre: c.marcaPre || "",
         qualificadoPelaEquipe: Boolean(c.qualificado),
         preEmTriagem: a.situacao === "preQualificado" && !c.qualificado && c.situacaoDeHoje === "emAndamento",
         _grupo: chaveDoGrupo(c) || SEM_VALOR,

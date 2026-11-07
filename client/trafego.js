@@ -147,7 +147,7 @@ function renderizarListaAberta() {
       .map(
         (l) => `
       <button ${l.leadId ? `data-lead="${esc(String(l.leadId))}"` : "disabled"} class="w-full flex items-center justify-between gap-3 border-b border-line py-1.5 text-left hover:bg-surface2" title="Abrir a ficha do lead">
-        <span class="text-ink truncate">${esc(l.nome)}</span>
+        <span class="text-ink truncate">${esc(l.nome)}${marcaPre(l)}</span>
         <span class="text-inkdim font-mono shrink-0">${esc(l.telefone || "sem telefone")}</span>
         <span class="text-inkfaint text-[10px] shrink-0 w-28 text-right">${esc(l.etapaMaisAvancada || "")}</span>
       </button>`,
@@ -162,7 +162,9 @@ function renderizarListaAberta() {
             .map((c) => {
               const t = textoDaColunaDaLista(l, c.chave);
               const classe = c.chave === "_nome" ? "text-ink" : c.chave === "_telefone" ? "text-inkdim font-mono" : "text-inkdim";
-              return `<td class="px-2 py-1.5 ${classe} max-w-[260px] truncate" title="${esc(t)}">${t ? esc(t) : '<span class="text-inkfaint">—</span>'}</td>`;
+              // A etiqueta "(pré)" só entra na tela; nos arquivos baixados o nome segue limpo.
+              const marca = c.chave === "_nome" ? marcaPre(l) : "";
+              return `<td class="px-2 py-1.5 ${classe} max-w-[260px] truncate" title="${esc(t)}">${t ? esc(t) + marca : '<span class="text-inkfaint">—</span>'}</td>`;
             })
             .join("")}</tr>`,
         )

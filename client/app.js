@@ -78,28 +78,71 @@ function baixarCSV(nomeDoArquivo, cabecalho, linhas) {
   URL.revokeObjectURL(url);
 }
 
+// Etiqueta "(pré)" ao lado do nome de um lead pré-qualificado pelo questionário:
+// verde enquanto o lead segue no funil; cinza e riscada quando ele foi
+// desqualificado ou perdido (exceto "sem interesse"). l.marcaPre vem do servidor.
+// O inline-block evita que o sublinhado do botão com o nome passe pela etiqueta.
+function marcaPre(l) {
+  if (l?.marcaPre === "ativo") {
+    return '<span class="inline-block ml-1 text-[9px] font-normal text-positivo" style="vertical-align:middle" title="Pré-qualificado pelo questionário">(pré)</span>';
+  }
+  if (l?.marcaPre === "descartado") {
+    return '<span class="inline-block ml-1 text-[9px] font-normal text-inkfaint" style="vertical-align:middle;text-decoration:line-through" title="Era pré-qualificado, mas hoje está desqualificado ou perdido">(pré)</span>';
+  }
+  return "";
+}
+
 function mostrarErro(mensagem) {
   const el = $("avisoErro");
   el.textContent = mensagem;
   el.classList.toggle("hidden", !mensagem);
 }
 
-// Chamada à API. Uma resposta que não seja JSON indica que a sessão do
-// Cloudflare Access expirou e a requisição foi redirecionada ao login.
+// Chamada à API. Uma resposta que não seja JSON tem duas causas possíveis:
+// a sessão do Cloudflare Access expirou (401, 403 ou redirecionamento ao login)
+// ou o servidor gratuito do Render está dormindo ou reiniciando e devolveu a
+// página de espera dele. No segundo caso, as consultas (GET) são refeitas
+// algumas vezes, dando tempo para o servidor acordar.
+const MENSAGEM_SESSAO_EXPIRADA = "A sessão expirou. Recarregue a página para entrar novamente.";
+const MENSAGEM_SERVIDOR_ACORDANDO = "O servidor está acordando e ainda não respondeu. Aguarde cerca de um minuto e tente de novo.";
+const ESPERAS_DO_SERVIDOR_MS = [4000, 6000, 8000, 10000, 12000, 15000]; // cerca de 55 s ao todo
+
+const dormir = (ms) => new Promise((ok) => setTimeout(ok, ms));
+
+// Mensagem para uma resposta que não veio em JSON.
+function mensagemSemJson(resposta) {
+  const sessaoExpirada = resposta.status === 401 || resposta.status === 403 || resposta.redirected;
+  return sessaoExpirada ? MENSAGEM_SESSAO_EXPIRADA : MENSAGEM_SERVIDOR_ACORDANDO;
+}
+
+// Corpo de uma resposta, como objeto. Sem JSON, devolve só a mensagem do erro.
+async function lerCorpoDaResposta(resposta) {
+  if ((resposta.headers.get("Content-Type") || "").includes("application/json")) return resposta.json();
+  return { error: mensagemSemJson(resposta) };
+}
+
 async function chamarApi(caminho, opcoes) {
-  let resposta;
-  try {
-    resposta = await fetch(`${API}${caminho}`, opcoes);
-  } catch {
-    throw new Error("Não foi possível contatar o servidor. Verifique a conexão e tente novamente.");
+  const consulta = !opcoes?.method || String(opcoes.method).toUpperCase() === "GET";
+  for (let tentativa = 0; ; tentativa++) {
+    let resposta;
+    try {
+      resposta = await fetch(`${API}${caminho}`, opcoes);
+    } catch {
+      throw new Error("Não foi possível contatar o servidor. Verifique a conexão e tente novamente.");
+    }
+    const tipo = resposta.headers.get("Content-Type") || "";
+    if (tipo.includes("application/json")) {
+      const corpo = await resposta.json();
+      if (!resposta.ok) throw new Error(corpo.error || `O servidor respondeu com o código ${resposta.status}.`);
+      return corpo;
+    }
+    const mensagem = mensagemSemJson(resposta);
+    if (mensagem === MENSAGEM_SERVIDOR_ACORDANDO && consulta && tentativa < ESPERAS_DO_SERVIDOR_MS.length) {
+      await dormir(ESPERAS_DO_SERVIDOR_MS[tentativa]);
+      continue;
+    }
+    throw new Error(mensagem);
   }
-  const tipo = resposta.headers.get("Content-Type") || "";
-  if (!tipo.includes("application/json")) {
-    throw new Error("A sessão expirou. Recarregue a página para entrar novamente.");
-  }
-  const corpo = await resposta.json();
-  if (!resposta.ok) throw new Error(corpo.error || `O servidor respondeu com o código ${resposta.status}.`);
-  return corpo;
 }
 
 // --- Datas iniciais: do primeiro dia do mês até hoje -------------------------
@@ -720,7 +763,7 @@ function renderizarPendencias() {
   const parados = daCampanha(dados.listas.leadsParados);
   $("totalParados").textContent = numero(parados.length);
   $("listaParados").innerHTML = parados.length
-    ? parados.slice(0, LIMITE_DE_ITENS).map((l) => itemDeLista(esc(l.nome), `${esc(l.campanha)} · ${esc(nomeEtapa(l.etapaAtual))}`, `${numero(l.diasParado)} dias`)).join("") +
+    ? parados.slice(0, LIMITE_DE_ITENS).map((l) => itemDeLista(esc(l.nome) + marcaPre(l), `${esc(l.campanha)} · ${esc(nomeEtapa(l.etapaAtual))}`, `${numero(l.diasParado)} dias`)).join("") +
       (parados.length > LIMITE_DE_ITENS ? `<p class="text-[10px] text-inkfaint pt-2">Mais ${numero(parados.length - LIMITE_DE_ITENS)} no arquivo CSV.</p>` : "")
     : '<p class="text-xs text-inkdim">Nenhum lead ativo parado.</p>';
 
@@ -750,7 +793,7 @@ function renderizarPendencias() {
       return `
       <div class="flex items-center justify-between gap-3 py-2 border-b border-gold/15 last:border-0">
         <div class="min-w-0">
-          <button data-lead="${esc(l.id)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(l.nome)}</button>
+          <button data-lead="${esc(l.id)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left truncate max-w-full">${esc(l.nome)}${marcaPre(l)}</button>
           <p class="text-[10px] text-inkfaint">${variasCampanhasNoPainel() ? `${esc(l.campanha)} · ` : ""}marcada em ${dataLocal(l.agendadoEm)}${l.linkDaReuniao ? ` · <a href="${esc(l.linkDaReuniao)}" target="_blank" rel="noopener noreferrer" class="text-goldbright underline decoration-dotted underline-offset-2">entrar na reunião</a>` : ""}</p>
         </div>
         <span class="text-[11px] tabular shrink-0 font-semibold text-right ${atrasada ? "text-negativo" : "text-goldbright"}">${situacao}</span>
@@ -782,7 +825,7 @@ function renderizarLeads() {
           const avancou = l.etapaAtual !== l.etapaNoPeriodo;
           return `
         <tr>
-          <td class="px-4 py-2.5 max-w-[220px] truncate ${l.semNome ? "text-negativo" : "text-ink"}" title="${esc(l.nome)}">${esc(l.nome)}</td>
+          <td class="px-4 py-2.5 max-w-[220px] truncate ${l.semNome ? "text-negativo" : "text-ink"}" title="${esc(l.nome)}">${esc(l.nome)}${marcaPre(l)}</td>
           <td class="px-4 py-2.5 text-xs font-mono ${l.telefone ? "text-inkdim" : "text-negativo"}">${esc(l.telefone || "sem telefone")}</td>
           <td class="px-4 py-2.5 text-xs text-inkdim">${esc(l.campanha)}</td>
           <td class="px-4 py-2.5">

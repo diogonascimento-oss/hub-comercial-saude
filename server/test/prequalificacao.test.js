@@ -10,6 +10,7 @@ import {
   avaliarCriterio,
   resolverCampos,
   analisarPreQualificacao,
+  marcarPreQualificados,
 } from "../prequalificacao.js";
 import { PRE_QUALIFICACAO } from "../config.js";
 
@@ -239,4 +240,38 @@ test("campos reais da conta: cada critério acha o seu campo pelo nome", () => {
   assert.equal(rea.tipoDePlano.id, 1127445);
   assert.equal(rea.mensalidade.id, 1127447);
   assert.equal(rea.aumentoRecente.id, 1127449);
+});
+
+// --- Marca "(pré)" ao lado do nome ---------------------------------------------
+
+test("marca (pré): verde enquanto no jogo, cinza riscado se desqualificado, verde se sem interesse", () => {
+  const definicoes = [
+    { id: 20, name: "Filho com deficiência?" },
+    { id: 21, name: "Escola particular?" },
+    { id: 22, name: "Mensalidade da escola" },
+  ];
+  const boa = { 20: "Sim", 21: "Sim", 22: "Acima de R$ 1.500" };
+  const lead = (id, campos, extras = {}) => ({ id, campanha: "IR-Q", criadoEm: 1_700_000_000 + id, campos, ...extras });
+  const leads = [
+    lead(1, boa), // pré-qualificado, em andamento
+    lead(2, boa, { situacao: "desqualificado" }), // pré-qualificado, hoje desqualificado
+    lead(3, boa, { situacao: "semInteresse" }), // pré-qualificado, sem interesse: continua verde
+    lead(4, { ...boa, 21: "Não" }), // não qualificado
+    lead(5, { ...boa, 22: "R$ 900 a R$ 1.500" }), // pendente
+    lead(6, {}), // sem respostas
+    { id: 7, campanha: "OUTRA", campos: boa }, // campanha sem regras
+  ];
+  marcarPreQualificados(leads, definicoes, (l) => l.situacao || "emAndamento");
+  assert.deepEqual(leads.map((l) => l.marcaPre), ["ativo", "descartado", "ativo", "", "", "", ""]);
+  assert.deepEqual(leads.map((l) => l.preQualificado), [true, true, true, false, false, false, false]);
+});
+
+test("a marca aparece nas listas da análise", () => {
+  const { leads, consolidados, definicoes } = cenarioRea();
+  for (const l of leads) l.campanha = "REA-Q";
+  marcarPreQualificados(leads, definicoes, () => "emAndamento");
+  const comMarca = consolidados.map((c) => ({ ...c, marcaPre: leads.find((l) => l.id === c.leadId).marcaPre }));
+  const bloco = analisarPreQualificacao({ leads, consolidados: comMarca, definicoes }).campanhas[0];
+  const marcados = bloco.total.leads.filter((l) => l.marcaPre === "ativo").map((l) => l.leadId).sort((a, b) => a - b);
+  assert.deepEqual(marcados, [1, 2, 8]); // os três pré-qualificados do cenário
 });

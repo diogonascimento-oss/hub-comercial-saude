@@ -31,13 +31,13 @@ import * as kommo from "./kommo.js";
 import * as google from "./google.js";
 import { mensagensDosEventos, resumirMensagens } from "./mensagens.js";
 import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
-import { nomeOficialDoResponsavel, numeroDoTexto, normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone } from "./leads.js";
+import { nomeOficialDoResponsavel, numeroDoTexto, normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone, chaveDoTelefone, camposDeOrigemEquivalentes } from "./leads.js";
 import { diasDeCalendario, calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
-import { analisarTrafego, consolidarLeads, agruparEComputar, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
+import { situacaoDeHoje, analisarTrafego, consolidarLeads, agruparEComputar, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
 import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
 import { getLocalizacao } from "./localizacao.js";
-import { analisarPreQualificacao } from "./prequalificacao.js";
+import { analisarPreQualificacao, marcarPreQualificados } from "./prequalificacao.js";
 
 const ETAPAS_ANTES_DA_REUNIAO = new Set(["CONTATO_INICIAL", "CONTATO_INICIADO", "EM_QUALIFICACAO", "LEAD_QUALIFICADO", "EM_AGENDAMENTO"]);
 const ETAPAS_DEPOIS_DA_REUNIAO = new Set(["REUNIAO_REALIZADA", "PROTOCOLO_FARMER", "FECHADO"]);
@@ -99,12 +99,19 @@ function obterLeads() {
     if (!mapeamento.idsDosFunis.length) return { mapeamento, leads: [] };
     const leadsBrutos = await kommo.listarLeadsDosFunis(mapeamento.idsDosFunis);
     const idsDeContatos = leadsBrutos.map((l) => l._embedded?.contacts?.[0]?.id).filter(Boolean);
-    const [contatosPorId, reunioes] = await Promise.all([kommo.listarContatosPorIds(idsDeContatos), armazenamento.lerReunioesDoPainel().catch(() => ({}))]);
+    const [contatosPorId, reunioes, definicoes] = await Promise.all([
+      kommo.listarContatosPorIds(idsDeContatos),
+      armazenamento.lerReunioesDoPainel().catch(() => ({})),
+      // Sem a lista de campos da conta, o painel segue só com o que está em config.js.
+      camposDaConta().catch(() => []),
+    ]);
     // A data marcada pelo painel vale sobre o campo do Kommo.
-    const leads = normalizarLeads(leadsBrutos, contatosPorId, mapeamento).map((l) => {
+    const leads = normalizarLeads(leadsBrutos, contatosPorId, mapeamento, { camposDeOrigem: camposDeOrigemEquivalentes(definicoes) }).map((l) => {
       const r = reunioes[String(l.id)];
       return r ? { ...l, dataDaReuniao: r.inicio || l.dataDaReuniao, linkDaReuniao: r.link || "" } : l;
     });
+    // Marca de "(pré)" ao lado do nome: pré-qualificado pelo questionário.
+    marcarPreQualificados(leads, definicoes, situacaoDeHoje);
     return { mapeamento, leads };
   })();
   cacheLeads = { em: Date.now(), promessa };
@@ -566,6 +573,7 @@ app.get("/api/leads/etapa", async (req, res) => {
       leads: naEtapa.map((l) => ({
         id: l.id,
         nome: l.nome,
+        marcaPre: l.marcaPre || "",
         telefone: l.telefone,
         campanha: l.campanha,
         criadoEm: iso(l.criadoEm),
@@ -608,6 +616,7 @@ app.get("/api/leads/responsavel", async (req, res) => {
       leads: daPessoa.map((l) => ({
         id: l.id,
         nome: l.nome,
+        marcaPre: l.marcaPre || "",
         telefone: l.telefone,
         campanha: l.campanha,
         etapa: l.etapa,
@@ -645,6 +654,7 @@ app.get("/api/leads/busca", async (req, res) => {
       resultados: encontrados.slice(0, 25).map((l) => ({
         id: l.id,
         nome: l.nome,
+        marcaPre: l.marcaPre || "",
         telefone: l.telefone,
         campanha: l.campanha,
         etapa: l.etapaNome,
@@ -770,6 +780,7 @@ app.get("/api/leads/:id", async (req, res) => {
       id: lead.id,
       titulo: lead.titulo,
       nome: lead.nome,
+      marcaPre: lead.marcaPre || "",
       telefone: lead.telefone,
       localizacao: localizacaoProvavel(lead.telefone),
       campanha,
@@ -2119,6 +2130,7 @@ app.get("/api/base-de-leads", async (req, res) => {
         return {
           id: l.id,
           nome: l.nome,
+          marcaPre: l.marcaPre || "",
           telefone: l.telefone,
           campanha: l.campanha,
           etapa: l.etapaNome,
@@ -2202,7 +2214,7 @@ app.get("/api/mensagens/sem-resposta", async (req, res) => {
       if (!lead || ENCERRADOS.has(lead.etapa)) continue;
       const r = resumirMensagens(mensagensDosEventos(eventos), agora);
       if (r.aguardandoSeg !== null && r.aguardandoSeg >= horas * 3600) {
-        aguardando.push({ id: lead.id, nome: lead.nome, telefone: lead.telefone, campanha: lead.campanha, etapaAtual: lead.etapa, sdr: lead.responsaveis?.sdr || "", aguardandoDesde: iso(r.aguardandoDesde), aguardandoSeg: r.aguardandoSeg });
+        aguardando.push({ id: lead.id, nome: lead.nome, marcaPre: lead.marcaPre || "", telefone: lead.telefone, campanha: lead.campanha, etapaAtual: lead.etapa, sdr: lead.responsaveis?.sdr || "", aguardandoDesde: iso(r.aguardandoDesde), aguardandoSeg: r.aguardandoSeg });
       }
     }
     aguardando.sort((a, b) => b.aguardandoSeg - a.aguardandoSeg);
@@ -2228,7 +2240,7 @@ app.get("/api/fora-dos-funis", async (req, res) => {
     const idsDeContatos = brutos.map((l) => l._embedded?.contacts?.[0]?.id).filter(Boolean);
     const contatos = idsDeContatos.length ? await kommo.listarContatosPorIds(idsDeContatos) : new Map();
     const porTelefone = new Map();
-    for (const l of doNucleo) if (l.telefone) porTelefone.set(l.telefone, l);
+    for (const l of doNucleo) if (l.telefone) porTelefone.set(chaveDoTelefone(l.telefone), l);
     const nomeDaColuna = (funil, statusId) => funil?._embedded?.statuses?.find((c) => Number(c.id) === Number(statusId))?.name || `Coluna ${statusId}`;
     const usuarios = await kommo.listarUsuarios().catch(() => new Map());
     const leads = brutos
@@ -2237,7 +2249,7 @@ app.get("/api/fora-dos-funis", async (req, res) => {
         const funil = outros.find((f) => Number(f.id) === Number(l.pipeline_id));
         const contato = contatos.get(l._embedded?.contacts?.[0]?.id) || null;
         const telefone = extrairTelefone(l, contato) || "";
-        const noNucleo = telefone ? porTelefone.get(telefone) : null;
+        const noNucleo = telefone ? porTelefone.get(chaveDoTelefone(telefone)) : null;
         const campos = (l.custom_fields_values || [])
           .map((c) => ({ nome: c.field_name || c.field_code || `Campo ${c.field_id}`, valor: (c.values || []).map((v) => v.value).filter((v) => v !== null && v !== undefined).join("; ") }))
           .filter((c) => c.valor !== "" && !/^\s*[{[]/.test(String(c.valor)));
@@ -2304,6 +2316,74 @@ app.get("/api/diagnostico/campos", async (req, res) => {
       })) });
   } catch (erro) {
     responderErro(res, erro, "Falha ao consultar os campos");
+  }
+});
+
+// Origem dos leads recentes, dia a dia: quantos chegaram com campanha do Meta,
+// conjunto e anúncio, e em quais campos do Kommo a informação está. Serve para
+// descobrir por que a campanha aparece como "(não informado)" no painel: se o
+// campo configurado ficou vazio e outro campo passou a trazer a campanha, ele
+// aparece em "candidatos" com a contagem de leads preenchidos.
+app.get("/api/diagnostico/origem", async (req, res) => {
+  const dias = Math.min(Math.max(parseInt(req.query.dias, 10) || 14, 1), 90);
+  try {
+    const [{ leads }, definicoes] = await Promise.all([obterLeads(), camposDaConta()]);
+    const nomeDoCampo = new Map(definicoes.map((d) => [String(d.id), d.name]));
+    const desde = Math.floor(Date.now() / 1000) - dias * 86400;
+    const recentes = leads.filter((l) => (l.criadoEm || 0) >= desde);
+
+    const porDia = new Map();
+    for (const l of recentes) {
+      const dia = dataLocal(l.criadoEm);
+      const d = porDia.get(dia) || { dia, leads: 0, comCampanha: 0, semCampanha: 0, comConjunto: 0, comAnuncio: 0 };
+      d.leads++;
+      if (l.origem.campanhaMeta) d.comCampanha++;
+      else d.semCampanha++;
+      if (l.origem.conjunto) d.comConjunto++;
+      if (l.origem.anuncio) d.comAnuncio++;
+      porDia.set(dia, d);
+    }
+
+    const parecemOrigem = /campanh|conjunto|an[uú]ncio|utm|origem|adset|ad set|criativo|fonte/i;
+    const preenchidosPorCampo = new Map();
+    for (const l of recentes) {
+      for (const [id, valor] of Object.entries(l.campos || {})) {
+        if (String(valor ?? "").trim()) preenchidosPorCampo.set(id, (preenchidosPorCampo.get(id) || 0) + 1);
+      }
+    }
+    const configurados = Object.fromEntries(
+      ["campanhaMeta", "conjunto", "anuncio"].map((chave) => [
+        chave,
+        { id: CAMPOS[chave], nome: nomeDoCampo.get(String(CAMPOS[chave])) || "(campo não encontrado na conta)", preenchidos: preenchidosPorCampo.get(String(CAMPOS[chave])) || 0 },
+      ]),
+    );
+    const candidatos = definicoes
+      .filter((d) => parecemOrigem.test(d.name || ""))
+      .map((d) => ({ id: d.id, nome: d.name, tipo: d.type, preenchidos: preenchidosPorCampo.get(String(d.id)) || 0, configurado: Object.values(CAMPOS).includes(Number(d.id)) }))
+      .sort((a, b) => b.preenchidos - a.preenchidos);
+
+    const semCampanha = recentes.filter((l) => !l.origem.campanhaMeta);
+    res.json({
+      dias,
+      totalRecentes: recentes.length,
+      semCampanha: semCampanha.length,
+      camposConfigurados: configurados,
+      camposComMesmoNome: camposDeOrigemEquivalentes(definicoes),
+      porDia: [...porDia.values()].sort((a, b) => a.dia.localeCompare(b.dia)),
+      candidatos,
+      // Até 8 leads recentes sem campanha, com os campos que eles têm preenchidos.
+      exemplosSemCampanha: semCampanha.slice(0, 8).map((l) => ({
+        id: l.id,
+        campanha: l.campanha,
+        criadoEm: iso(l.criadoEm),
+        camposPreenchidos: Object.entries(l.campos || {})
+          .filter(([, valor]) => String(valor ?? "").trim())
+          .slice(0, 30)
+          .map(([id, valor]) => ({ id: Number(id), campo: nomeDoCampo.get(id) || `Campo ${id}`, valor: String(valor).slice(0, 80) })),
+      })),
+    });
+  } catch (erro) {
+    responderErro(res, erro, "Falha ao diagnosticar a origem dos leads");
   }
 });
 

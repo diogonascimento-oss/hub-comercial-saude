@@ -256,7 +256,7 @@ function renderizarTabelaDaBase() {
               (l) => `<tr class="border-t border-line hover:bg-surface2/60">${colunas
                 .map((c) =>
                   c.chave === "nome"
-                    ? `<td class="px-3 py-1.5"><button type="button" data-lead="${esc(l.id)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left">${esc(l.nome)}</button></td>`
+                    ? `<td class="px-3 py-1.5"><button type="button" data-lead="${esc(l.id)}" class="text-ink hover:text-goldbright underline decoration-dotted underline-offset-2 text-left">${esc(l.nome)}${marcaPre(l)}</button></td>`
                     : `<td class="px-3 py-1.5 ${c.tipo === "numero" ? "text-right tabular" : ""} text-inkdim">${formatarCelula(c, valorDaColuna(l, c.chave))}</td>`,
                 )
                 .join("")}</tr>`,
