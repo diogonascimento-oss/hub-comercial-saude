@@ -19,5 +19,13 @@
   "preview_urls": false,
   "observability": {
     "enabled": true
+  },
+  // Mantém o servidor do Render acordado no horário de trabalho: a cada 10
+  // minutos, das 8h às 19h59 (Brasília), de segunda a sábado. A agenda do
+  // Cloudflare usa UTC (Brasília + 3 h). Fora desse horário o servidor dorme e
+  // não gasta horas gratuitas do Render (750 por mês, somadas entre os serviços
+  // gratuitos da conta). Para desligar, apague esta linha e publique de novo.
+  "triggers": {
+    "crons": ["*/10 11-22 * * MON-SAT"]
   }
 }

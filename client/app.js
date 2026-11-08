@@ -105,7 +105,12 @@ function mostrarErro(mensagem) {
 // algumas vezes, dando tempo para o servidor acordar.
 const MENSAGEM_SESSAO_EXPIRADA = "A sessão expirou. Recarregue a página para entrar novamente.";
 const MENSAGEM_SERVIDOR_ACORDANDO = "O servidor está acordando e ainda não respondeu. Aguarde cerca de um minuto e tente de novo.";
-const ESPERAS_DO_SERVIDOR_MS = [4000, 6000, 8000, 10000, 12000, 15000]; // cerca de 55 s ao todo
+// Tempo que o painel continua tentando enquanto o servidor acorda. O Render
+// leva cerca de um minuto; a margem cobre uma partida mais lenta.
+const LIMITE_DE_ESPERA_DO_SERVIDOR_MS = 4 * 60 * 1000;
+const ESPERAS_DO_SERVIDOR_MS = [3000, 5000, 8000, 10000, 15000]; // depois disso, de 15 em 15 s
+const AVISO_SERVIDOR_ACORDANDO = "O servidor estava dormindo e está acordando. Isso leva cerca de um minuto; o painel tenta de novo sozinho.";
+let avisoDeSonoNaTela = false;
 
 const dormir = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
@@ -121,27 +126,55 @@ async function lerCorpoDaResposta(resposta) {
   return { error: mensagemSemJson(resposta) };
 }
 
+function avisarQueOServidorAcorda() {
+  avisoDeSonoNaTela = true;
+  mostrarErro(AVISO_SERVIDOR_ACORDANDO);
+}
+function limparAvisoDoServidor() {
+  if (!avisoDeSonoNaTela) return;
+  avisoDeSonoNaTela = false;
+  mostrarErro("");
+}
+
+// Consultas (GET) são refeitas enquanto o servidor acorda: quando a conexão cai,
+// quando o gateway do Render responde sem JSON ou quando o Worker avisa que o
+// servidor está acordando. Erros de verdade (JSON com erro, sessão expirada)
+// aparecem na hora. Chamadas que alteram dados nunca são repetidas.
 async function chamarApi(caminho, opcoes) {
   const consulta = !opcoes?.method || String(opcoes.method).toUpperCase() === "GET";
+  const inicio = Date.now();
   for (let tentativa = 0; ; tentativa++) {
-    let resposta;
+    let mensagemSeFalhar = null; // preenchida quando a falha é do tipo "servidor acordando"
+    let resposta = null;
     try {
       resposta = await fetch(`${API}${caminho}`, opcoes);
     } catch {
-      throw new Error("Não foi possível contatar o servidor. Verifique a conexão e tente novamente.");
+      mensagemSeFalhar = "Não foi possível contatar o servidor. Verifique a conexão e tente novamente.";
     }
-    const tipo = resposta.headers.get("Content-Type") || "";
-    if (tipo.includes("application/json")) {
-      const corpo = await resposta.json();
-      if (!resposta.ok) throw new Error(corpo.error || `O servidor respondeu com o código ${resposta.status}.`);
-      return corpo;
+
+    if (resposta) {
+      const tipo = resposta.headers.get("Content-Type") || "";
+      if (tipo.includes("application/json")) {
+        const corpo = await resposta.json();
+        if (resposta.ok) {
+          limparAvisoDoServidor();
+          return corpo;
+        }
+        if (!corpo.acordando) throw new Error(corpo.error || `O servidor respondeu com o código ${resposta.status}.`);
+        mensagemSeFalhar = MENSAGEM_SERVIDOR_ACORDANDO;
+      } else {
+        mensagemSeFalhar = mensagemSemJson(resposta);
+        if (mensagemSeFalhar !== MENSAGEM_SERVIDOR_ACORDANDO) throw new Error(mensagemSeFalhar);
+      }
     }
-    const mensagem = mensagemSemJson(resposta);
-    if (mensagem === MENSAGEM_SERVIDOR_ACORDANDO && consulta && tentativa < ESPERAS_DO_SERVIDOR_MS.length) {
-      await dormir(ESPERAS_DO_SERVIDOR_MS[tentativa]);
-      continue;
+
+    const passou = Date.now() - inicio;
+    if (!consulta || passou >= LIMITE_DE_ESPERA_DO_SERVIDOR_MS) {
+      limparAvisoDoServidor();
+      throw new Error(mensagemSeFalhar);
     }
-    throw new Error(mensagem);
+    avisarQueOServidorAcorda();
+    await dormir(ESPERAS_DO_SERVIDOR_MS[Math.min(tentativa, ESPERAS_DO_SERVIDOR_MS.length - 1)]);
   }
 }
 

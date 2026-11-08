@@ -170,3 +170,66 @@ test("anexos: repassa nome e tipo do arquivo e devolve os cabeçalhos do downloa
     globalThis.fetch = fetchOriginal;
   }
 });
+
+// --- Servidor dormindo -------------------------------------------------------------
+
+// Troca a resposta da API por um instante e devolve a rede de teste ao final.
+async function comApi(respostaDaApi, fn) {
+  const normal = globalThis.fetch;
+  globalThis.fetch = async (destino, opcoes = {}) => {
+    if (String(destino).includes("/cdn-cgi/access/certs")) return normal(destino, opcoes);
+    return respostaDaApi(destino, opcoes);
+  };
+  try {
+    return await fn();
+  } finally {
+    globalThis.fetch = normal;
+  }
+}
+
+test("conexão que cai com o servidor dormindo: o painel é avisado de que ele está acordando", async () => {
+  const r = await comApi(() => Promise.reject(new TypeError("fetch failed")), async () => chamar("/api/metrics", { token: await emitirToken() }));
+  assert.equal(r.status, 503);
+  assert.equal(r.headers.get("Retry-After"), "5");
+  const corpo = await r.json();
+  assert.equal(corpo.acordando, true);
+});
+
+test("erro do gateway do Render sem JSON também vira \"acordando\"", async () => {
+  for (const status of [502, 503, 504]) {
+    const r = await comApi(
+      () => new Response("<html>Bad Gateway</html>", { status, headers: { "Content-Type": "text/html" } }),
+      async () => chamar("/api/metrics", { token: await emitirToken() }),
+    );
+    assert.equal(r.status, 503, `status ${status}`);
+    assert.equal((await r.json()).acordando, true);
+  }
+});
+
+test("erro de verdade do servidor, em JSON, passa como está (não é \"acordando\")", async () => {
+  const r = await comApi(
+    () => Response.json({ error: "O Kommo recusou o token de acesso." }, { status: 502 }),
+    async () => chamar("/api/metrics", { token: await emitirToken() }),
+  );
+  assert.equal(r.status, 502);
+  assert.deepEqual(await r.json(), { error: "O Kommo recusou o token de acesso." });
+});
+
+test("agenda: visita a página inicial do servidor, sem segredo e sem derrubar o Worker se falhar", async () => {
+  const visitas = [];
+  await comApi(
+    (destino, opcoes) => {
+      visitas.push({ url: String(destino), cabecalhos: Object.fromEntries(new Headers(opcoes.headers)) });
+      return new Response("ok");
+    },
+    () => worker.scheduled({}, env),
+  );
+  assert.equal(visitas.length, 1);
+  assert.equal(visitas[0].url, "https://api.exemplo.test/");
+  assert.equal(visitas[0].cabecalhos["x-api-token"], undefined);
+
+  // Falha da rede: não lança.
+  await comApi(() => Promise.reject(new Error("sem rede")), () => worker.scheduled({}, env));
+  // Sem endereço configurado: não faz nada.
+  await comApi(() => assert.fail("não devia chamar a rede"), () => worker.scheduled({}, {}));
+});

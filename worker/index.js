@@ -20,12 +20,21 @@
 const VALIDADE_DAS_CHAVES_MS = 60 * 60 * 1000;
 let chavesDoAccess = null; // { em, dominio, porKid }
 
-function json(status, corpo) {
+function json(status, corpo, cabecalhosExtras = {}) {
   return new Response(JSON.stringify(corpo), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...cabecalhosExtras },
   });
 }
+
+// O servidor gratuito do Render dorme depois de 15 minutos sem uso e leva cerca
+// de um minuto para acordar. Nesse tempo a conexão pode cair ou o gateway do
+// Render pode responder sem JSON. O painel reconhece "acordando" e tenta de novo
+// sozinho; erros reais do servidor (que sempre vêm em JSON) passam como estão.
+const servidorAcordando = () =>
+  json(503, { error: "O servidor está acordando. Aguarde um instante.", acordando: true }, { "Retry-After": "5" });
+
+const ehJson = (resposta) => (resposta.headers.get("Content-Type") || "").includes("application/json");
 
 function decodificarBase64Url(texto) {
   const base64 = texto.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(texto.length / 4) * 4, "=");
@@ -118,7 +127,26 @@ async function paginaNaoEncontrada(url, env) {
 
 const METODOS_ACEITOS = new Set(["GET", "POST", "PUT", "DELETE"]);
 
+// Tempo máximo de espera de cada chamada da agenda; um servidor dormindo leva
+// cerca de um minuto para responder.
+const ESPERA_DA_AGENDA_MS = 110_000;
+
 export default {
+  // Chamado pela agenda do Cloudflare (triggers.crons, em wrangler.jsonc). Faz uma
+  // visita à página inicial do servidor para que ele não durma no horário de
+  // trabalho e, se já estiver dormindo, comece a acordar antes de alguém abrir
+  // o painel. Não passa pelo Access e não envia dados: só a visita.
+  async scheduled(controller, env) {
+    if (!env.API_ORIGEM) return;
+    const inicio = Date.now();
+    try {
+      const resposta = await fetch(`${env.API_ORIGEM.replace(/\/+$/, "")}/`, { signal: AbortSignal.timeout(ESPERA_DA_AGENDA_MS) });
+      console.log(`Servidor visitado: ${resposta.status} em ${Math.round((Date.now() - inicio) / 1000)} s.`);
+    } catch (erro) {
+      console.warn(`Visita ao servidor falhou após ${Math.round((Date.now() - inicio) / 1000)} s: ${erro.message}`);
+    }
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) {
@@ -173,8 +201,10 @@ export default {
         body: temCorpo ? await request.arrayBuffer() : undefined,
       });
     } catch {
-      return json(502, { error: "Não foi possível contatar o servidor da API." });
+      return servidorAcordando();
     }
+    // Erro do gateway sem JSON: o servidor ainda não está de pé.
+    if ([502, 503, 504].includes(resposta.status) && !ehJson(resposta)) return servidorAcordando();
 
     const saida = new Headers({ "Cache-Control": "no-store" });
     saida.set("Content-Type", resposta.headers.get("Content-Type") || "application/json; charset=utf-8");

@@ -234,6 +234,15 @@ O modelo está em `server/.env.exemplo`.
 
 O arquivo `.env` não deve ser enviado ao repositório.
 
+### 7.2.1 Servidor gratuito do Render dormindo
+
+O servidor no plano gratuito do Render dorme depois de 15 minutos sem requisições e leva cerca de um minuto para acordar na próxima. Duas medidas reduzem o efeito:
+
+- **O painel espera e tenta de novo sozinho.** Consultas (GET) são repetidas por até 4 minutos quando a conexão cai, quando o gateway do Render responde sem JSON ou quando o Worker responde `503` com `acordando: true`. Um aviso na tela explica o que está acontecendo e some quando os dados chegam. Erros reais do servidor (sempre em JSON, como o do token do Kommo) aparecem na hora, e chamadas que alteram dados nunca são repetidas.
+- **O Worker visita o servidor no horário de trabalho.** A agenda `triggers.crons`, em `wrangler.jsonc`, faz uma visita à página inicial do servidor a cada 10 minutos, das 8h às 19h59 de Brasília, de segunda a sábado (a agenda do Cloudflare usa UTC). Assim o servidor não dorme durante o expediente e, na primeira visita do dia, já começa a acordar antes de alguém abrir o painel. Fora desse horário ele dorme normalmente.
+
+O plano gratuito do Render dá 750 horas por mês, somadas entre todos os serviços gratuitos da conta; passando disso, o Render suspende todos eles até o mês seguinte. A agenda mantém o serviço de pé por cerca de 12 horas por dia útil (uns 310 horas por mês). Se a conta tiver outros serviços gratuitos, some as horas antes de manter vários acordados. Para desligar a agenda, apague a linha `crons` e publique o Worker de novo.
+
 ### 7.3 Execução local com dados fictícios
 
 ```bash
