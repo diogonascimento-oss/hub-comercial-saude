@@ -123,7 +123,7 @@ const totalDaLinha = (b, linha) => b.campanhas.reduce((t, c) => t + contagemDaCe
 const reaisDoResumo = (v) => (v === null || v === undefined ? "" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
 const reaisSemSimbolo = (v) => (v === null || v === undefined ? "" : v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const nomeDaColuna = (c) => (c.partes ? c.partes.join(" · ") : c.grupo || "(não informado)");
-const ROTULO_DO_NIVEL = { campanha: "Campanha do Meta", conjunto: "Conjunto de anúncios", anuncio: "Anúncio" };
+const ROTULO_DO_NIVEL = { campanha: "Campanha do Meta", conjunto: "Conjunto de anúncios", anuncio: "Anúncio", nucleo: "Campanha do núcleo" };
 
 // Linhas do cabeçalho de um quadro (cada uma com rótulo, colunas e TOTAL).
 // No modo "todos", três linhas: campanha, conjunto e anúncio.
@@ -157,9 +157,29 @@ function valorTotalDoBloco(bloco) {
   return comValor.length ? Math.round(comValor.reduce((t, c) => t + c.valor, 0) * 100) / 100 : null;
 }
 
+// Com as campanhas do núcleo nas colunas, o quadro é um só (um quadro por
+// campanha teria uma coluna única): "Quadros" passa a "Tudo unificado" e fica
+// travado; ao sair dessa opção, volta ao que estava escolhido.
+let quadrosAntesDoNucleo = null;
+function sincronizarQuadrosComAsColunas() {
+  const quadros = $("quadrosResumo");
+  if ($("colunasResumo").value === "nucleo") {
+    if (quadrosAntesDoNucleo === null) quadrosAntesDoNucleo = quadros.value;
+    quadros.value = "todas";
+    quadros.disabled = true;
+    quadros.title = "Com as campanhas do núcleo nas colunas, o quadro é um só.";
+  } else if (quadrosAntesDoNucleo !== null) {
+    quadros.value = quadrosAntesDoNucleo;
+    quadrosAntesDoNucleo = null;
+    quadros.disabled = false;
+    quadros.title = "";
+  }
+}
+
 async function carregarResumoDoNucleo(forcar = false) {
   const { inicio, fim } = periodoDoFiltro();
   if (!inicio || !fim) return;
+  sincronizarQuadrosComAsColunas();
   const apenasNovos = $("apenasNovos").checked;
   const nivel = $("colunasResumo").value;
   const juntar = $("quadrosResumo").value;
@@ -182,7 +202,9 @@ function renderizarResumoDoNucleo() {
   $("notaResumoNucleo").textContent = r.apenasNovos
     ? "Contando só os leads que chegaram no período, acompanhados até hoje: um lead que chegou no período e fechou depois aparece como fechado aqui. É a leitura certa para comparar com o valor investido no período."
     : "Contando tudo o que aconteceu no período, inclusive com leads que chegaram antes dele: as reuniões e os contratos podem ser de leads de outras semanas, e os números não se comparam diretamente com o valor investido no período.";
-  $("notaValorResumo").textContent = r.nivel !== "campanha"
+  $("notaValorResumo").textContent = r.nivel === "nucleo"
+    ? "Valor: não aparece com as campanhas do núcleo nas colunas. O valor investido é lançado por campanha do Meta, conjunto ou anúncio; escolha uma dessas colunas para digitá-lo."
+    : r.nivel !== "campanha"
     ? `Valor: digite o valor investido em cada ${{ anuncio: "anúncio", conjunto: "conjunto", todos: "coluna (campanha, conjunto e anúncio)" }[r.nivel]}. Ele fica salvo para este período exato e para esta forma de colunas; o valor lido do Meta vale só nas colunas por campanha.`
     : r.meta.configurado && !r.meta.erro
     ? "Valor: investido em cada campanha no período, lido do Meta. Campanhas sem gasto encontrado no Meta podem receber um valor digitado."
@@ -218,7 +240,9 @@ function renderizarResumoDoNucleo() {
       };
       const anteriorDe = (linha, c) => (c ? c[LINHAS_DO_RESUMO[linha.indice - 1].campo] || 0 : totalDoBloco(b, LINHAS_DO_RESUMO[linha.indice - 1].campo));
       const celulaValor = (c, ci) =>
-        c.origemDoValor === "meta"
+        r.nivel === "nucleo"
+          ? '<span class="text-inkfaint">—</span>'
+          : c.origemDoValor === "meta"
           ? `<span title="Valor do Meta">${reaisDoResumo(c.valor)}</span>`
           : `<input type="text" inputmode="decimal" data-valor-bloco="${bi}" data-valor-coluna="${ci}" value="${esc(reaisSemSimbolo(c.valor))}" placeholder="R$ 0,00" class="w-24 bg-surface2 border border-line px-1.5 py-0.5 text-right text-ink tabular text-xs">`;
       return `

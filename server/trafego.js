@@ -3,6 +3,7 @@
 // lead no funil. Funções puras, sem consulta a serviços externos.
 
 import {
+  CAMPANHAS,
   ETAPAS_PRE_QUALIFICACAO,
   ORDEM_ETAPAS,
   CAMPANHAS_SEM_RASTREIO_DE_ANUNCIO,
@@ -186,6 +187,21 @@ export function agruparEComputar(leads, chaveDoGrupo) {
     });
   }
   return resultado.sort((a, b) => b.totalLeads - a.totalLeads);
+}
+
+// Colunas "Campanha do núcleo" do Resumo para o núcleo: um grupo por campanha do
+// núcleo (IR, IR - WhatsApp, Reajuste), na ordem de CAMPANHAS e com o título que
+// o Resumo usa nos quadros. Essa informação vem do funil do lead, então todo lead
+// tem uma; não existe "(não informado)" aqui.
+export function agruparPorCampanhaDoNucleo(consolidados, campanhas = CAMPANHAS) {
+  const ordem = new Map(campanhas.map((c, i) => [c.codigo, i]));
+  const tituloDe = (codigo) => {
+    const c = campanhas.find((x) => x.codigo === codigo);
+    return c ? c.tituloNoResumo || c.nome || c.codigo : codigo;
+  };
+  return agruparEComputar(consolidados, (l) => l.campanha)
+    .sort((a, b) => (ordem.get(a.grupo) ?? 99) - (ordem.get(b.grupo) ?? 99))
+    .map((g) => ({ ...g, grupo: tituloDe(g.grupo) }));
 }
 
 function engajamentoPorEtapa(leads, chaveDoGrupo) {

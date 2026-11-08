@@ -23,8 +23,6 @@ import {
   ROTULO_SEM_RASTREIO_DE_ANUNCIO,
   MOTIVOS_SEM_INTERESSE,
   CAMPOS,
-  CAMPOS_META_ADS,
-  NOMES_DO_META,
   RESPONSAVEIS,
   AGENDA,
   FUNIS_VIGIADOS,
@@ -36,8 +34,8 @@ import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
 import { nomeOficialDoResponsavel, numeroDoTexto, normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone, chaveDoTelefone, camposDeOrigemEquivalentes } from "./leads.js";
 import { diasDeCalendario, calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
-import { situacaoDeHoje, analisarTrafego, consolidarLeads, agruparEComputar, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
-import { metaConfigurado, buscarGastoDoMeta, buscarNomesDoMeta } from "./meta.js";
+import { situacaoDeHoje, analisarTrafego, consolidarLeads, agruparEComputar, agruparPorCampanhaDoNucleo, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
+import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
 import { getLocalizacao } from "./localizacao.js";
 import { analisarPreQualificacao, marcarPreQualificados } from "./prequalificacao.js";
 
@@ -101,15 +99,14 @@ function obterLeads() {
     if (!mapeamento.idsDosFunis.length) return { mapeamento, leads: [] };
     const leadsBrutos = await kommo.listarLeadsDosFunis(mapeamento.idsDosFunis);
     const idsDeContatos = leadsBrutos.map((l) => l._embedded?.contacts?.[0]?.id).filter(Boolean);
-    const [contatosPorId, reunioes, definicoes, nomesDoMeta] = await Promise.all([
+    const [contatosPorId, reunioes, definicoes] = await Promise.all([
       kommo.listarContatosPorIds(idsDeContatos),
       armazenamento.lerReunioesDoPainel().catch(() => ({})),
       // Sem a lista de campos da conta, o painel segue só com o que está em config.js.
       camposDaConta().catch(() => []),
-      nomesDoMetaCompletos(),
     ]);
     // A data marcada pelo painel vale sobre o campo do Kommo.
-    const leads = normalizarLeads(leadsBrutos, contatosPorId, mapeamento, { camposDeOrigem: camposDeOrigemEquivalentes(definicoes), nomesDoMeta }).map((l) => {
+    const leads = normalizarLeads(leadsBrutos, contatosPorId, mapeamento, { camposDeOrigem: camposDeOrigemEquivalentes(definicoes) }).map((l) => {
       const r = reunioes[String(l.id)];
       return r ? { ...l, dataDaReuniao: r.inicio || l.dataDaReuniao, linkDaReuniao: r.link || "" } : l;
     });
@@ -897,24 +894,6 @@ async function camposDaConta() {
   camposDaContaEmCache = { valor, ate: Date.now() + 3600_000 };
   return valor;
 }
-
-// Nomes das campanhas, conjuntos e anúncios do Meta, por ID, buscados no Meta
-// (se configurado) e completados por NOMES_DO_META. Em cache por uma hora; se o
-// Meta falhar, tenta de novo em cinco minutos e o painel segue com os IDs.
-let nomesDoMetaEmCache = { valor: { nomes: {}, erro: null }, ate: 0 };
-async function nomesDoMeta() {
-  if (nomesDoMetaEmCache.ate > Date.now()) return nomesDoMetaEmCache.valor;
-  let valor;
-  try {
-    valor = { nomes: await buscarNomesDoMeta(), erro: null };
-  } catch (erro) {
-    console.error("Nomes do Meta:", erro.message);
-    valor = { nomes: {}, erro: erro.message };
-  }
-  nomesDoMetaEmCache = { valor, ate: Date.now() + (valor.erro ? 5 * 60_000 : 3600_000) };
-  return valor;
-}
-const nomesDoMetaCompletos = async () => ({ ...(await nomesDoMeta()).nomes, ...NOMES_DO_META });
 
 function esquecerDadosEmCache() {
   cacheLeads = null;
@@ -1706,9 +1685,12 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
   const apenasNovos = req.query.apenasNovos === "true";
   // Colunas de cada quadro: campanha do Meta, conjunto de anúncios ou anúncio.
   // "todos": uma coluna por combinação campanha + conjunto + anúncio.
-  const nivel = ["conjunto", "anuncio", "todos"].includes(req.query.colunas) ? req.query.colunas : "campanha";
-  // Quadros: um por campanha, os dois de IR juntos, ou as três juntas.
-  const juntar = ["ir", "todas"].includes(req.query.juntar) ? req.query.juntar : "nao";
+  // "nucleo": uma coluna por campanha do núcleo (IR, IR - WhatsApp, Reajuste).
+  const nivel = ["conjunto", "anuncio", "todos", "nucleo"].includes(req.query.colunas) ? req.query.colunas : "campanha";
+  // Quadros: um por campanha, os dois de IR juntos, ou as três juntas. Com as
+  // campanhas do núcleo nas colunas, o quadro é um só: um quadro por campanha
+  // teria uma coluna única.
+  const juntar = nivel === "nucleo" ? "todas" : ["ir", "todas"].includes(req.query.juntar) ? req.query.juntar : "nao";
   const SEPARADOR = "\u241f";
   try {
     const hoje = dataLocal(Math.floor(Date.now() / 1000));
@@ -1727,8 +1709,11 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
     const blocos = quadrosDoResumo(juntar).map((c) => {
       const doQuadro = leads.filter((l) => c.codigos.includes(l.campanha));
       const analise = analisarTrafego({ leads: doQuadro, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
+      const consolidadosDoQuadro = () => consolidarLeads({ leads: doQuadro, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos });
       const doNivel =
-        nivel === "todos"
+        nivel === "nucleo"
+          ? agruparPorCampanhaDoNucleo(consolidadosDoQuadro())
+          : nivel === "todos"
           ? agruparEComputar(
               consolidarLeads({ leads: doQuadro, eventosPorLead, deTs: periodo.deTs, ateTs: periodo.ateTs, apenasNovos }),
               (l) => [l.campanhaMeta, l.conjunto, l.anuncio].map((x) => x || "(não informado)").join(SEPARADOR),
@@ -1746,11 +1731,12 @@ app.get("/api/trafego/resumo-nucleo", async (req, res) => {
         const partes = c.codigos.map((codigo) => digitadoNo(codigo, chave)).filter((v) => v !== null);
         return partes.length ? Math.round(partes.reduce((a, b) => a + b, 0) * 100) / 100 : null;
       };
-      const campanhas = [...grupos]
-        .sort((a, b) => String(a.grupo).localeCompare(String(b.grupo), "pt-BR", { numeric: true }))
+      // As campanhas do núcleo ficam na ordem da configuração; os demais, por nome.
+      const campanhas = (nivel === "nucleo" ? [...grupos] : [...grupos].sort((a, b) => String(a.grupo).localeCompare(String(b.grupo), "pt-BR", { numeric: true })))
         .map((g) => {
           const doMeta = g.investido ?? null;
-          const digitado = valorDigitado(nivel === "campanha" ? g.grupo : `${nivel}:${g.grupo}`);
+          // Por campanha do núcleo não há valor próprio: ele é digitado por campanha do Meta, conjunto ou anúncio.
+          const digitado = nivel === "nucleo" ? null : valorDigitado(nivel === "campanha" ? g.grupo : `${nivel}:${g.grupo}`);
           return {
             grupo: g.grupo,
             ...(nivel === "todos" ? { partes: String(g.grupo).split(SEPARADOR) } : {}),
@@ -2356,9 +2342,8 @@ app.get("/api/diagnostico/origem", async (req, res) => {
     const porDia = new Map();
     for (const l of recentes) {
       const dia = dataLocal(l.criadoEm);
-      const d = porDia.get(dia) || { dia, leads: 0, comCampanha: 0, semCampanha: 0, comConjunto: 0, comAnuncio: 0, comMetaAdsId: 0 };
+      const d = porDia.get(dia) || { dia, leads: 0, comCampanha: 0, semCampanha: 0, comConjunto: 0, comAnuncio: 0 };
       d.leads++;
-      if (String(l.campos?.[CAMPOS_META_ADS.campanhaMeta] ?? "").trim()) d.comMetaAdsId++;
       if (l.origem.campanhaMeta) d.comCampanha++;
       else d.semCampanha++;
       if (l.origem.conjunto) d.comConjunto++;
@@ -2385,41 +2370,8 @@ app.get("/api/diagnostico/origem", async (req, res) => {
       .sort((a, b) => b.preenchidos - a.preenchidos);
 
     const semCampanha = recentes.filter((l) => !l.origem.campanhaMeta);
-
-    // Leads cuja origem veio do ID do Meta Ads, sem nome: o que falta traduzir.
-    const idsSemNome = (chave) => {
-      const contagem = new Map();
-      for (const l of recentes) {
-        const m = /^ID (\d+)$/.exec(l.origem[chave] || "");
-        if (m) contagem.set(m[1], (contagem.get(m[1]) || 0) + 1);
-      }
-      return [...contagem].map(([id, leads]) => ({ id, leads })).sort((a, b) => b.leads - a.leads).slice(0, 30);
-    };
-    const doMeta = await nomesDoMeta();
-    const metaAds = {
-      camposLidos: Object.fromEntries(
-        Object.entries(CAMPOS_META_ADS).map(([chave, id]) => [chave, { id, nome: nomeDoCampo.get(String(id)) || "(campo não encontrado na conta)", preenchidos: preenchidosPorCampo.get(String(id)) || 0 }]),
-      ),
-      apiDoMeta: { configurado: metaConfigurado(), nomesConhecidos: Object.keys(doMeta.nomes).length, erro: doMeta.erro },
-      nomesManuais: Object.keys(NOMES_DO_META).length,
-      comCampanhaPeloId: recentes.filter((l) => /^ID \d+$/.test(l.origem.campanhaMeta || "")).length,
-      idsSemNome: { campanhaMeta: idsSemNome("campanhaMeta"), conjunto: idsSemNome("conjunto"), anuncio: idsSemNome("anuncio") },
-      // Valores crus dos campos Meta Ads nos 5 leads mais recentes que os têm.
-      exemplosRecentes: [...recentes]
-        .filter((l) => String(l.campos?.[CAMPOS_META_ADS.campanhaMeta] ?? "").trim())
-        .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0))
-        .slice(0, 5)
-        .map((l) => ({
-          id: l.id,
-          campanha: l.campanha,
-          criadoEm: iso(l.criadoEm),
-          ...Object.fromEntries(Object.entries(CAMPOS_META_ADS).map(([chave, id]) => [chave, String(l.campos?.[id] ?? "")])),
-          origemMostrada: l.origem.campanhaMeta,
-        })),
-    };
     res.json({
       dias,
-      metaAds,
       totalRecentes: recentes.length,
       semCampanha: semCampanha.length,
       camposConfigurados: configurados,

@@ -1,7 +1,7 @@
 // Testes da análise de tráfego e do cálculo de custo.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analisarTrafego, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "../trafego.js";
+import { analisarTrafego, consolidarLeads, agruparPorCampanhaDoNucleo, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "../trafego.js";
 
 const DE = 1_000_000;
 const ATE = DE + 7 * 86400;
@@ -134,4 +134,28 @@ test("por campanha do Meta: reuniões realizadas e valor investido pelo nome da 
   assert.equal(comInvestimento.find((g) => g.grupo === "Campanha").investido, 120.5);
   assert.equal(associarInvestimentoPorCampanha([{ grupo: "Sem gasto" }], []).at(0).investido, null);
   assert.equal(comInvestimento.length, a.porCampanhaMeta.length);
+});
+
+// --- Resumo: colunas por campanha do núcleo -------------------------------------------
+
+test("colunas por campanha do núcleo: uma por campanha, na ordem da configuração e com o título do quadro", () => {
+  const leads = [
+    lead(1, "A", "AD 01", "5581999990001", { campanha: "REA-Q" }),
+    lead(2, "A", "AD 01", "5581999990002", { campanha: "IR-Q" }),
+    lead(3, "A", "AD 01", "5581999990003", { campanha: "IR-Q" }),
+    lead(4, "", "", "5581999990004", { campanha: "REA-Q", origem: { campanhaMeta: "", conjunto: "", anuncio: "" } }), // sem campanha do Meta
+    lead(5, "A", "AD 01", "5581999990005", { campanha: "IR-W" }),
+  ];
+  const consolidados = consolidarLeads({ leads, eventosPorLead: new Map(), deTs: DE, ateTs: ATE, apenasNovos: true });
+  const grupos = agruparPorCampanhaDoNucleo(consolidados);
+  assert.deepEqual(grupos.map((g) => [g.grupo, g.totalLeads]), [["IR", 2], ["IR - WhatsApp (Novo Número)", 1], ["Reajuste", 2]]);
+  // Cada coluna traz os leads dela, inclusive o que não tem campanha do Meta: não existe "(não informado)" aqui.
+  assert.deepEqual(grupos[2].leads.map((l) => l.leadId).sort(), [1, 4]);
+  assert.ok(grupos.every((g) => g.grupo !== "(não informado)"));
+});
+
+test("colunas por campanha do núcleo: só entram as campanhas que têm leads", () => {
+  const consolidados = consolidarLeads({ leads: [lead(1, "A", "AD 01", "5581999990001", { campanha: "REA-Q" })], eventosPorLead: new Map(), deTs: DE, ateTs: ATE, apenasNovos: true });
+  assert.deepEqual(agruparPorCampanhaDoNucleo(consolidados).map((g) => g.grupo), ["Reajuste"]);
+  assert.deepEqual(agruparPorCampanhaDoNucleo([]), []);
 });

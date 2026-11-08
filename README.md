@@ -109,6 +109,7 @@ Aba própria, com a origem de marketing dos leads:
 
 - Leads, qualificados, reuniões e contratos por conjunto de anúncios, por anúncio e por região.
 - Distribuição por estado, em barras ou em mapa, a partir do DDD do telefone.
+- Resumo para o núcleo, no formato da planilha da coordenação: os indicadores nas linhas e, nas colunas, a campanha do Meta, o conjunto de anúncios, o anúncio, a combinação dos três ou a **campanha do núcleo** (IR, IR - WhatsApp e Reajuste lado a lado, num quadro só; nessa opção o valor investido não é mostrado). Os quadros podem ser um por campanha, os dois de IR juntos ou todos juntos. A campanha do núcleo vem do funil do lead e todo lead tem uma; a campanha do Meta é o nome gravado no campo "Campanha Meta" do Kommo e, sem ele, o lead aparece como "(não informado)". Pode ser copiado para planilha e baixado em HTML ou imagem.
 - Pré-qualificados pelo questionário, por anúncio, conjunto ou campanha: leads cujas respostas, gravadas no Kommo, já atendem ao critério da campanha, separados de quem a equipe qualificou na mão (ver "Pré-qualificação" abaixo).
 - Engajamento por etapa de cada conjunto de anúncios e de cada estado.
 - Histórico semanal salvo, com orçamento, decisões e observações de cada semana.

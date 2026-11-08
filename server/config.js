@@ -137,23 +137,6 @@ export const CAMPOS = {
   substatusFarmer: 1127429,
 };
 
-// Campos "Meta Ads" que o Kommo preenche sozinho nos leads que chegam pela
-// integração com o Meta, com o ID (e não o nome) da campanha, do conjunto e do
-// anúncio. São a origem de reserva: valem quando os campos de texto acima (que
-// guardam os nomes) vêm vazios, como aconteceu nos leads de 04/11 em diante.
-// Os IDs vêm de GET /api/diagnostico/campos.
-export const CAMPOS_META_ADS = {
-  campanhaMeta: 1129785, // Meta Ads ID da campanha
-  conjunto: 1129783, // Meta Ads ID do conjunto de anúncios
-  anuncio: 1129781, // Meta Ads ID do anúncio
-};
-
-// Nome de cada ID do Meta Ads, para os leads que só trazem o ID. Com META_TOKEN
-// e META_CONTA_ANUNCIOS configurados, o painel busca os nomes no Meta sozinho;
-// esta lista cobre o que o Meta não devolver, e vale sobre ele. Formato:
-//   "120238000000000": "[IR LEAD FORMS] D05 - 04/11",
-export const NOMES_DO_META = {};
-
 // Nome oficial de cada responsável. O campo no Kommo é texto livre, então o
 // mesmo nome pode chegar escrito de jeitos diferentes. O painel junta as
 // variações sem diferenciar maiúsculas, acentos e títulos (Dr., Dra.); aceita

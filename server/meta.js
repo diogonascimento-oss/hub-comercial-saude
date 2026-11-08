@@ -60,28 +60,3 @@ export async function buscarGastoDoMeta(inicio, fim) {
   }
   return linhas;
 }
-
-// Nome de cada campanha, conjunto e anúncio da conta, por ID. O Kommo grava só o
-// ID nos leads novos; com isto o painel mostra o nome. Somente leitura, mesmo
-// token do gasto (permissão "ads_read"). "get" existe para os testes.
-export async function buscarNomesDoMeta(get = axios.get) {
-  if (!metaConfigurado()) return {};
-  const versao = process.env.META_VERSAO_API || VERSAO_PADRAO;
-  const headers = { Authorization: `Bearer ${process.env.META_TOKEN}` };
-  const nomes = {};
-  try {
-    for (const nivel of ["campaigns", "adsets", "ads"]) {
-      let url = `https://graph.facebook.com/${versao}/${contaDeAnuncios()}/${nivel}`;
-      let params = { fields: "id,name", limit: 500 };
-      for (let pagina = 0; url && pagina < MAXIMO_DE_PAGINAS; pagina++) {
-        const { data } = await get(url, { params, headers, timeout: 30000 });
-        for (const item of data.data || []) if (item.id && item.name) nomes[String(item.id)] = item.name;
-        url = data.paging?.next || null;
-        params = undefined;
-      }
-    }
-  } catch (erro) {
-    throw erroDoMeta(erro);
-  }
-  return nomes;
-}
