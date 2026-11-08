@@ -36,6 +36,55 @@ const servidorAcordando = () =>
 
 const ehJson = (resposta) => (resposta.headers.get("Content-Type") || "").includes("application/json");
 
+// O Render só parece acordar o servidor gratuito com uma visita de navegador: a
+// página que ele mostra enquanto acorda é para pessoas, e chamadas de API
+// (Accept: application/json, sem identificação de navegador) ficam sem resposta
+// ou sem efeito. Por isso a "visita para acordar" imita a abertura da página.
+const CABECALHOS_DE_NAVEGADOR = {
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  "Upgrade-Insecure-Requests": "1",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+};
+
+const origemDaApi = (env) => String(env.API_ORIGEM || "").replace(/\/+$/, "");
+
+// Espera máxima de cada visita e de cada consulta (GET) à API. Um servidor
+// dormindo leva cerca de um minuto para responder.
+const ESPERA_DA_VISITA_MS = 110_000;
+const ESPERA_DA_CONSULTA_MS = 70_000;
+
+// Visita a página inicial do servidor como um navegador faria e resume a
+// resposta. Não envia segredo nenhum.
+async function acordarServidor(env, espera = ESPERA_DA_VISITA_MS) {
+  const inicio = Date.now();
+  const tempo = () => Math.round(Date.now() - inicio);
+  try {
+    const resposta = await fetch(`${origemDaApi(env)}/`, { headers: CABECALHOS_DE_NAVEGADOR, redirect: "manual", signal: AbortSignal.timeout(espera) });
+    const trecho = (await resposta.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
+    return { status: resposta.status, tipo: resposta.headers.get("Content-Type") || "", ms: tempo(), trecho, render: resposta.headers.get("x-render-routing") || undefined };
+  } catch (erro) {
+    return { erro: erro.message, ms: tempo() };
+  }
+}
+
+// Evita uma visita por consulta quando o painel faz várias chamadas ao mesmo
+// tempo: no máximo uma a cada 15 segundos por instância do Worker.
+let ultimaVisita = 0;
+// Usado nos testes, que fazem várias falhas seguidas.
+export const reiniciarLimiteDeVisitas = () => {
+  ultimaVisita = 0;
+};
+function acordarEmSegundoPlano(env, ctx) {
+  if (!ctx?.waitUntil || Date.now() - ultimaVisita < 15_000) return;
+  ultimaVisita = Date.now();
+  ctx.waitUntil(acordarServidor(env).then((r) => console.log("Visita para acordar o servidor:", JSON.stringify(r))));
+}
+
 function decodificarBase64Url(texto) {
   const base64 = texto.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(texto.length / 4) * 4, "=");
   const binario = atob(base64);
@@ -127,27 +176,18 @@ async function paginaNaoEncontrada(url, env) {
 
 const METODOS_ACEITOS = new Set(["GET", "POST", "PUT", "DELETE"]);
 
-// Tempo máximo de espera de cada chamada da agenda; um servidor dormindo leva
-// cerca de um minuto para responder.
-const ESPERA_DA_AGENDA_MS = 110_000;
-
 export default {
-  // Chamado pela agenda do Cloudflare (triggers.crons, em wrangler.jsonc). Faz uma
-  // visita à página inicial do servidor para que ele não durma no horário de
-  // trabalho e, se já estiver dormindo, comece a acordar antes de alguém abrir
-  // o painel. Não passa pelo Access e não envia dados: só a visita.
+  // Chamado pela agenda do Cloudflare (triggers.crons, em wrangler.jsonc). Visita
+  // a página inicial do servidor, como um navegador, para que ele não durma no
+  // horário de trabalho e, se já estiver dormindo, comece a acordar antes de
+  // alguém abrir o painel. Não passa pelo Access e não envia dados: só a visita.
   async scheduled(controller, env) {
     if (!env.API_ORIGEM) return;
-    const inicio = Date.now();
-    try {
-      const resposta = await fetch(`${env.API_ORIGEM.replace(/\/+$/, "")}/`, { signal: AbortSignal.timeout(ESPERA_DA_AGENDA_MS) });
-      console.log(`Servidor visitado: ${resposta.status} em ${Math.round((Date.now() - inicio) / 1000)} s.`);
-    } catch (erro) {
-      console.warn(`Visita ao servidor falhou após ${Math.round((Date.now() - inicio) / 1000)} s: ${erro.message}`);
-    }
+    const r = await acordarServidor(env);
+    console.log("Servidor visitado:", JSON.stringify(r));
   },
 
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) {
       return paginaNaoEncontrada(url, env);
@@ -181,6 +221,31 @@ export default {
     // acordar: é o que a saudação de boas-vindas usa.
     if (url.pathname === "/api/eu" && request.method === "GET") return json(200, { usuario: usuario.email || null });
 
+    // Acordar o servidor com um clique: abre a página do Render, como se o
+    // endereço fosse digitado. É o que o link do aviso "servidor iniciando" usa.
+    if (url.pathname === "/api/acordar" && request.method === "GET") {
+      return new Response(null, { status: 302, headers: { Location: origemDaApi(env) + "/", "Cache-Control": "no-store" } });
+    }
+
+    // Diagnóstico: o que o Render responde a uma chamada de API e a uma visita
+    // de navegador. Com o servidor dormindo, mostra por que ele não acorda.
+    if (url.pathname === "/api/estado-do-servidor" && request.method === "GET") {
+      const [comoApi, comoNavegador] = await Promise.all([
+        (async () => {
+          const inicio = Date.now();
+          try {
+            const r = await fetch(`${origemDaApi(env)}/`, { headers: { Accept: "application/json" }, redirect: "manual", signal: AbortSignal.timeout(30_000) });
+            const trecho = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
+            return { status: r.status, tipo: r.headers.get("Content-Type") || "", ms: Date.now() - inicio, trecho, render: r.headers.get("x-render-routing") || undefined };
+          } catch (erro) {
+            return { erro: erro.message, ms: Date.now() - inicio };
+          }
+        })(),
+        acordarServidor(env, 30_000),
+      ]);
+      return json(200, { servidor: origemDaApi(env).replace(/^https?:\/\//, ""), comoApi, comoNavegador });
+    }
+
     const destino = new URL(url.pathname + url.search, env.API_ORIGEM.replace(/\/+$/, "") + "/");
     const cabecalhos = new Headers({ "x-api-token": env.API_TOKEN, Accept: "application/json" });
     const tipo = request.headers.get("Content-Type");
@@ -199,12 +264,21 @@ export default {
         method: request.method,
         headers: cabecalhos,
         body: temCorpo ? await request.arrayBuffer() : undefined,
+        // Consultas não ficam presas para sempre num servidor que não acorda.
+        signal: temCorpo ? undefined : AbortSignal.timeout(ESPERA_DA_CONSULTA_MS),
       });
     } catch {
+      acordarEmSegundoPlano(env, ctx);
       return servidorAcordando();
     }
-    // Erro do gateway sem JSON: o servidor ainda não está de pé.
-    if ([502, 503, 504].includes(resposta.status) && !ehJson(resposta)) return servidorAcordando();
+    // Resposta sem JSON do gateway (502, 503, 504) ou página HTML no lugar dos
+    // dados: o servidor ainda não está de pé. Além de avisar o painel, faz a
+    // visita de navegador que o acorda.
+    const paginaNoLugarDosDados = !ehJson(resposta) && /text\/html/.test(resposta.headers.get("Content-Type") || "");
+    if (([502, 503, 504].includes(resposta.status) && !ehJson(resposta)) || (resposta.ok && paginaNoLugarDosDados)) {
+      acordarEmSegundoPlano(env, ctx);
+      return servidorAcordando();
+    }
 
     const saida = new Headers({ "Cache-Control": "no-store" });
     saida.set("Content-Type", resposta.headers.get("Content-Type") || "application/json; charset=utf-8");

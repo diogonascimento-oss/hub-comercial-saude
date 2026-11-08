@@ -2,7 +2,7 @@
 // encaminhamento da chamada à API.
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker from "./index.js";
+import worker, { reiniciarLimiteDeVisitas } from "./index.js";
 
 const DOMINIO = "escritorio-teste.cloudflareaccess.com";
 const AUD = "aud-de-teste";
@@ -41,11 +41,11 @@ globalThis.fetch = async (destino, opcoes = {}) => {
   return Response.json({ ok: true }, { headers: { "x-interno": "nao-deve-sair" } });
 };
 
-const chamar = (caminho, { token, ...opcoes } = {}) => {
+const chamar = (caminho, { token, ctx, ...opcoes } = {}) => {
   chamadasNaApi = [];
   const headers = new Headers(opcoes.headers);
   if (token) headers.set("Cf-Access-Jwt-Assertion", token);
-  return worker.fetch(new Request(`https://painel.exemplo.test${caminho}`, { ...opcoes, headers }), env);
+  return worker.fetch(new Request(`https://painel.exemplo.test${caminho}`, { ...opcoes, headers }), env, ctx);
 };
 
 test("sem token do Access a chamada é recusada e não chega à API", async () => {
@@ -227,9 +227,124 @@ test("agenda: visita a página inicial do servidor, sem segredo e sem derrubar o
   assert.equal(visitas.length, 1);
   assert.equal(visitas[0].url, "https://api.exemplo.test/");
   assert.equal(visitas[0].cabecalhos["x-api-token"], undefined);
+  assert.match(visitas[0].cabecalhos.accept, /text\/html/); // visita de navegador, como o clique manual
 
   // Falha da rede: não lança.
   await comApi(() => Promise.reject(new Error("sem rede")), () => worker.scheduled({}, env));
   // Sem endereço configurado: não faz nada.
   await comApi(() => assert.fail("não devia chamar a rede"), () => worker.scheduled({}, {}));
+});
+
+// --- Acordar o servidor como um navegador ----------------------------------------------
+
+// Contexto de execução de mentira: guarda o que o Worker pede para fazer "em segundo plano".
+const contexto = () => {
+  const tarefas = [];
+  return { waitUntil: (p) => tarefas.push(p), esperar: () => Promise.all(tarefas) };
+};
+const respostaDeServidorDormindo = (_destino, opcoes = {}) => {
+  const cabecalhos = new Headers(opcoes.headers);
+  // O Render mostra a página de espera a quem pede HTML, e nega a quem pede JSON.
+  return cabecalhos.get("Accept")?.includes("text/html")
+    ? new Response("<html>Welcome to Render</html>", { status: 200, headers: { "Content-Type": "text/html" } })
+    : new Response("Service Unavailable", { status: 503, headers: { "Content-Type": "text/plain" } });
+};
+
+test("consulta que falha com o servidor dormindo: avisa o painel e faz a visita de navegador em segundo plano", async () => {
+  reiniciarLimiteDeVisitas();
+  const visitas = [];
+  const ctx = contexto();
+  const r = await comApi(
+    (destino, opcoes) => {
+      visitas.push({ url: String(destino), cabecalhos: Object.fromEntries(new Headers(opcoes.headers)) });
+      return respostaDeServidorDormindo(destino, opcoes);
+    },
+    async () => {
+      const resposta = await chamar("/api/metrics", { token: await emitirToken(), ctx });
+      await ctx.esperar();
+      return resposta;
+    },
+  );
+  assert.equal(r.status, 503);
+  assert.equal((await r.json()).acordando, true);
+  // 1ª: a chamada de API (JSON, com o segredo); 2ª: a visita de navegador à página inicial, sem segredo.
+  assert.equal(visitas.length, 2);
+  assert.equal(visitas[0].cabecalhos.accept, "application/json");
+  assert.equal(visitas[0].cabecalhos["x-api-token"], "segredo-da-api");
+  assert.equal(visitas[1].url, "https://api.exemplo.test/");
+  assert.match(visitas[1].cabecalhos.accept, /text\/html/);
+  assert.match(visitas[1].cabecalhos["user-agent"], /Mozilla\/5\.0/);
+  assert.equal(visitas[1].cabecalhos["x-api-token"], undefined);
+});
+
+test("várias consultas seguidas fazem uma visita só (no máximo uma a cada 15 segundos)", async () => {
+  reiniciarLimiteDeVisitas();
+  let visitasDeNavegador = 0;
+  const ctx = contexto();
+  await comApi(
+    (destino, opcoes) => {
+      if (new Headers(opcoes.headers).get("Accept")?.includes("text/html")) visitasDeNavegador++;
+      return respostaDeServidorDormindo(destino, opcoes);
+    },
+    async () => {
+      const token = await emitirToken();
+      await Promise.all([1, 2, 3].map((n) => chamar(`/api/metrics?n=${n}`, { token, ctx })));
+      await ctx.esperar();
+    },
+  );
+  assert.equal(visitasDeNavegador, 1);
+});
+
+test("página HTML no lugar dos dados (200) também vira \"acordando\"", async () => {
+  reiniciarLimiteDeVisitas();
+  const ctx = contexto();
+  const r = await comApi(
+    () => new Response("<html>Welcome to Render</html>", { status: 200, headers: { "Content-Type": "text/html" } }),
+    async () => {
+      const resposta = await chamar("/api/metrics", { token: await emitirToken(), ctx });
+      await ctx.esperar();
+      return resposta;
+    },
+  );
+  assert.equal(r.status, 503);
+  assert.equal((await r.json()).acordando, true);
+});
+
+test("consultas têm tempo máximo; envios de dados não", async () => {
+  const sinais = [];
+  await comApi(
+    (_destino, opcoes) => {
+      sinais.push([opcoes.method, Boolean(opcoes.signal)]);
+      return Response.json({ ok: true });
+    },
+    async () => {
+      const token = await emitirToken();
+      await chamar("/api/metrics", { token });
+      await chamar("/api/leads/1", { token, method: "POST", body: "{}", headers: { "Content-Type": "application/json" } });
+    },
+  );
+  assert.deepEqual(sinais, [["GET", true], ["POST", false]]);
+});
+
+test("/api/acordar leva à página do servidor (só para quem passou pelo Access)", async () => {
+  const sem = await chamar("/api/acordar");
+  assert.equal(sem.status, 401);
+  const r = await chamar("/api/acordar", { token: await emitirToken(), redirect: "manual" });
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get("Location"), "https://api.exemplo.test/");
+  assert.equal(chamadasNaApi.length, 0);
+});
+
+test("/api/estado-do-servidor mostra o que o servidor responde a uma chamada de API e a uma visita de navegador", async () => {
+  const r = await comApi(respostaDeServidorDormindo, async () => chamar("/api/estado-do-servidor", { token: await emitirToken() }));
+  assert.equal(r.status, 200);
+  const corpo = await r.json();
+  assert.equal(corpo.servidor, "api.exemplo.test");
+  assert.equal(corpo.comoApi.status, 503);
+  assert.equal(corpo.comoNavegador.status, 200);
+  assert.match(corpo.comoNavegador.trecho, /Welcome to Render/);
+  // O diagnóstico não revela o segredo da API.
+  assert.ok(!JSON.stringify(corpo).includes("segredo-da-api"));
+  const sem = await chamar("/api/estado-do-servidor");
+  assert.equal(sem.status, 401);
 });

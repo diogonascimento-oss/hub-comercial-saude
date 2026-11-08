@@ -108,6 +108,7 @@ const MENSAGEM_SERVIDOR_ACORDANDO = "O servidor está acordando e ainda não res
 // Tempo que o painel continua tentando enquanto o servidor acorda. O Render
 // leva cerca de um minuto; a margem cobre uma partida mais lenta.
 const LIMITE_DE_ESPERA_DO_SERVIDOR_MS = 4 * 60 * 1000;
+const ESPERA_DE_CADA_TENTATIVA_MS = 90 * 1000; // o Worker desiste em 70 s
 const ESPERAS_DO_SERVIDOR_MS = [3000, 5000, 8000, 10000, 15000]; // depois disso, de 15 em 15 s
 const AVISO_SERVIDOR_ACORDANDO = "O servidor estava dormindo e está acordando. Isso leva cerca de um minuto; o painel tenta de novo sozinho.";
 let avisoDeSonoNaTela = false;
@@ -147,7 +148,9 @@ async function chamarApi(caminho, opcoes) {
     let mensagemSeFalhar = null; // preenchida quando a falha é do tipo "servidor acordando"
     let resposta = null;
     try {
-      resposta = await fetch(`${API}${caminho}`, opcoes);
+      // Cada tentativa de consulta tem tempo máximo; uma conexão que fica pendurada
+      // não pode prender o painel (e o aviso) para sempre.
+      resposta = await fetch(`${API}${caminho}`, consulta && !opcoes?.signal ? { ...opcoes, signal: AbortSignal.timeout(ESPERA_DE_CADA_TENTATIVA_MS) } : opcoes);
     } catch {
       mensagemSeFalhar = "Não foi possível contatar o servidor. Verifique a conexão e tente novamente.";
     }

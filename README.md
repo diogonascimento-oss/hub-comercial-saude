@@ -242,6 +242,13 @@ O servidor no plano gratuito do Render dorme depois de 15 minutos sem requisiç�
 - **O painel espera e tenta de novo sozinho.** Consultas (GET) são repetidas por até 4 minutos quando a conexão cai, quando o gateway do Render responde sem JSON ou quando o Worker responde `503` com `acordando: true`. Um aviso na tela explica o que está acontecendo e some quando os dados chegam. Erros reais do servidor (sempre em JSON, como o do token do Kommo) aparecem na hora, e chamadas que alteram dados nunca são repetidas.
 - **O Worker visita o servidor no horário de trabalho.** A agenda `triggers.crons`, em `wrangler.jsonc`, faz uma visita à página inicial do servidor a cada 10 minutos, das 8h às 19h59 de Brasília, de segunda a sábado (a agenda do Cloudflare usa UTC). Assim o servidor não dorme durante o expediente e, na primeira visita do dia, já começa a acordar antes de alguém abrir o painel. Fora desse horário ele dorme normalmente.
 
+**Por que só a visita de navegador acorda.** Relatos de outros usuários do Render, e o comportamento observado aqui, indicam que o servidor gratuito nem sempre acorda com chamadas de API (`Accept: application/json`, sem identificação de navegador): a página de espera do Render é feita para pessoas. Por isso:
+
+- quando uma consulta ao servidor falha (conexão caída, resposta sem JSON do gateway ou uma página HTML no lugar dos dados), o Worker responde `503 acordando` e, em segundo plano, faz uma **visita à página inicial do servidor imitando um navegador** (no máximo uma a cada 15 segundos); a visita da agenda usa o mesmo jeito;
+- o aviso "O servidor está sendo iniciado" da tela traz o link **"clique aqui para acordá-lo"**, que abre a página do servidor em outra aba (rota `/api/acordar`, só para quem passou pelo Access); o painel carrega sozinho quando o servidor responde;
+- cada consulta tem tempo máximo (70 s no Worker, 90 s no navegador), para que uma conexão pendurada não prenda o painel;
+- `/api/estado-do-servidor`, aberta no navegador com o servidor dormindo, mostra o que o servidor responde a uma chamada de API e a uma visita de navegador (código, tipo, tempo e um trecho da resposta, sem segredos). Serve para entender por que ele não acorda.
+
 O plano gratuito do Render dá 750 horas por mês, somadas entre todos os serviços gratuitos da conta; passando disso, o Render suspende todos eles até o mês seguinte. A agenda mantém o serviço de pé por cerca de 12 horas por dia útil (uns 310 horas por mês). Se a conta tiver outros serviços gratuitos, some as horas antes de manter vários acordados. Para desligar a agenda, apague a linha `crons` e publique o Worker de novo.
 
 ### 7.3 Execução local com dados fictícios

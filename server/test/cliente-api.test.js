@@ -16,6 +16,7 @@ function montar(respostas) {
   const contexto = {
     API: "/api",
     Date: { now: () => estado.agora },
+    AbortSignal,
     // O tempo "passa" sem esperar de verdade.
     setTimeout: (fn, ms) => {
       estado.agora += ms;
@@ -86,4 +87,18 @@ test("a espera começa curta e passa a 15 segundos", async () => {
   const { chamarApi, estado } = montar([semRede(), semRede(), semRede(), semRede(), semRede(), semRede(), semRede(), ok()]);
   await chamarApi("/metrics");
   assert.deepEqual(estado.esperas, [3000, 5000, 8000, 10000, 15000, 15000, 15000]);
+});
+
+test("cada tentativa de consulta tem tempo máximo; envios de dados não", async () => {
+  const sinais = [];
+  const { chamarApi, estado } = montar([ok()]);
+  void estado;
+  const original = chamarApi;
+  // O contexto de teste guarda as opções recebidas pelo fetch.
+  const contexto = vm.createContext({ API: "/api", Date: { now: () => 0 }, AbortSignal, setTimeout: (f) => f(), mostrarErro: () => {}, fetch: async (_c, o) => (sinais.push(Boolean(o?.signal)), ok()) });
+  vm.runInContext(`${trecho}\nthis.chamarApi = chamarApi;`, contexto);
+  await contexto.chamarApi("/metrics");
+  await contexto.chamarApi("/leads/1", { method: "POST" });
+  assert.deepEqual(sinais, [true, false]);
+  assert.ok(original);
 });
