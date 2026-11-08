@@ -15,6 +15,9 @@ const semAcento = (texto) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    // O Kommo grava as opções de lista com sublinhado ("acima_de_r$_2.000"); sem
+    // trocá-lo por espaço, "acima" e "até" não são reconhecidos.
+    .replace(/_/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 

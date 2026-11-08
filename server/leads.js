@@ -1,7 +1,7 @@
 // Converte os registros brutos do Kommo (leads, contatos e eventos) para o
 // formato usado pelos cálculos.
 
-import { CAMPOS, RESPONSAVEIS } from "./config.js";
+import { CAMPOS, CAMPOS_META_ADS, RESPONSAVEIS } from "./config.js";
 import { resolverEtapa } from "./mapeamento.js";
 
 const PALAVRAS_CHAVE_TELEFONE = ["telefone", "celular", "fone", "whatsapp", "phone", "tel.", "tel "];
@@ -145,6 +145,19 @@ function valorDeOrigem(lead, chave, opcoes) {
   return "";
 }
 
+// Origem de reserva: os campos "Meta Ads" que o Kommo preenche sozinho, com o ID
+// da campanha, do conjunto ou do anúncio. O ID vira o nome quando ele consta em
+// opcoes.nomesDoMeta (Meta + NOMES_DO_META); sem nome, aparece como "ID 123…",
+// para que os leads ao menos se separem por campanha, em vez de caírem juntos em
+// "(não informado)". Um valor que não é só número (já é um nome) fica como está.
+function origemPeloMetaAds(lead, chave, opcoes) {
+  const valor = valorDoCampo(lead.custom_fields_values, CAMPOS_META_ADS[chave]);
+  if (!valor) return "";
+  const nome = opcoes.nomesDoMeta?.[valor];
+  if (nome) return nome;
+  return /^\d+$/.test(valor) ? `ID ${valor}` : valor;
+}
+
 // Nome de um campo para comparar: sem acentos, pontuação, maiúsculas e sem o
 // prefixo da campanha ("IR:", "REA:"), com que os campos novos têm sido criados.
 const nomeDoCampoParaComparar = (nome) =>
@@ -212,9 +225,9 @@ export function normalizarLeads(leadsBrutos, contatosPorId, mapeamento, opcoes =
       // Kommo grava nos leads de anúncio de WhatsApp: utm_campaign para a
       // campanha, utm_term para o conjunto e utm_content para o anúncio.
       origem: {
-        campanhaMeta: valorDeOrigem(lead, "campanhaMeta", opcoes) || valorDoRastreamento(lead.custom_fields_values, "UTM_CAMPAIGN"),
-        conjunto: valorDeOrigem(lead, "conjunto", opcoes) || valorDoRastreamento(lead.custom_fields_values, "UTM_TERM"),
-        anuncio: valorDeOrigem(lead, "anuncio", opcoes) || valorDoRastreamento(lead.custom_fields_values, "UTM_CONTENT"),
+        campanhaMeta: valorDeOrigem(lead, "campanhaMeta", opcoes) || valorDoRastreamento(lead.custom_fields_values, "UTM_CAMPAIGN") || origemPeloMetaAds(lead, "campanhaMeta", opcoes),
+        conjunto: valorDeOrigem(lead, "conjunto", opcoes) || valorDoRastreamento(lead.custom_fields_values, "UTM_TERM") || origemPeloMetaAds(lead, "conjunto", opcoes),
+        anuncio: valorDeOrigem(lead, "anuncio", opcoes) || valorDoRastreamento(lead.custom_fields_values, "UTM_CONTENT") || origemPeloMetaAds(lead, "anuncio", opcoes),
       },
       responsaveis: {
         sdr: nomeOficialDoResponsavel("sdr", valorDoCampo(lead.custom_fields_values, CAMPOS.sdrResponsavel)),

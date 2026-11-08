@@ -275,3 +275,28 @@ test("a marca aparece nas listas da análise", () => {
   const marcados = bloco.total.leads.filter((l) => l.marcaPre === "ativo").map((l) => l.leadId).sort((a, b) => a - b);
   assert.deepEqual(marcados, [1, 2, 8]); // os três pré-qualificados do cenário
 });
+
+// --- Opções de lista do Kommo, gravadas com sublinhado ------------------------------
+
+test("valores com sublinhado, como o Kommo grava as opções de lista", () => {
+  // Reajuste (acima de R$ 2.000)
+  assert.equal(posicao("acima_de_r$_2.000", 2000), "acima"); // lido como valor exato, reprovaria
+  assert.equal(posicao("de_r$_2.000_a_r$_4.000", 2000), "acima");
+  assert.equal(posicao("de_r$_1.000_a_r$_2.000", 2000), "abaixo");
+  assert.equal(posicao("de_r$_1.500_a_r$_2.500", 2000), "incerto");
+  // IR (acima de R$ 950)
+  assert.equal(posicao("acima_de_r$_1.500", 950), "acima");
+  assert.equal(posicao("de_r$_900_a_r$_1.500", 950), "incerto");
+  assert.equal(posicao("até_r$_900", 950), "abaixo");
+  assert.equal(posicao("ate_r$_900", 950), "abaixo");
+  assert.equal(posicao("abaixo_de_r$_900", 950), "abaixo");
+});
+
+test("tipo de plano e sim/não com os valores reais do Kommo", () => {
+  assert.equal(avaliarCriterio(planoRea, "empresarial/cnpj").status, "atende");
+  assert.equal(avaliarCriterio(planoRea, "familiar").status, "atende");
+  assert.equal(avaliarCriterio(planoRea, "individual").status, "falha");
+  assert.equal(respostaSimNao("sim"), "sim");
+  assert.equal(respostaSimNao("nao"), "nao");
+  assert.equal(respostaSimNao("não"), "nao");
+});

@@ -23,6 +23,8 @@ import {
   ROTULO_SEM_RASTREIO_DE_ANUNCIO,
   MOTIVOS_SEM_INTERESSE,
   CAMPOS,
+  CAMPOS_META_ADS,
+  NOMES_DO_META,
   RESPONSAVEIS,
   AGENDA,
   FUNIS_VIGIADOS,
@@ -35,7 +37,7 @@ import { nomeOficialDoResponsavel, numeroDoTexto, normalizarLeads, normalizarEve
 import { diasDeCalendario, calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
 import { situacaoDeHoje, analisarTrafego, consolidarLeads, agruparEComputar, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
-import { metaConfigurado, buscarGastoDoMeta } from "./meta.js";
+import { metaConfigurado, buscarGastoDoMeta, buscarNomesDoMeta } from "./meta.js";
 import { getLocalizacao } from "./localizacao.js";
 import { analisarPreQualificacao, marcarPreQualificados } from "./prequalificacao.js";
 
@@ -99,14 +101,15 @@ function obterLeads() {
     if (!mapeamento.idsDosFunis.length) return { mapeamento, leads: [] };
     const leadsBrutos = await kommo.listarLeadsDosFunis(mapeamento.idsDosFunis);
     const idsDeContatos = leadsBrutos.map((l) => l._embedded?.contacts?.[0]?.id).filter(Boolean);
-    const [contatosPorId, reunioes, definicoes] = await Promise.all([
+    const [contatosPorId, reunioes, definicoes, nomesDoMeta] = await Promise.all([
       kommo.listarContatosPorIds(idsDeContatos),
       armazenamento.lerReunioesDoPainel().catch(() => ({})),
       // Sem a lista de campos da conta, o painel segue só com o que está em config.js.
       camposDaConta().catch(() => []),
+      nomesDoMetaCompletos(),
     ]);
     // A data marcada pelo painel vale sobre o campo do Kommo.
-    const leads = normalizarLeads(leadsBrutos, contatosPorId, mapeamento, { camposDeOrigem: camposDeOrigemEquivalentes(definicoes) }).map((l) => {
+    const leads = normalizarLeads(leadsBrutos, contatosPorId, mapeamento, { camposDeOrigem: camposDeOrigemEquivalentes(definicoes), nomesDoMeta }).map((l) => {
       const r = reunioes[String(l.id)];
       return r ? { ...l, dataDaReuniao: r.inicio || l.dataDaReuniao, linkDaReuniao: r.link || "" } : l;
     });
@@ -894,6 +897,24 @@ async function camposDaConta() {
   camposDaContaEmCache = { valor, ate: Date.now() + 3600_000 };
   return valor;
 }
+
+// Nomes das campanhas, conjuntos e anúncios do Meta, por ID, buscados no Meta
+// (se configurado) e completados por NOMES_DO_META. Em cache por uma hora; se o
+// Meta falhar, tenta de novo em cinco minutos e o painel segue com os IDs.
+let nomesDoMetaEmCache = { valor: { nomes: {}, erro: null }, ate: 0 };
+async function nomesDoMeta() {
+  if (nomesDoMetaEmCache.ate > Date.now()) return nomesDoMetaEmCache.valor;
+  let valor;
+  try {
+    valor = { nomes: await buscarNomesDoMeta(), erro: null };
+  } catch (erro) {
+    console.error("Nomes do Meta:", erro.message);
+    valor = { nomes: {}, erro: erro.message };
+  }
+  nomesDoMetaEmCache = { valor, ate: Date.now() + (valor.erro ? 5 * 60_000 : 3600_000) };
+  return valor;
+}
+const nomesDoMetaCompletos = async () => ({ ...(await nomesDoMeta()).nomes, ...NOMES_DO_META });
 
 function esquecerDadosEmCache() {
   cacheLeads = null;
@@ -2335,8 +2356,9 @@ app.get("/api/diagnostico/origem", async (req, res) => {
     const porDia = new Map();
     for (const l of recentes) {
       const dia = dataLocal(l.criadoEm);
-      const d = porDia.get(dia) || { dia, leads: 0, comCampanha: 0, semCampanha: 0, comConjunto: 0, comAnuncio: 0 };
+      const d = porDia.get(dia) || { dia, leads: 0, comCampanha: 0, semCampanha: 0, comConjunto: 0, comAnuncio: 0, comMetaAdsId: 0 };
       d.leads++;
+      if (String(l.campos?.[CAMPOS_META_ADS.campanhaMeta] ?? "").trim()) d.comMetaAdsId++;
       if (l.origem.campanhaMeta) d.comCampanha++;
       else d.semCampanha++;
       if (l.origem.conjunto) d.comConjunto++;
@@ -2363,8 +2385,41 @@ app.get("/api/diagnostico/origem", async (req, res) => {
       .sort((a, b) => b.preenchidos - a.preenchidos);
 
     const semCampanha = recentes.filter((l) => !l.origem.campanhaMeta);
+
+    // Leads cuja origem veio do ID do Meta Ads, sem nome: o que falta traduzir.
+    const idsSemNome = (chave) => {
+      const contagem = new Map();
+      for (const l of recentes) {
+        const m = /^ID (\d+)$/.exec(l.origem[chave] || "");
+        if (m) contagem.set(m[1], (contagem.get(m[1]) || 0) + 1);
+      }
+      return [...contagem].map(([id, leads]) => ({ id, leads })).sort((a, b) => b.leads - a.leads).slice(0, 30);
+    };
+    const doMeta = await nomesDoMeta();
+    const metaAds = {
+      camposLidos: Object.fromEntries(
+        Object.entries(CAMPOS_META_ADS).map(([chave, id]) => [chave, { id, nome: nomeDoCampo.get(String(id)) || "(campo não encontrado na conta)", preenchidos: preenchidosPorCampo.get(String(id)) || 0 }]),
+      ),
+      apiDoMeta: { configurado: metaConfigurado(), nomesConhecidos: Object.keys(doMeta.nomes).length, erro: doMeta.erro },
+      nomesManuais: Object.keys(NOMES_DO_META).length,
+      comCampanhaPeloId: recentes.filter((l) => /^ID \d+$/.test(l.origem.campanhaMeta || "")).length,
+      idsSemNome: { campanhaMeta: idsSemNome("campanhaMeta"), conjunto: idsSemNome("conjunto"), anuncio: idsSemNome("anuncio") },
+      // Valores crus dos campos Meta Ads nos 5 leads mais recentes que os têm.
+      exemplosRecentes: [...recentes]
+        .filter((l) => String(l.campos?.[CAMPOS_META_ADS.campanhaMeta] ?? "").trim())
+        .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0))
+        .slice(0, 5)
+        .map((l) => ({
+          id: l.id,
+          campanha: l.campanha,
+          criadoEm: iso(l.criadoEm),
+          ...Object.fromEntries(Object.entries(CAMPOS_META_ADS).map(([chave, id]) => [chave, String(l.campos?.[id] ?? "")])),
+          origemMostrada: l.origem.campanhaMeta,
+        })),
+    };
     res.json({
       dias,
+      metaAds,
       totalRecentes: recentes.length,
       semCampanha: semCampanha.length,
       camposConfigurados: configurados,
