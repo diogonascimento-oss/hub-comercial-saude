@@ -105,6 +105,27 @@ export function listarMudancasDeEtapa(deTs, ateTs) {
   });
 }
 
+// Mudanças de etapa a partir do identificador do evento, sem limite de data.
+// Só a primeira página é lida (no máximo 50 identificadores por consulta) e o
+// resultado é conferido contra os identificadores pedidos, para que um filtro
+// ignorado pelo Kommo nunca traga eventos que ninguém pediu.
+export async function listarMudancasDeEtapaPorIds(ids) {
+  const unicos = [...new Set(ids.map(String))].filter(Boolean);
+  const achados = [];
+  for (let i = 0; i < unicos.length; i += 50) {
+    const bloco = unicos.slice(i, i + 50);
+    const params = { "filter[entity]": "leads", "filter[type]": "lead_status_changed", limit: 250 };
+    bloco.forEach((id, j) => {
+      params[`filter[id][${j}]`] = id;
+    });
+    const r = await requisitar("/events", params);
+    if (r.status === 204 || !r.data) continue;
+    const lote = r.data?._embedded?.events || [];
+    achados.push(...lote.filter((ev) => bloco.includes(String(ev.id)) && ev.type === "lead_status_changed"));
+  }
+  return achados;
+}
+
 // Todas as mudanças de etapa de um lead, sem limite de data.
 export function listarMudancasDeEtapaDoLead(leadId) {
   return listarTudo("/events", "events", {

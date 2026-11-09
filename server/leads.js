@@ -277,6 +277,22 @@ export function aplicarCorrecoes(eventos, correcoesPorId) {
   });
 }
 
+// Identificadores das movimentações que uma correção manual passou para dentro
+// do período, mas que o Kommo registrou em outra data e por isso não vieram na
+// consulta do período. Sem elas, a correção de uma movimentação feita depois do
+// período (por exemplo, uma reunião marcada como realizada dias depois, com a
+// data corrigida para o dia certo) nunca apareceria no filtro daquele dia.
+export function idsCorrigidosParaDentroDoPeriodo({ correcoesPorId, idsJaPresentes, idsExcluidos, deTs, ateTs }) {
+  const ids = [];
+  for (const c of correcoesPorId.values()) {
+    const id = String(c.eventId);
+    if (!c.novaDataHora || idsJaPresentes.has(id) || idsExcluidos.has(id)) continue;
+    const ts = Math.floor(new Date(c.novaDataHora).getTime() / 1000);
+    if (ts >= deTs && ts <= ateTs) ids.push(id);
+  }
+  return ids;
+}
+
 // Número contido num texto digitado ("R$ 1.500,00", "1500", "850,5").
 export function numeroDoTexto(texto) {
   const bruto = String(texto ?? "").replace(/[R$\s]/gi, "");

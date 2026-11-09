@@ -31,7 +31,7 @@ import * as kommo from "./kommo.js";
 import * as google from "./google.js";
 import { mensagensDosEventos, resumirMensagens } from "./mensagens.js";
 import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
-import { nomeOficialDoResponsavel, numeroDoTexto, normalizarLeads, normalizarEvento, aplicarCorrecoes, extrairNome, extrairTelefone, chaveDoTelefone, camposDeOrigemEquivalentes } from "./leads.js";
+import { nomeOficialDoResponsavel, numeroDoTexto, normalizarLeads, normalizarEvento, aplicarCorrecoes, idsCorrigidosParaDentroDoPeriodo, extrairNome, extrairTelefone, chaveDoTelefone, camposDeOrigemEquivalentes } from "./leads.js";
 import { diasDeCalendario, calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
 import { situacaoDeHoje, analisarTrafego, consolidarLeads, agruparEComputar, agruparPorCampanhaDoNucleo, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
@@ -200,6 +200,26 @@ app.get("/api/etapas", (req, res) => {
   res.json({ etapas: ETAPAS.map((e) => ({ chave: e.chave, nome: e.nome, categoria: e.categoria })) });
 });
 
+// Eventos que uma correção manual passou para dentro do período, mas que o Kommo
+// registrou em outra data. Uma falha aqui não derruba o cálculo: o período segue
+// sem essas movimentações, como era antes.
+async function eventosTrazidosPorCorrecoes(periodo, eventosBrutos, correcoesPorId, idsExcluidos) {
+  const ids = idsCorrigidosParaDentroDoPeriodo({
+    correcoesPorId,
+    idsJaPresentes: new Set(eventosBrutos.map((ev) => String(ev.id))),
+    idsExcluidos,
+    deTs: periodo.deTs,
+    ateTs: periodo.ateTs,
+  });
+  if (!ids.length) return [];
+  try {
+    return await kommo.listarMudancasDeEtapaPorIds(ids);
+  } catch (erro) {
+    console.error("Falha ao buscar as movimentações corrigidas para dentro do período:", erro.message);
+    return [];
+  }
+}
+
 // Leads e eventos do período prontos para cálculo: sem os eventos excluídos,
 // com as correções aplicadas e agrupados por lead.
 async function prepararPeriodo(periodo) {
@@ -212,8 +232,9 @@ async function prepararPeriodo(periodo) {
   const eventosPorLead = new Map();
   let eventosDeLeadsForaDaBase = 0;
 
+  const trazidos = await eventosTrazidosPorCorrecoes(periodo, eventosBrutos, correcoesPorId, idsExcluidos);
   const eventos = aplicarCorrecoes(
-    eventosBrutos.filter((ev) => !idsExcluidos.has(String(ev.id))),
+    [...eventosBrutos, ...trazidos].filter((ev) => !idsExcluidos.has(String(ev.id))),
     correcoesPorId,
   ).map((ev) => normalizarEvento(ev, mapeamento));
 
@@ -423,7 +444,9 @@ app.get("/api/historico-completo", async (req, res) => {
     const correcoesPorId = new Map((await armazenamento.lerCorrecoes()).map((c) => [String(c.eventId), c]));
     const leadsPorId = new Map(leads.map((l) => [l.id, l]));
 
-    const eventos = aplicarCorrecoes(eventosBrutos, correcoesPorId)
+    const exclusoesIds = new Set(exclusoesPorId.keys());
+    const trazidos = await eventosTrazidosPorCorrecoes(periodo, eventosBrutos, correcoesPorId, exclusoesIds);
+    const eventos = aplicarCorrecoes([...eventosBrutos, ...trazidos], correcoesPorId)
       .map((ev) => normalizarEvento(ev, mapeamento))
       .filter((ev) => mapeamento.campanhaPorFunil.has(Number(ev.funilId)) || leadsPorId.has(ev.leadId))
       .sort((a, b) => a.ts - b.ts);
