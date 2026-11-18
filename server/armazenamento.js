@@ -126,6 +126,18 @@ export async function gravarEdicaoDeDescricao(leadId, edicao) {
   await gravar(CHAVE_DESCRICOES, todas);
 }
 
+// Data de criação (chegada) de cada lead definida pelo painel, que vale sobre a
+// do Kommo: { "<leadId>": { criadoEm (segundos), usuario, quando } }. Voltar à
+// data original apaga o registro.
+const CHAVE_DATAS_DE_CRIACAO = "hubsaude:datasdecriacao";
+export const lerDatasDeCriacao = async () => (await lerRegistro(CHAVE_DATAS_DE_CRIACAO)) || {};
+export async function gravarDataDeCriacao(leadId, registro) {
+  const todas = await lerDatasDeCriacao();
+  if (registro) todas[String(leadId)] = registro;
+  else delete todas[String(leadId)];
+  await gravar(CHAVE_DATAS_DE_CRIACAO, todas);
+}
+
 // Quem anexou cada arquivo pelo painel, e quando: { "<uuid>": { usuario, quando } }.
 const CHAVE_ANEXOS = "hubsaude:anexos";
 export const lerAutoriaDosAnexos = async () => (await lerRegistro(CHAVE_ANEXOS)) || {};

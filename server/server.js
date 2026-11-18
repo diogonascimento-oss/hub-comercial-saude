@@ -31,7 +31,7 @@ import * as kommo from "./kommo.js";
 import * as google from "./google.js";
 import { mensagensDosEventos, resumirMensagens } from "./mensagens.js";
 import { montarMapeamento, nomeDaEtapa, resolverEtapa } from "./mapeamento.js";
-import { nomeOficialDoResponsavel, numeroDoTexto, normalizarLeads, normalizarEvento, aplicarCorrecoes, idsCorrigidosParaDentroDoPeriodo, extrairNome, extrairTelefone, chaveDoTelefone, camposDeOrigemEquivalentes } from "./leads.js";
+import { nomeOficialDoResponsavel, numeroDoTexto, normalizarLeads, normalizarEvento, aplicarCorrecoes, idsCorrigidosParaDentroDoPeriodo, aplicarDatasDeCriacao, extrairNome, extrairTelefone, chaveDoTelefone, camposDeOrigemEquivalentes } from "./leads.js";
 import { diasDeCalendario, calcularEscopo, etapasParaInterface, reunioesDoLead } from "./metricas.js";
 import * as armazenamento from "./armazenamento.js";
 import { situacaoDeHoje, analisarTrafego, consolidarLeads, agruparEComputar, agruparPorCampanhaDoNucleo, mesclarCusto, combinarSemanas, compararSemanas, associarGastoDoMeta, associarInvestimentoPorCampanha } from "./trafego.js";
@@ -99,17 +99,22 @@ function obterLeads() {
     if (!mapeamento.idsDosFunis.length) return { mapeamento, leads: [] };
     const leadsBrutos = await kommo.listarLeadsDosFunis(mapeamento.idsDosFunis);
     const idsDeContatos = leadsBrutos.map((l) => l._embedded?.contacts?.[0]?.id).filter(Boolean);
-    const [contatosPorId, reunioes, definicoes] = await Promise.all([
+    const [contatosPorId, reunioes, datasDeCriacao, definicoes] = await Promise.all([
       kommo.listarContatosPorIds(idsDeContatos),
       armazenamento.lerReunioesDoPainel().catch(() => ({})),
+      armazenamento.lerDatasDeCriacao().catch(() => ({})),
       // Sem a lista de campos da conta, o painel segue só com o que está em config.js.
       camposDaConta().catch(() => []),
     ]);
     // A data marcada pelo painel vale sobre o campo do Kommo.
-    const leads = normalizarLeads(leadsBrutos, contatosPorId, mapeamento, { camposDeOrigem: camposDeOrigemEquivalentes(definicoes) }).map((l) => {
-      const r = reunioes[String(l.id)];
-      return r ? { ...l, dataDaReuniao: r.inicio || l.dataDaReuniao, linkDaReuniao: r.link || "" } : l;
-    });
+    // A data de chegada (criação) definida pelo painel também vale sobre a do Kommo.
+    const leads = aplicarDatasDeCriacao(
+      normalizarLeads(leadsBrutos, contatosPorId, mapeamento, { camposDeOrigem: camposDeOrigemEquivalentes(definicoes) }).map((l) => {
+        const r = reunioes[String(l.id)];
+        return r ? { ...l, dataDaReuniao: r.inicio || l.dataDaReuniao, linkDaReuniao: r.link || "" } : l;
+      }),
+      datasDeCriacao,
+    );
     // Marca de "(pré)" ao lado do nome: pré-qualificado pelo questionário.
     marcarPreQualificados(leads, definicoes, situacaoDeHoje);
     return { mapeamento, leads };
@@ -716,7 +721,7 @@ app.get("/api/leads/:id", async (req, res) => {
     if (!campanha) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
 
     const idContato = bruto._embedded?.contacts?.[0]?.id;
-    const [contato, eventosBrutos, exclusoes, correcoes, campoDescricao, edicoesDeDescricao, reunioesDoPainel] = await Promise.all([
+    const [contato, eventosBrutos, exclusoes, correcoes, campoDescricao, edicoesDeDescricao, reunioesDoPainel, datasDeCriacao] = await Promise.all([
       idContato ? kommo.buscarContato(idContato) : null,
       kommo.listarMudancasDeEtapaDoLead(leadId),
       armazenamento.lerExclusoes(),
@@ -724,9 +729,10 @@ app.get("/api/leads/:id", async (req, res) => {
       campoDeDescricao().catch(() => null),
       armazenamento.lerEdicoesDeDescricao().catch(() => ({})),
       armazenamento.lerReunioesDoPainel().catch(() => ({})),
+      armazenamento.lerDatasDeCriacao().catch(() => ({})),
     ]);
     const contatosPorId = new Map(contato ? [[contato.id, contato]] : []);
-    const [lead] = normalizarLeads([bruto], contatosPorId, mapeamento);
+    const [lead] = aplicarDatasDeCriacao(normalizarLeads([bruto], contatosPorId, mapeamento), datasDeCriacao);
 
     // Campos de data chegam do Kommo como número de segundos; são convertidos
     // para o horário do escritório.
@@ -810,6 +816,9 @@ app.get("/api/leads/:id", async (req, res) => {
       etapa: lead.etapaNome,
       diasNaEtapa: ultimaMudanca ? Math.floor((agora - ultimaMudanca) / 86400) : null,
       criadoEm: iso(lead.criadoEm),
+      // Preenchidos só quando a data de chegada foi alterada pelo painel.
+      criadoEmOriginal: lead.criadoEmOriginal ? iso(lead.criadoEmOriginal) : null,
+      criadoEmEditada: lead.criadoEmEditada || null,
       atualizadoEm: iso(lead.atualizadoEm),
       etiquetas: lead.tags,
       motivoPerda: lead.motivoPerda,
@@ -978,7 +987,11 @@ async function opcoesDeEdicao(leadId) {
   const doPainel = (await armazenamento.lerReunioesDoPainel().catch(() => ({})))[String(bruto.id)] || null;
   const doKommo = Number.isFinite(valorData) && valorData > 0 ? valorData : null;
   const dataDaReuniao = { nome: "Data da reunião", comHora: true, atual: doPainel?.inicio ?? doKommo, linkAtual: doPainel?.link || "", doPainel };
-  return { bruto, campanha, colunas, statusAtual: Number(bruto.status_id), responsaveis, dataDaReuniao };
+  // A data de chegada (criação) também fica só no painel; a do Kommo é a original.
+  const edicaoDeCriacao = (await armazenamento.lerDatasDeCriacao().catch(() => ({})))[String(bruto.id)] || null;
+  const criadoNoKommo = Number(bruto.created_at) || null;
+  const dataDeCriacao = { nome: "Data de chegada do lead", comHora: true, atual: edicaoDeCriacao?.criadoEm ?? criadoNoKommo, original: criadoNoKommo, editada: Boolean(edicaoDeCriacao) };
+  return { bruto, campanha, colunas, statusAtual: Number(bruto.status_id), responsaveis, dataDaReuniao, dataDeCriacao };
 }
 
 // E-mail da agenda de cada closer: o de config.js ou, se faltar, o da
@@ -1219,6 +1232,27 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
         if (linkNovo !== d.linkAtual) mudancasDoPainel.push(`link da reunião: ${linkNovo ? "atualizado" : "apagado"}`);
       }
     }
+    // Data de chegada (criação) do lead: gravada só no painel, como a da reunião.
+    // undefined = sem mudança; null = volta à data original do Kommo.
+    let criacaoNova;
+    const pedidoCriacao = corpo.dataDeCriacao;
+    if (pedidoCriacao && pedidoCriacao.valor && opcoes.dataDeCriacao?.atual) {
+      const d = opcoes.dataDeCriacao;
+      const novo = Math.floor(Number(pedidoCriacao.valor));
+      if (!Number.isFinite(novo) || novo < 946684800 || novo > Math.floor(Date.now() / 1000) + 60) {
+        return res.status(400).json({ error: "Data de chegada inválida: não pode ficar no futuro." });
+      }
+      // O campo de data do navegador não traz segundos: compara por minuto.
+      const mesmoMinuto = (a, b) => Math.floor(a / 60) === Math.floor(b / 60);
+      if (!mesmoMinuto(novo, d.atual)) {
+        if (Math.floor(Number(pedidoCriacao.anterior)) !== d.atual) {
+          return res.status(409).json({ error: "A data de chegada mudou enquanto a ficha estava aberta. A ficha foi recarregada; confira antes de salvar." });
+        }
+        criacaoNova = d.original && mesmoMinuto(novo, d.original) ? null : { criadoEm: novo, usuario, quando: new Date().toISOString() };
+        const legivelCriacao = (ts) => new Date(ts * 1000).toLocaleString("pt-BR", { timeZone: "America/Recife", dateStyle: "short", timeStyle: "short" });
+        mudancasDoPainel.push(`data de chegada do lead: ${legivelCriacao(d.atual)} → ${legivelCriacao(novo)}${criacaoNova === null ? " (original do Kommo)" : ""}`);
+      }
+    }
     if (novosCampos.length) dados.custom_fields_values = novosCampos;
 
     const pedidoAgenda = corpo.agenda && google.googleConfigurado() ? corpo.agenda : null;
@@ -1239,7 +1273,8 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
 
     if (mudancas.length) await kommo.atualizarLead(leadId, dados);
     if (reuniaoNova) await armazenamento.gravarReuniaoDoPainel(leadId, reuniaoNova);
-    if (mudancas.length || reuniaoNova) esquecerDadosEmCache();
+    if (criacaoNova !== undefined) await armazenamento.gravarDataDeCriacao(leadId, criacaoNova);
+    if (mudancas.length || reuniaoNova || criacaoNova !== undefined) esquecerDadosEmCache();
 
     let agenda = null;
     if (pedidoAgenda || destinoPerdido || (corpo.dataDaReuniao && !inicioFinal)) {

@@ -197,7 +197,7 @@ function blocoDeAlteracao() {
     <section id="blocoAlteracao" class="border border-gold/40 bg-gold/[0.04] px-3 py-2.5">
       <div class="flex items-center justify-between gap-3">
         <p class="rotulo text-goldbright">Alterar no Kommo</p>
-        <button type="button" id="btnAbrirAlteracao" class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink">Mudar etapa, data da reunião ou responsáveis</button>
+        <button type="button" id="btnAbrirAlteracao" class="text-[11px] text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink">Mudar etapa, data da reunião, data de chegada ou responsáveis</button>
       </div>
       <div id="formAlteracao" class="hidden mt-3 space-y-3"></div>
     </section>`;
@@ -241,6 +241,20 @@ function montarFormularioDeAlteracao(o) {
             </label>
           </div>
           <p class="text-[10px] text-inkfaint -mt-1">A data, a hora e o link ficam só no painel: não vão para o Kommo, para não disparar as automações de lá.</p>`
+        : ""
+    }
+    ${
+      o.dataDeCriacao?.atual
+        ? `<div class="grid grid-cols-1 sm:grid-cols-[16rem_minmax(0,1fr)] gap-2 items-end">
+            <label class="block"><span class="block text-[11px] text-inkdim">Data e hora de chegada do lead (horário de Recife)</span>
+              <input id="alteracaoCriacao" type="datetime-local" value="${paraCampoDeRecife(o.dataDeCriacao.atual, true)}" max="${paraCampoDeRecife(Math.floor(Date.now() / 1000), true)}" data-original="${paraCampoDeRecife(o.dataDeCriacao.original, true)}" class="w-full bg-surface2 border border-line px-2 py-1.5 text-ink text-xs [color-scheme:dark]">
+            </label>
+            <p class="text-[10px] text-inkfaint pb-1.5">${
+              o.dataDeCriacao.editada
+                ? `Alterada pelo painel. No Kommo: ${esc(dataHoraBr(new Date(o.dataDeCriacao.original * 1000).toISOString()))}. <button type="button" id="btnVoltarCriacao" class="text-goldbright underline decoration-dotted underline-offset-2 hover:text-ink">Voltar à original</button>`
+                : `No Kommo: ${esc(dataHoraBr(new Date(o.dataDeCriacao.original * 1000).toISOString()))}.`
+            } Fica só no painel: o Kommo não é alterado. Vale para os indicadores, as listas e o tráfego.</p>
+          </div>`
         : ""
     }
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${o.responsaveis.map(campoDoResponsavel).join("")}</div>
@@ -335,6 +349,10 @@ async function salvarAlteracao() {
     ...(opcoes.dataDaReuniao
       ? { dataDaReuniao: { valor: deCampoDeRecife($("alteracaoData").value, true), anterior: opcoes.dataDaReuniao.atual, link: $("alteracaoLink").value.trim() } }
       : {}),
+    // Só vai para o servidor se a data de chegada foi realmente mudada no campo.
+    ...(opcoes.dataDeCriacao?.atual && $("alteracaoCriacao")?.value && $("alteracaoCriacao").value !== paraCampoDeRecife(opcoes.dataDeCriacao.atual, true)
+      ? { dataDeCriacao: { valor: deCampoDeRecife($("alteracaoCriacao").value, true), anterior: opcoes.dataDeCriacao.atual } }
+      : {}),
     ...($("agendaSincronizar")
       ? {
           agenda: {
@@ -396,6 +414,7 @@ $("corpoFicha").addEventListener("click", (e) => {
   if (alvo.id === "btnAbrirAlteracao" && $("corpoFicha").dataset.lead) abrirAlteracao($("corpoFicha").dataset.lead);
   else if (alvo.id === "btnCancelarAlteracao") fecharAlteracao();
   else if (alvo.id === "btnSalvarAlteracao") salvarAlteracao();
+  else if (alvo.id === "btnVoltarCriacao" && $("alteracaoCriacao")) $("alteracaoCriacao").value = $("alteracaoCriacao").dataset.original;
 });
 
 // Mensagens do chat: horários, direção e quem enviou. O texto fica só no
@@ -743,7 +762,14 @@ function renderizarFicha(l) {
     blocoDaFicha("Situação no funil", [
       ["Campanha", esc(l.campanha)],
       ["Etapa atual", `${esc(l.etapa)}${l.diasNaEtapa !== null ? ` <span class="text-inkfaint">${l.diasNaEtapa === 0 ? "desde hoje" : `há ${numero(l.diasNaEtapa)} dia(s)`}</span>` : ""}`],
-      ["Criado em", dataHoraBr(l.criadoEm)],
+      [
+        "Criado em",
+        `${dataHoraBr(l.criadoEm)}${
+          l.criadoEmEditada
+            ? ` <span class="text-goldbright text-[10px]">alterada pelo painel${l.criadoEmEditada.usuario ? ` por ${esc(l.criadoEmEditada.usuario)}` : ""}${l.criadoEmEditada.quando ? ` em ${esc(dataHoraBr(l.criadoEmEditada.quando))}` : ""}; no Kommo: ${esc(dataHoraBr(l.criadoEmOriginal))}</span>`
+            : ""
+        }`,
+      ],
       ["Última atualização", dataHoraBr(l.atualizadoEm)],
       [
         "Reunião marcada",

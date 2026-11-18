@@ -277,6 +277,22 @@ export function aplicarCorrecoes(eventos, correcoesPorId) {
   });
 }
 
+// Data de criação (chegada) definida pelo painel, que vale sobre a do Kommo.
+// Guarda a original em criadoEmOriginal e quem editou em criadoEmEditada.
+export function aplicarDatasDeCriacao(leads, edicoes) {
+  return leads.map((lead) => {
+    const edicao = edicoes?.[String(lead.id)];
+    const novo = Number(edicao?.criadoEm);
+    if (!edicao || !Number.isFinite(novo) || novo <= 0) return lead;
+    return {
+      ...lead,
+      criadoEm: novo,
+      criadoEmOriginal: lead.criadoEm,
+      criadoEmEditada: { usuario: edicao.usuario || null, quando: edicao.quando || null },
+    };
+  });
+}
+
 // Identificadores das movimentações que uma correção manual passou para dentro
 // do período, mas que o Kommo registrou em outra data e por isso não vieram na
 // consulta do período. Sem elas, a correção de uma movimentação feita depois do
