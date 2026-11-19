@@ -91,6 +91,9 @@ async function obterMapeamento() {
 // Leads dos três funis. A consulta é a mais pesada e não depende do período,
 // por isso tem cache próprio, compartilhado entre os períodos consultados.
 let cacheLeads = null; // { em, promessa }
+// Últimos leads carregados, mesmo com o cache vencido ou descartado. Servem só
+// para sugerir nomes de responsáveis ao abrir a ficha, sem esperar nova consulta.
+let leadsConhecidos = [];
 
 function obterLeads() {
   if (cacheLeads && Date.now() - cacheLeads.em < CACHE_DADOS_MS) return cacheLeads.promessa;
@@ -117,6 +120,7 @@ function obterLeads() {
     );
     // Marca de "(pré)" ao lado do nome: pré-qualificado pelo questionário.
     marcarPreQualificados(leads, definicoes, situacaoDeHoje);
+    leadsConhecidos = leads;
     return { mapeamento, leads };
   })();
   cacheLeads = { em: Date.now(), promessa };
@@ -927,6 +931,15 @@ async function camposDaConta() {
   return valor;
 }
 
+// Motivos de perda da conta: mudam raramente, então não vão ao Kommo a cada ficha aberta.
+let motivosDePerdaEmCache = { valor: null, ate: 0 };
+async function motivosDePerda() {
+  if (motivosDePerdaEmCache.ate > Date.now()) return motivosDePerdaEmCache.valor;
+  const valor = await kommo.listarMotivosDePerda();
+  motivosDePerdaEmCache = { valor, ate: Date.now() + CACHE_FUNIS_MS };
+  return valor;
+}
+
 function esquecerDadosEmCache() {
   cacheLeads = null;
   cacheDados.clear();
@@ -938,12 +951,17 @@ const valorDoCampoBruto = (bruto, campoId) => {
 };
 
 async function opcoesDeEdicao(leadId) {
-  const [{ valor: mapeamento, funis }, bruto, campos, { leads }] = await Promise.all([
+  // Não espera a lista completa de leads: ela só dava sugestões de nomes, que
+  // saem dos leads já conhecidos. Assim a ficha abre e salva sem uma nova
+  // carga do Kommo inteiro, que era o que fazia a edição demorar.
+  const [{ valor: mapeamento, funis }, bruto, campos, reunioesDoPainel, datasDeCriacao] = await Promise.all([
     obterMapeamento(),
     kommo.buscarLead(leadId),
     camposDaConta(),
-    obterLeads(),
+    armazenamento.lerReunioesDoPainel().catch(() => ({})),
+    armazenamento.lerDatasDeCriacao().catch(() => ({})),
   ]);
+  const leads = leadsConhecidos;
   const campanha = mapeamento.campanhaPorFunil.get(Number(bruto.pipeline_id));
   if (!campanha) return null;
   const funil = funis.find((f) => Number(f.id) === Number(bruto.pipeline_id));
@@ -984,11 +1002,11 @@ async function opcoesDeEdicao(leadId) {
   const valorData = defData ? Number((bruto.custom_fields_values || []).find((c) => Number(c.field_id) === Number(defData.id))?.values?.[0]?.value) : NaN;
   // A data e o link da reunião ficam só no painel; o campo do Kommo serve
   // apenas de valor inicial, enquanto o painel não tiver um registro próprio.
-  const doPainel = (await armazenamento.lerReunioesDoPainel().catch(() => ({})))[String(bruto.id)] || null;
+  const doPainel = reunioesDoPainel[String(bruto.id)] || null;
   const doKommo = Number.isFinite(valorData) && valorData > 0 ? valorData : null;
   const dataDaReuniao = { nome: "Data da reunião", comHora: true, atual: doPainel?.inicio ?? doKommo, linkAtual: doPainel?.link || "", doPainel };
   // A data de chegada (criação) também fica só no painel; a do Kommo é a original.
-  const edicaoDeCriacao = (await armazenamento.lerDatasDeCriacao().catch(() => ({})))[String(bruto.id)] || null;
+  const edicaoDeCriacao = datasDeCriacao[String(bruto.id)] || null;
   const criadoNoKommo = Number(bruto.created_at) || null;
   const dataDeCriacao = { nome: "Data de chegada do lead", comHora: true, atual: edicaoDeCriacao?.criadoEm ?? criadoNoKommo, original: criadoNoKommo, editada: Boolean(edicaoDeCriacao) };
   return { bruto, campanha, colunas, statusAtual: Number(bruto.status_id), responsaveis, dataDaReuniao, dataDeCriacao };
@@ -1133,7 +1151,7 @@ app.get("/api/leads/:id/edicao", async (req, res) => {
   const leadId = String(req.params.id);
   if (!/^\d+$/.test(leadId)) return res.status(400).json({ error: "ID de lead inválido." });
   try {
-    const [opcoes, motivos] = await Promise.all([opcoesDeEdicao(leadId), kommo.listarMotivosDePerda().catch(() => [])]);
+    const [opcoes, motivos] = await Promise.all([opcoesDeEdicao(leadId), motivosDePerda().catch(() => [])]);
     if (!opcoes) return res.status(404).json({ error: "Lead fora dos funis acompanhados pelo painel." });
     const { bruto, ...resto } = opcoes;
     const eventos = google.googleConfigurado() ? await armazenamento.lerEventosDaAgenda().catch(() => ({})) : {};
@@ -1180,8 +1198,13 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
       dados.pipeline_id = Number(bruto.pipeline_id);
       let motivoTexto = "";
       if (destino.perdido && corpo.etapa.motivoPerdaId) {
-        const motivos = await kommo.listarMotivosDePerda();
-        const motivo = motivos.find((m) => Number(m.id) === Number(corpo.etapa.motivoPerdaId));
+        const procurar = (lista) => lista.find((m) => Number(m.id) === Number(corpo.etapa.motivoPerdaId));
+        let motivo = procurar(await motivosDePerda());
+        // Motivo criado no Kommo há pouco: confere de novo, sem o cache.
+        if (!motivo) {
+          motivosDePerdaEmCache.ate = 0;
+          motivo = procurar(await motivosDePerda());
+        }
         if (!motivo) return res.status(400).json({ error: "Motivo de perda inválido." });
         dados.loss_reason_id = Number(motivo.id);
         motivoTexto = ` (motivo: ${motivo.name})`;
@@ -1268,8 +1291,10 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
       ? corpo.dataDaReuniao ? (corpo.dataDaReuniao.valor ? Math.floor(Number(corpo.dataDaReuniao.valor)) : null) : opcoes.dataDaReuniao.atual
       : null;
     const destinoPerdido = dados.status_id ? Boolean(colunas.find((c) => c.id === dados.status_id)?.perdido) : false;
-    const { leads } = await obterLeads();
-    const leadNormalizado = leads.find((l) => String(l.id) === leadId);
+    // A lista completa de leads só é preciso para a agenda; sem agenda, a
+    // gravação não espera por ela.
+    const precisaDaAgenda = google.googleConfigurado() && Boolean(pedidoAgenda || destinoPerdido || (corpo.dataDaReuniao && !inicioFinal));
+    const leadNormalizado = precisaDaAgenda ? (await obterLeads()).leads.find((l) => String(l.id) === leadId) : null;
 
     if (mudancas.length) await kommo.atualizarLead(leadId, dados);
     if (reuniaoNova) await armazenamento.gravarReuniaoDoPainel(leadId, reuniaoNova);
@@ -1277,7 +1302,7 @@ app.put("/api/leads/:id/edicao", async (req, res) => {
     if (mudancas.length || reuniaoNova || criacaoNova !== undefined) esquecerDadosEmCache();
 
     let agenda = null;
-    if (pedidoAgenda || destinoPerdido || (corpo.dataDaReuniao && !inicioFinal)) {
+    if (precisaDaAgenda) {
       agenda = await sincronizarAgenda({
         leadId,
         bruto,
